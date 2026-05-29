@@ -1,0 +1,322 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/modals/RoomSettingsModal.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ae620a6a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ae620a6a"; const useState = __vite__cjsImport3_react["useState"]; const useRef = __vite__cjsImport3_react["useRef"];
+import { X, Image as ImageIcon, Save, Camera } from "/node_modules/.vite/deps/lucide-react.js?v=ae620a6a";
+import { updateRoom, updateRoomThumbnail } from "/src/services/roomService.ts";
+import { uploadThumbnail } from "/src/services/uploadService.ts";
+import { toast } from "/node_modules/.vite/deps/sonner.js?v=ae620a6a";
+export function RoomSettingsModal({ isOpen, room, onClose, onUpdate }) {
+  _s();
+  const [name, setName] = useState(room.name || "");
+  const [description, setDescription] = useState(room.description || "");
+  const [thumbnailUrl, setThumbnailUrl] = useState(room.thumbnailUrl || "");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  if (!isOpen) return null;
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    const result = await uploadThumbnail(file, room.id);
+    setIsUploading(false);
+    if (result.success && result.url) {
+      setThumbnailUrl(result.url);
+      await updateRoomThumbnail(room.id, result.url);
+      onUpdate({ thumbnailUrl: result.url });
+      toast.success("Cover uploaded successfully");
+    } else {
+      toast.error(result.error || "Failed to upload cover");
+    }
+  };
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Room name cannot be empty");
+      return;
+    }
+    setIsSaving(true);
+    const updates = {
+      name: name.trim(),
+      description: description.trim() || void 0
+    };
+    const { error } = await updateRoom(room.id, updates);
+    setIsSaving(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    toast.success("Room settings saved");
+    onUpdate(updates);
+    onClose();
+  };
+  return /* @__PURE__ */ jsxDEV("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "absolute inset-0 bg-black/70 backdrop-blur-sm", onClick: onClose }, void 0, false, {
+      fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+      lineNumber: 98,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "relative w-full max-w-md glass-md rounded-2xl p-6 animate-scale-in", children: [
+      /* @__PURE__ */ jsxDEV("div", { className: "flex items-center justify-between mb-6", children: [
+        /* @__PURE__ */ jsxDEV("h2", { className: "text-xl font-bold text-[#f4f4f5]", children: "Room Settings" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 101,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("button", { onClick: onClose, className: "btn-icon", children: /* @__PURE__ */ jsxDEV(X, { size: 18 }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 102,
+          columnNumber: 58
+        }, this) }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 102,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+        lineNumber: 100,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "mb-6 flex flex-col items-center", children: [
+        /* @__PURE__ */ jsxDEV(
+          "div",
+          {
+            onClick: handleAvatarClick,
+            className: "group relative w-full h-40 rounded-xl bg-white/5 border border-white/10 overflow-hidden cursor-pointer flex items-center justify-center transition-all hover:border-white/20",
+            children: [
+              thumbnailUrl ? /* @__PURE__ */ jsxDEV("img", { src: thumbnailUrl, alt: "Room Cover", className: "w-full h-full object-cover" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 111,
+                columnNumber: 13
+              }, this) : /* @__PURE__ */ jsxDEV("div", { className: "flex flex-col items-center text-[#71717a]", children: [
+                /* @__PURE__ */ jsxDEV(ImageIcon, { size: 32, className: "mb-2 opacity-50" }, void 0, false, {
+                  fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                  lineNumber: 114,
+                  columnNumber: 17
+                }, this),
+                /* @__PURE__ */ jsxDEV("span", { className: "text-sm", children: "Upload Cover" }, void 0, false, {
+                  fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                  lineNumber: 115,
+                  columnNumber: 17
+                }, this)
+              ] }, void 0, true, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 113,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("div", { className: "absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity", children: isUploading ? /* @__PURE__ */ jsxDEV("div", { className: "w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 121,
+                columnNumber: 15
+              }, this) : /* @__PURE__ */ jsxDEV(Camera, { size: 24, className: "text-white drop-shadow-md" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 123,
+                columnNumber: 15
+              }, this) }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 119,
+                columnNumber: 13
+              }, this)
+            ]
+          },
+          void 0,
+          true,
+          {
+            fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+            lineNumber: 106,
+            columnNumber: 11
+          },
+          this
+        ),
+        /* @__PURE__ */ jsxDEV(
+          "input",
+          {
+            type: "file",
+            ref: fileInputRef,
+            className: "hidden",
+            accept: "image/*",
+            onChange: handleFileChange
+          },
+          void 0,
+          false,
+          {
+            fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+            lineNumber: 127,
+            columnNumber: 11
+          },
+          this
+        ),
+        /* @__PURE__ */ jsxDEV("p", { className: "text-xs text-[#71717a] mt-2 text-center", children: "Click to upload a custom cover image" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 134,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+        lineNumber: 105,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("form", { onSubmit: handleSave, className: "space-y-4", children: [
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("label", { className: "input-label", children: "Room Name" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+            lineNumber: 141,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV(
+            "input",
+            {
+              type: "text",
+              className: "input-base",
+              value: name,
+              onChange: (e) => setName(e.target.value),
+              placeholder: "e.g. Hawaii Trip 2024",
+              maxLength: 50
+            },
+            void 0,
+            false,
+            {
+              fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+              lineNumber: 142,
+              columnNumber: 13
+            },
+            this
+          )
+        ] }, void 0, true, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 140,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("label", { className: "input-label", children: "Description (Optional)" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+            lineNumber: 153,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV(
+            "textarea",
+            {
+              className: "input-base min-h-[80px] resize-none",
+              value: description,
+              onChange: (e) => setDescription(e.target.value),
+              placeholder: "Add some details about this room...",
+              maxLength: 200
+            },
+            void 0,
+            false,
+            {
+              fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+              lineNumber: 154,
+              columnNumber: 13
+            },
+            this
+          )
+        ] }, void 0, true, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 152,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "flex gap-3 pt-2", children: [
+          /* @__PURE__ */ jsxDEV("button", { type: "button", className: "btn-secondary flex-1", onClick: onClose, children: "Cancel" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+            lineNumber: 164,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV(
+            "button",
+            {
+              type: "submit",
+              className: "btn-blue flex-1",
+              disabled: isSaving || isUploading || !name.trim(),
+              children: isSaving ? /* @__PURE__ */ jsxDEV("span", { className: "flex items-center gap-2 justify-center", children: [
+                /* @__PURE__ */ jsxDEV("span", { className: "w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" }, void 0, false, {
+                  fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                  lineNumber: 174,
+                  columnNumber: 19
+                }, this),
+                "Saving..."
+              ] }, void 0, true, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 173,
+                columnNumber: 15
+              }, this) : /* @__PURE__ */ jsxDEV("span", { className: "flex items-center gap-2 justify-center", children: [
+                /* @__PURE__ */ jsxDEV(Save, { size: 16 }, void 0, false, {
+                  fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                  lineNumber: 179,
+                  columnNumber: 19
+                }, this),
+                "Save Changes"
+              ] }, void 0, true, {
+                fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+                lineNumber: 178,
+                columnNumber: 15
+              }, this)
+            },
+            void 0,
+            false,
+            {
+              fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+              lineNumber: 167,
+              columnNumber: 13
+            },
+            this
+          )
+        ] }, void 0, true, {
+          fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+          lineNumber: 163,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+        lineNumber: 139,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+      lineNumber: 99,
+      columnNumber: 7
+    }, this)
+  ] }, void 0, true, {
+    fileName: "E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx",
+    lineNumber: 97,
+    columnNumber: 5
+  }, this);
+}
+_s(RoomSettingsModal, "72OeBARl1z/ykW0lAm9/IX3+XBA=");
+_c = RoomSettingsModal;
+var _c;
+$RefreshReg$(_c, "RoomSettingsModal");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("E:/project/cogallery/client/src/components/modals/RoomSettingsModal.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QUNDLE1BQUs7QUFBQSxjQUNMLFdBQVU7QUFBQSxjQUNWLFVBQVVXLFlBQVlGLGVBQWUsQ0FBQ04sS0FBSzBCLEtBQUs7QUFBQSxjQUUvQ2xCLHFCQUNDLHVCQUFDLFVBQUssV0FBVSwwQ0FDZDtBQUFBLHVDQUFDLFVBQUssV0FBVSxvRkFBaEI7QUFBQTtBQUFBO0FBQUE7QUFBQSx1QkFBZ0c7QUFBQTtBQUFBLG1CQURsRztBQUFBO0FBQUE7QUFBQTtBQUFBLHFCQUdBLElBRUEsdUJBQUMsVUFBSyxXQUFVLDBDQUNkO0FBQUEsdUNBQUMsUUFBSyxNQUFNLE1BQVo7QUFBQTtBQUFBO0FBQUE7QUFBQSx1QkFBZTtBQUFBO0FBQUEsbUJBRGpCO0FBQUE7QUFBQTtBQUFBO0FBQUEscUJBR0E7QUFBQTtBQUFBLFlBZEo7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBLFVBZ0JBO0FBQUEsYUFwQkY7QUFBQTtBQUFBO0FBQUE7QUFBQSxlQXFCQTtBQUFBLFdBN0NGO0FBQUE7QUFBQTtBQUFBO0FBQUEsYUE4Q0E7QUFBQSxTQXRGRjtBQUFBO0FBQUE7QUFBQTtBQUFBLFdBdUZBO0FBQUEsT0F6RkY7QUFBQTtBQUFBO0FBQUE7QUFBQSxTQTBGQTtBQUVKO0FBQUNULEdBM0plTCxtQkFBaUI7QUFBQSxLQUFqQkE7QUFBaUIsSUFBQW9DO0FBQUEsYUFBQUEsSUFBQSIsIm5hbWVzIjpbInVzZVN0YXRlIiwidXNlUmVmIiwiWCIsIkltYWdlIiwiSW1hZ2VJY29uIiwiU2F2ZSIsIkNhbWVyYSIsInVwZGF0ZVJvb20iLCJ1cGRhdGVSb29tVGh1bWJuYWlsIiwidXBsb2FkVGh1bWJuYWlsIiwidG9hc3QiLCJSb29tU2V0dGluZ3NNb2RhbCIsImlzT3BlbiIsInJvb20iLCJvbkNsb3NlIiwib25VcGRhdGUiLCJfcyIsIm5hbWUiLCJzZXROYW1lIiwiZGVzY3JpcHRpb24iLCJzZXREZXNjcmlwdGlvbiIsInRodW1ibmFpbFVybCIsInNldFRodW1ibmFpbFVybCIsImlzVXBsb2FkaW5nIiwic2V0SXNVcGxvYWRpbmciLCJpc1NhdmluZyIsInNldElzU2F2aW5nIiwiZmlsZUlucHV0UmVmIiwiaGFuZGxlQXZhdGFyQ2xpY2siLCJjdXJyZW50IiwiY2xpY2siLCJoYW5kbGVGaWxlQ2hhbmdlIiwiZSIsImZpbGUiLCJ0YXJnZXQiLCJmaWxlcyIsInJlc3VsdCIsImlkIiwic3VjY2VzcyIsInVybCIsImVycm9yIiwiaGFuZGxlU2F2ZSIsInByZXZlbnREZWZhdWx0IiwidHJpbSIsInVwZGF0ZXMiLCJ1bmRlZmluZWQiLCJ2YWx1ZSIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIlJvb21TZXR0aW5nc01vZGFsLnRzeCJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyB1c2VTdGF0ZSwgdXNlUmVmIH0gZnJvbSAncmVhY3QnXG5pbXBvcnQgeyBYLCBJbWFnZSBhcyBJbWFnZUljb24sIFNhdmUsIFRyYXNoMiwgQ2FtZXJhIH0gZnJvbSAnbHVjaWRlLXJlYWN0J1xuaW1wb3J0IHsgdXBkYXRlUm9vbSwgdXBkYXRlUm9vbVRodW1ibmFpbCB9IGZyb20gJ0Avc2VydmljZXMvcm9vbVNlcnZpY2UnXG5pbXBvcnQgeyB1cGxvYWRUaHVtYm5haWwgfSBmcm9tICdAL3NlcnZpY2VzL3VwbG9hZFNlcnZpY2UnXG5pbXBvcnQgeyB0b2FzdCB9IGZyb20gJ3Nvbm5lcidcbmltcG9ydCB0eXBlIHsgUm9vbSB9IGZyb20gJ0AvdHlwZXMnXG5cbmludGVyZmFjZSBSb29tU2V0dGluZ3NNb2RhbFByb3BzIHtcbiAgaXNPcGVuOiBib29sZWFuXG4gIHJvb206IFJvb21cbiAgb25DbG9zZTogKCkgPT4gdm9pZFxuICBvblVwZGF0ZTogKHVwZGF0ZWRSb29tOiBQYXJ0aWFsPFJvb20+KSA9PiB2b2lkXG59XG5cbmV4cG9ydCBmdW5jdGlvbiBSb29tU2V0dGluZ3NNb2RhbCh7IGlzT3Blbiwgcm9vbSwgb25DbG9zZSwgb25VcGRhdGUgfTogUm9vbVNldHRpbmdzTW9kYWxQcm9wcykge1xuICBjb25zdCBbbmFtZSwgc2V0TmFtZV0gPSB1c2VTdGF0ZShyb29tLm5hbWUgfHwgJycpXG4gIGNvbnN0IFtkZXNjcmlwdGlvbiwgc2V0RGVzY3JpcHRpb25dID0gdXNlU3RhdGUocm9vbS5kZXNjcmlwdGlvbiB8fCAnJylcbiAgY29uc3QgW3RodW1ibmFpbFVybCwgc2V0VGh1bWJuYWlsVXJsXSA9IHVzZVN0YXRlKHJvb20udGh1bWJuYWlsVXJsIHx8ICcnKVxuICBcbiAgY29uc3QgW2lzVXBsb2FkaW5nLCBzZXRJc1VwbG9hZGluZ10gPSB1c2VTdGF0ZShmYWxzZSlcbiAgY29uc3QgW2lzU2F2aW5nLCBzZXRJc1NhdmluZ10gPSB1c2VTdGF0ZShmYWxzZSlcbiAgXG4gIGNvbnN0IGZpbGVJbnB1dFJlZiA9IHVzZVJlZjxIVE1MSW5wdXRFbGVtZW50PihudWxsKVxuXG4gIGlmICghaXNPcGVuKSByZXR1cm4gbnVsbFxuXG4gIGNvbnN0IGhhbmRsZUF2YXRhckNsaWNrID0gKCkgPT4ge1xuICAgIGZpbGVJbnB1dFJlZi5jdXJyZW50Py5jbGljaygpXG4gIH1cblxuICBjb25zdCBoYW5kbGVGaWxlQ2hhbmdlID0gYXN5bmMgKGU6IFJlYWN0LkNoYW5nZUV2ZW50PEhUTUxJbnB1dEVsZW1lbnQ+KSA9PiB7XG4gICAgY29uc3QgZmlsZSA9IGUudGFyZ2V0LmZpbGVzPy5bMF1cbiAgICBpZiAoIWZpbGUpIHJldHVyblxuXG4gICAgc2V0SXNVcGxvYWRpbmcodHJ1ZSlcbiAgICAvLyBVcGxvYWQgdG8gcGhvdG9zIGJ1Y2tldCAvdGh1bWJuYWlscy9yb29tSWRcbiAgICBjb25zdCByZXN1bHQgPSBhd2FpdCB1cGxvYWRUaHVtYm5haWwoZmlsZSwgcm9vbS5pZClcbiAgICBzZXRJc1VwbG9hZGluZyhmYWxzZSlcblxuICAgIGlmIChyZXN1bHQuc3VjY2VzcyAmJiByZXN1bHQudXJsKSB7XG4gICAgICBzZXRUaHVtYm5haWxVcmwocmVzdWx0LnVybClcbiAgICAgIC8vIFNhdmUgaXQgaW1tZWRpYXRlbHkgc28gaXQgcGVyc2lzdHNcbiAgICAgIGF3YWl0IHVwZGF0ZVJvb21UaHVtYm5haWwocm9vbS5pZCwgcmVzdWx0LnVybClcbiAgICAgIG9uVXBkYXRlKHsgdGh1bWJuYWlsVXJsOiByZXN1bHQudXJsIH0pXG4gICAgICB0b2FzdC5zdWNjZXNzKCdDb3ZlciB1cGxvYWRlZCBzdWNjZXNzZnVsbHknKVxuICAgIH0gZWxzZSB7XG4gICAgICB0b2FzdC5lcnJvcihyZXN1bHQuZXJyb3IgfHwgJ0ZhaWxlZCB0byB1cGxvYWQgY292ZXInKVxuICAgIH1cbiAgfVxuXG4gIGNvbnN0IGhhbmRsZVNhdmUgPSBhc3luYyAoZTogUmVhY3QuRm9ybUV2ZW50KSA9PiB7XG4gICAgZS5wcmV2ZW50RGVmYXVsdCgpXG4gICAgaWYgKCFuYW1lLnRyaW0oKSkge1xuICAgICAgdG9hc3QuZXJyb3IoJ1Jvb20gbmFtZSBjYW5ub3QgYmUgZW1wdHknKVxuICAgICAgcmV0dXJuXG4gICAgfVxuXG4gICAgc2V0SXNTYXZpbmcodHJ1ZSlcbiAgICBjb25zdCB1cGRhdGVzID0geyBcbiAgICAgIG5hbWU6IG5hbWUudHJpbSgpLCBcbiAgICAgIGRlc2NyaXB0aW9uOiBkZXNjcmlwdGlvbi50cmltKCkgfHwgdW5kZWZpbmVkIFxuICAgIH1cbiAgICBcbiAgICBjb25zdCB7IGVycm9yIH0gPSBhd2FpdCB1cGRhdGVSb29tKHJvb20uaWQsIHVwZGF0ZXMpXG4gICAgc2V0SXNTYXZpbmcoZmFsc2UpXG5cbiAgICBpZiAoZXJyb3IpIHtcbiAgICAgIHRvYXN0LmVycm9yKGVycm9yKVxuICAgICAgcmV0dXJuXG4gICAgfVxuXG4gICAgdG9hc3Quc3VjY2VzcygnUm9vbSBzZXR0aW5ncyBzYXZlZCcpXG4gICAgb25VcGRhdGUodXBkYXRlcylcbiAgICBvbkNsb3NlKClcbiAgfVxuXG4gIHJldHVybiAoXG4gICAgPGRpdiBjbGFzc05hbWU9XCJmaXhlZCBpbnNldC0wIHotNTAgZmxleCBpdGVtcy1jZW50ZXIganVzdGlmeS1jZW50ZXIgcC00XCI+XG4gICAgICA8ZGl2IGNsYXNzTmFtZT1cImFic29sdXRlIGluc2V0LTAgYmctYmxhY2svNzAgYmFja2Ryb3AtYmx1ci1zbVwiIG9uQ2xpY2s9e29uQ2xvc2V9IC8+XG4gICAgICA8ZGl2IGNsYXNzTmFtZT1cInJlbGF0aXZlIHctZnVsbCBtYXgtdy1tZCBnbGFzcy1tZCByb3VuZGVkLTJ4bCBwLTYgYW5pbWF0ZS1zY2FsZS1pblwiPlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktYmV0d2VlbiBtYi02XCI+XG4gICAgICAgICAgPGgyIGNsYXNzTmFtZT1cInRleHQteGwgZm9udC1ib2xkIHRleHQtWyNmNGY0ZjVdXCI+Um9vbSBTZXR0aW5nczwvaDI+XG4gICAgICAgICAgPGJ1dHRvbiBvbkNsaWNrPXtvbkNsb3NlfSBjbGFzc05hbWU9XCJidG4taWNvblwiPjxYIHNpemU9ezE4fSAvPjwvYnV0dG9uPlxuICAgICAgICA8L2Rpdj5cblxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cIm1iLTYgZmxleCBmbGV4LWNvbCBpdGVtcy1jZW50ZXJcIj5cbiAgICAgICAgICA8ZGl2IFxuICAgICAgICAgICAgb25DbGljaz17aGFuZGxlQXZhdGFyQ2xpY2t9XG4gICAgICAgICAgICBjbGFzc05hbWU9XCJncm91cCByZWxhdGl2ZSB3LWZ1bGwgaC00MCByb3VuZGVkLXhsIGJnLXdoaXRlLzUgYm9yZGVyIGJvcmRlci13aGl0ZS8xMCBvdmVyZmxvdy1oaWRkZW4gY3Vyc29yLXBvaW50ZXIgZmxleCBpdGVtcy1jZW50ZXIganVzdGlmeS1jZW50ZXIgdHJhbnNpdGlvbi1hbGwgaG92ZXI6Ym9yZGVyLXdoaXRlLzIwXCJcbiAgICAgICAgICA+XG4gICAgICAgICAgICB7dGh1bWJuYWlsVXJsID8gKFxuICAgICAgICAgICAgICA8aW1nIHNyYz17dGh1bWJuYWlsVXJsfSBhbHQ9XCJSb29tIENvdmVyXCIgY2xhc3NOYW1lPVwidy1mdWxsIGgtZnVsbCBvYmplY3QtY292ZXJcIiAvPlxuICAgICAgICAgICAgKSA6IChcbiAgICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGZsZXgtY29sIGl0ZW1zLWNlbnRlciB0ZXh0LVsjNzE3MTdhXVwiPlxuICAgICAgICAgICAgICAgIDxJbWFnZUljb24gc2l6ZT17MzJ9IGNsYXNzTmFtZT1cIm1iLTIgb3BhY2l0eS01MFwiIC8+XG4gICAgICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwidGV4dC1zbVwiPlVwbG9hZCBDb3Zlcjwvc3Bhbj5cbiAgICAgICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgICApfVxuICAgICAgICAgICAgXG4gICAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImFic29sdXRlIGluc2V0LTAgYmctYmxhY2svNTAgb3BhY2l0eS0wIGdyb3VwLWhvdmVyOm9wYWNpdHktMTAwIGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIHRyYW5zaXRpb24tb3BhY2l0eVwiPlxuICAgICAgICAgICAgICB7aXNVcGxvYWRpbmcgPyAoXG4gICAgICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJ3LTYgaC02IGJvcmRlci0yIGJvcmRlci13aGl0ZS8zMCBib3JkZXItdC13aGl0ZSByb3VuZGVkLWZ1bGwgYW5pbWF0ZS1zcGluLXNsb3dcIiAvPlxuICAgICAgICAgICAgICApIDogKFxuICAgICAgICAgICAgICAgIDxDYW1lcmEgc2l6ZT17MjR9IGNsYXNzTmFtZT1cInRleHQtd2hpdGUgZHJvcC1zaGFkb3ctbWRcIiAvPlxuICAgICAgICAgICAgICApfVxuICAgICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgPGlucHV0IFxuICAgICAgICAgICAgdHlwZT1cImZpbGVcIlxuICAgICAgICAgICAgcmVmPXtmaWxlSW5wdXRSZWZ9XG4gICAgICAgICAgICBjbGFzc05hbWU9XCJoaWRkZW5cIlxuICAgICAgICAgICAgYWNjZXB0PVwiaW1hZ2UvKlwiXG4gICAgICAgICAgICBvbkNoYW5nZT17aGFuZGxlRmlsZUNoYW5nZX1cbiAgICAgICAgICAvPlxuICAgICAgICAgIDxwIGNsYXNzTmFtZT1cInRleHQteHMgdGV4dC1bIzcxNzE3YV0gbXQtMiB0ZXh0LWNlbnRlclwiPlxuICAgICAgICAgICAgQ2xpY2sgdG8gdXBsb2FkIGEgY3VzdG9tIGNvdmVyIGltYWdlXG4gICAgICAgICAgPC9wPlxuICAgICAgICA8L2Rpdj5cblxuICAgICAgICA8Zm9ybSBvblN1Ym1pdD17aGFuZGxlU2F2ZX0gY2xhc3NOYW1lPVwic3BhY2UteS00XCI+XG4gICAgICAgICAgPGRpdj5cbiAgICAgICAgICAgIDxsYWJlbCBjbGFzc05hbWU9XCJpbnB1dC1sYWJlbFwiPlJvb20gTmFtZTwvbGFiZWw+XG4gICAgICAgICAgICA8aW5wdXRcbiAgICAgICAgICAgICAgdHlwZT1cInRleHRcIlxuICAgICAgICAgICAgICBjbGFzc05hbWU9XCJpbnB1dC1iYXNlXCJcbiAgICAgICAgICAgICAgdmFsdWU9e25hbWV9XG4gICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0TmFtZShlLnRhcmdldC52YWx1ZSl9XG4gICAgICAgICAgICAgIHBsYWNlaG9sZGVyPVwiZS5nLiBIYXdhaWkgVHJpcCAyMDI0XCJcbiAgICAgICAgICAgICAgbWF4TGVuZ3RoPXs1MH1cbiAgICAgICAgICAgIC8+XG4gICAgICAgICAgPC9kaXY+XG5cbiAgICAgICAgICA8ZGl2PlxuICAgICAgICAgICAgPGxhYmVsIGNsYXNzTmFtZT1cImlucHV0LWxhYmVsXCI+RGVzY3JpcHRpb24gKE9wdGlvbmFsKTwvbGFiZWw+XG4gICAgICAgICAgICA8dGV4dGFyZWFcbiAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiaW5wdXQtYmFzZSBtaW4taC1bODBweF0gcmVzaXplLW5vbmVcIlxuICAgICAgICAgICAgICB2YWx1ZT17ZGVzY3JpcHRpb259XG4gICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0RGVzY3JpcHRpb24oZS50YXJnZXQudmFsdWUpfVxuICAgICAgICAgICAgICBwbGFjZWhvbGRlcj1cIkFkZCBzb21lIGRldGFpbHMgYWJvdXQgdGhpcyByb29tLi4uXCJcbiAgICAgICAgICAgICAgbWF4TGVuZ3RoPXsyMDB9XG4gICAgICAgICAgICAvPlxuICAgICAgICAgIDwvZGl2PlxuXG4gICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGdhcC0zIHB0LTJcIj5cbiAgICAgICAgICAgIDxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzTmFtZT1cImJ0bi1zZWNvbmRhcnkgZmxleC0xXCIgb25DbGljaz17b25DbG9zZX0+XG4gICAgICAgICAgICAgIENhbmNlbFxuICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgICA8YnV0dG9uIFxuICAgICAgICAgICAgICB0eXBlPVwic3VibWl0XCIgXG4gICAgICAgICAgICAgIGNsYXNzTmFtZT1cImJ0bi1ibHVlIGZsZXgtMVwiXG4gICAgICAgICAgICAgIGRpc2FibGVkPXtpc1NhdmluZyB8fCBpc1VwbG9hZGluZyB8fCAhbmFtZS50cmltKCl9XG4gICAgICAgICAgICA+XG4gICAgICAgICAgICAgIHtpc1NhdmluZyA/IChcbiAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtMiBqdXN0aWZ5LWNlbnRlclwiPlxuICAgICAgICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwidy00IGgtNCBib3JkZXItMiBib3JkZXItd2hpdGUvMzAgYm9yZGVyLXQtd2hpdGUgcm91bmRlZC1mdWxsIGFuaW1hdGUtc3Bpbi1zbG93XCIgLz5cbiAgICAgICAgICAgICAgICAgIFNhdmluZy4uLlxuICAgICAgICAgICAgICAgIDwvc3Bhbj5cbiAgICAgICAgICAgICAgKSA6IChcbiAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtMiBqdXN0aWZ5LWNlbnRlclwiPlxuICAgICAgICAgICAgICAgICAgPFNhdmUgc2l6ZT17MTZ9IC8+XG4gICAgICAgICAgICAgICAgICBTYXZlIENoYW5nZXNcbiAgICAgICAgICAgICAgICA8L3NwYW4+XG4gICAgICAgICAgICAgICl9XG4gICAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgPC9mb3JtPlxuICAgICAgPC9kaXY+XG4gICAgPC9kaXY+XG4gIClcbn1cbiJdLCJmaWxlIjoiRTovcHJvamVjdC9jb2dhbGxlcnkvY2xpZW50L3NyYy9jb21wb25lbnRzL21vZGFscy9Sb29tU2V0dGluZ3NNb2RhbC50c3gifQ==

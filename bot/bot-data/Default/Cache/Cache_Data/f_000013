@@ -1,0 +1,240 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/modals/CreateRoomModal.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ae620a6a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ae620a6a"; const useState = __vite__cjsImport3_react["useState"];
+import { X } from "/node_modules/.vite/deps/lucide-react.js?v=ae620a6a";
+import { createRoom } from "/src/services/roomService.ts";
+import { useAuth } from "/src/hooks/useAuth.ts";
+import { useRoomStore } from "/src/store/roomStore.ts";
+import { toast } from "/node_modules/.vite/deps/sonner.js?v=ae620a6a";
+export function CreateRoomModal({ isOpen, onClose, onCreated }) {
+  _s();
+  const { user } = useAuth();
+  const addRoom = useRoomStore((s) => s.addRoom);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  if (!isOpen) return null;
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!user || !name.trim()) return;
+    setIsLoading(true);
+    const { data, error } = await createRoom(user.id, name.trim(), description.trim() || void 0);
+    setIsLoading(false);
+    if (error || !data) {
+      toast.error(error ?? "Failed to create room");
+      return;
+    }
+    addRoom(data);
+    toast.success(`Room "${data.name}" created!`);
+    setName("");
+    setDescription("");
+    onClose();
+    onCreated?.(data.id);
+  }
+  return /* @__PURE__ */ jsxDEV("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4", onClick: onClose, children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "absolute inset-0 bg-black/70 backdrop-blur-sm" }, void 0, false, {
+      fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+      lineNumber: 65,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV(
+      "div",
+      {
+        className: "relative w-full max-w-md glass-md rounded-2xl p-6 animate-scale-in",
+        onClick: (e) => e.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxDEV("div", { className: "flex items-center justify-between mb-6", children: [
+            /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("h2", { className: "text-xl font-bold text-[#f4f4f5]", children: "Create Room" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                lineNumber: 73,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("p", { className: "text-sm text-[#a1a1aa] mt-0.5", children: "A room holds all events for a trip or occasion" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                lineNumber: 74,
+                columnNumber: 13
+              }, this)
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+              lineNumber: 72,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("button", { onClick: onClose, className: "btn-icon", children: /* @__PURE__ */ jsxDEV(X, { size: 18 }, void 0, false, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+              lineNumber: 77,
+              columnNumber: 13
+            }, this) }, void 0, false, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+              lineNumber: 76,
+              columnNumber: 11
+            }, this)
+          ] }, void 0, true, {
+            fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+            lineNumber: 71,
+            columnNumber: 9
+          }, this),
+          /* @__PURE__ */ jsxDEV("form", { onSubmit: handleSubmit, className: "space-y-4", children: [
+            /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("label", { className: "input-label", children: "Room Name *" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                lineNumber: 83,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV(
+                "input",
+                {
+                  id: "room-name",
+                  type: "text",
+                  className: "input-base",
+                  placeholder: "e.g. Goa Trip 2026",
+                  value: name,
+                  onChange: (e) => setName(e.target.value),
+                  required: true,
+                  autoFocus: true,
+                  maxLength: 80
+                },
+                void 0,
+                false,
+                {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                  lineNumber: 84,
+                  columnNumber: 13
+                },
+                this
+              )
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+              lineNumber: 82,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("label", { className: "input-label", children: "Description" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                lineNumber: 98,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV(
+                "textarea",
+                {
+                  id: "room-description",
+                  className: "input-base resize-none",
+                  placeholder: "What's this room for?",
+                  rows: 3,
+                  value: description,
+                  onChange: (e) => setDescription(e.target.value),
+                  maxLength: 500
+                },
+                void 0,
+                false,
+                {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                  lineNumber: 99,
+                  columnNumber: 13
+                },
+                this
+              )
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+              lineNumber: 97,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("div", { className: "flex gap-3 pt-2", children: [
+              /* @__PURE__ */ jsxDEV("button", { type: "button", className: "btn-secondary flex-1", onClick: onClose, children: "Cancel" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                lineNumber: 111,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV(
+                "button",
+                {
+                  id: "create-room-submit",
+                  type: "submit",
+                  className: "btn-blue flex-1",
+                  disabled: isLoading || !name.trim(),
+                  children: isLoading ? /* @__PURE__ */ jsxDEV("span", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ jsxDEV("span", { className: "w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" }, void 0, false, {
+                      fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                      lineNumber: 122,
+                      columnNumber: 19
+                    }, this),
+                    "Creating..."
+                  ] }, void 0, true, {
+                    fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                    lineNumber: 121,
+                    columnNumber: 15
+                  }, this) : "Create Room"
+                },
+                void 0,
+                false,
+                {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+                  lineNumber: 114,
+                  columnNumber: 13
+                },
+                this
+              )
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+              lineNumber: 110,
+              columnNumber: 11
+            }, this)
+          ] }, void 0, true, {
+            fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+            lineNumber: 81,
+            columnNumber: 9
+          }, this)
+        ]
+      },
+      void 0,
+      true,
+      {
+        fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+        lineNumber: 66,
+        columnNumber: 7
+      },
+      this
+    )
+  ] }, void 0, true, {
+    fileName: "E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx",
+    lineNumber: 64,
+    columnNumber: 5
+  }, this);
+}
+_s(CreateRoomModal, "ktbmrMczzjlZ+3RED59bY+6Ya/4=", false, function() {
+  return [useAuth, useRoomStore];
+});
+_c = CreateRoomModal;
+var _c;
+$RefreshReg$(_c, "CreateRoomModal");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("E:/project/cogallery/client/src/components/modals/CreateRoomModal.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QUFBQSxlQWhERjtBQUFBO0FBQUE7QUFBQTtBQUFBLGlCQWlEQTtBQUFBO0FBQUE7QUFBQSxNQWhFRjtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUEsSUFpRUE7QUFBQSxPQW5FRjtBQUFBO0FBQUE7QUFBQTtBQUFBLFNBb0VBO0FBRUo7QUFBQ1IsR0FyR2VKLGlCQUFlO0FBQUEsVUFDWkgsU0FDREMsWUFBWTtBQUFBO0FBQUEsS0FGZEU7QUFBZSxJQUFBMEI7QUFBQSxhQUFBQSxJQUFBIiwibmFtZXMiOlsidXNlU3RhdGUiLCJYIiwiY3JlYXRlUm9vbSIsInVzZUF1dGgiLCJ1c2VSb29tU3RvcmUiLCJ0b2FzdCIsIkNyZWF0ZVJvb21Nb2RhbCIsImlzT3BlbiIsIm9uQ2xvc2UiLCJvbkNyZWF0ZWQiLCJfcyIsInVzZXIiLCJhZGRSb29tIiwicyIsIm5hbWUiLCJzZXROYW1lIiwiZGVzY3JpcHRpb24iLCJzZXREZXNjcmlwdGlvbiIsImlzTG9hZGluZyIsInNldElzTG9hZGluZyIsImhhbmRsZVN1Ym1pdCIsImUiLCJwcmV2ZW50RGVmYXVsdCIsInRyaW0iLCJkYXRhIiwiZXJyb3IiLCJpZCIsInVuZGVmaW5lZCIsInN1Y2Nlc3MiLCJzdG9wUHJvcGFnYXRpb24iLCJ0YXJnZXQiLCJ2YWx1ZSIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkNyZWF0ZVJvb21Nb2RhbC50c3giXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICdyZWFjdCdcbmltcG9ydCB7IFggfSBmcm9tICdsdWNpZGUtcmVhY3QnXG5pbXBvcnQgeyBjcmVhdGVSb29tIH0gZnJvbSAnQC9zZXJ2aWNlcy9yb29tU2VydmljZSdcbmltcG9ydCB7IHVzZUF1dGggfSBmcm9tICdAL2hvb2tzL3VzZUF1dGgnXG5pbXBvcnQgeyB1c2VSb29tU3RvcmUgfSBmcm9tICdAL3N0b3JlL3Jvb21TdG9yZSdcbmltcG9ydCB7IHRvYXN0IH0gZnJvbSAnc29ubmVyJ1xuXG5pbnRlcmZhY2UgQ3JlYXRlUm9vbU1vZGFsUHJvcHMge1xuICBpc09wZW46IGJvb2xlYW5cbiAgb25DbG9zZTogKCkgPT4gdm9pZFxuICBvbkNyZWF0ZWQ/OiAocm9vbUlkOiBzdHJpbmcpID0+IHZvaWRcbn1cblxuZXhwb3J0IGZ1bmN0aW9uIENyZWF0ZVJvb21Nb2RhbCh7IGlzT3Blbiwgb25DbG9zZSwgb25DcmVhdGVkIH06IENyZWF0ZVJvb21Nb2RhbFByb3BzKSB7XG4gIGNvbnN0IHsgdXNlciB9ID0gdXNlQXV0aCgpXG4gIGNvbnN0IGFkZFJvb20gPSB1c2VSb29tU3RvcmUoKHMpID0+IHMuYWRkUm9vbSlcbiAgY29uc3QgW25hbWUsIHNldE5hbWVdID0gdXNlU3RhdGUoJycpXG4gIGNvbnN0IFtkZXNjcmlwdGlvbiwgc2V0RGVzY3JpcHRpb25dID0gdXNlU3RhdGUoJycpXG4gIGNvbnN0IFtpc0xvYWRpbmcsIHNldElzTG9hZGluZ10gPSB1c2VTdGF0ZShmYWxzZSlcblxuICBpZiAoIWlzT3BlbikgcmV0dXJuIG51bGxcblxuICBhc3luYyBmdW5jdGlvbiBoYW5kbGVTdWJtaXQoZTogUmVhY3QuRm9ybUV2ZW50KSB7XG4gICAgZS5wcmV2ZW50RGVmYXVsdCgpXG4gICAgaWYgKCF1c2VyIHx8ICFuYW1lLnRyaW0oKSkgcmV0dXJuXG5cbiAgICBzZXRJc0xvYWRpbmcodHJ1ZSlcbiAgICBjb25zdCB7IGRhdGEsIGVycm9yIH0gPSBhd2FpdCBjcmVhdGVSb29tKHVzZXIuaWQsIG5hbWUudHJpbSgpLCBkZXNjcmlwdGlvbi50cmltKCkgfHwgdW5kZWZpbmVkKVxuICAgIHNldElzTG9hZGluZyhmYWxzZSlcblxuICAgIGlmIChlcnJvciB8fCAhZGF0YSkge1xuICAgICAgdG9hc3QuZXJyb3IoZXJyb3IgPz8gJ0ZhaWxlZCB0byBjcmVhdGUgcm9vbScpXG4gICAgICByZXR1cm5cbiAgICB9XG5cbiAgICBhZGRSb29tKGRhdGEpXG4gICAgdG9hc3Quc3VjY2VzcyhgUm9vbSBcIiR7ZGF0YS5uYW1lfVwiIGNyZWF0ZWQhYClcbiAgICBzZXROYW1lKCcnKVxuICAgIHNldERlc2NyaXB0aW9uKCcnKVxuICAgIG9uQ2xvc2UoKVxuICAgIG9uQ3JlYXRlZD8uKGRhdGEuaWQpXG4gIH1cblxuICByZXR1cm4gKFxuICAgIDxkaXYgY2xhc3NOYW1lPVwiZml4ZWQgaW5zZXQtMCB6LTUwIGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIHAtNFwiIG9uQ2xpY2s9e29uQ2xvc2V9PlxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJhYnNvbHV0ZSBpbnNldC0wIGJnLWJsYWNrLzcwIGJhY2tkcm9wLWJsdXItc21cIiAvPlxuICAgICAgPGRpdlxuICAgICAgICBjbGFzc05hbWU9XCJyZWxhdGl2ZSB3LWZ1bGwgbWF4LXctbWQgZ2xhc3MtbWQgcm91bmRlZC0yeGwgcC02IGFuaW1hdGUtc2NhbGUtaW5cIlxuICAgICAgICBvbkNsaWNrPXsoZSkgPT4gZS5zdG9wUHJvcGFnYXRpb24oKX1cbiAgICAgID5cbiAgICAgICAgey8qIEhlYWRlciAqL31cbiAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWJldHdlZW4gbWItNlwiPlxuICAgICAgICAgIDxkaXY+XG4gICAgICAgICAgICA8aDIgY2xhc3NOYW1lPVwidGV4dC14bCBmb250LWJvbGQgdGV4dC1bI2Y0ZjRmNV1cIj5DcmVhdGUgUm9vbTwvaDI+XG4gICAgICAgICAgICA8cCBjbGFzc05hbWU9XCJ0ZXh0LXNtIHRleHQtWyNhMWExYWFdIG10LTAuNVwiPkEgcm9vbSBob2xkcyBhbGwgZXZlbnRzIGZvciBhIHRyaXAgb3Igb2NjYXNpb248L3A+XG4gICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgPGJ1dHRvbiBvbkNsaWNrPXtvbkNsb3NlfSBjbGFzc05hbWU9XCJidG4taWNvblwiPlxuICAgICAgICAgICAgPFggc2l6ZT17MTh9IC8+XG4gICAgICAgICAgPC9idXR0b24+XG4gICAgICAgIDwvZGl2PlxuXG4gICAgICAgIDxmb3JtIG9uU3VibWl0PXtoYW5kbGVTdWJtaXR9IGNsYXNzTmFtZT1cInNwYWNlLXktNFwiPlxuICAgICAgICAgIDxkaXY+XG4gICAgICAgICAgICA8bGFiZWwgY2xhc3NOYW1lPVwiaW5wdXQtbGFiZWxcIj5Sb29tIE5hbWUgKjwvbGFiZWw+XG4gICAgICAgICAgICA8aW5wdXRcbiAgICAgICAgICAgICAgaWQ9XCJyb29tLW5hbWVcIlxuICAgICAgICAgICAgICB0eXBlPVwidGV4dFwiXG4gICAgICAgICAgICAgIGNsYXNzTmFtZT1cImlucHV0LWJhc2VcIlxuICAgICAgICAgICAgICBwbGFjZWhvbGRlcj1cImUuZy4gR29hIFRyaXAgMjAyNlwiXG4gICAgICAgICAgICAgIHZhbHVlPXtuYW1lfVxuICAgICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IHNldE5hbWUoZS50YXJnZXQudmFsdWUpfVxuICAgICAgICAgICAgICByZXF1aXJlZFxuICAgICAgICAgICAgICBhdXRvRm9jdXNcbiAgICAgICAgICAgICAgbWF4TGVuZ3RoPXs4MH1cbiAgICAgICAgICAgIC8+XG4gICAgICAgICAgPC9kaXY+XG5cbiAgICAgICAgICA8ZGl2PlxuICAgICAgICAgICAgPGxhYmVsIGNsYXNzTmFtZT1cImlucHV0LWxhYmVsXCI+RGVzY3JpcHRpb248L2xhYmVsPlxuICAgICAgICAgICAgPHRleHRhcmVhXG4gICAgICAgICAgICAgIGlkPVwicm9vbS1kZXNjcmlwdGlvblwiXG4gICAgICAgICAgICAgIGNsYXNzTmFtZT1cImlucHV0LWJhc2UgcmVzaXplLW5vbmVcIlxuICAgICAgICAgICAgICBwbGFjZWhvbGRlcj1cIldoYXQncyB0aGlzIHJvb20gZm9yP1wiXG4gICAgICAgICAgICAgIHJvd3M9ezN9XG4gICAgICAgICAgICAgIHZhbHVlPXtkZXNjcmlwdGlvbn1cbiAgICAgICAgICAgICAgb25DaGFuZ2U9eyhlKSA9PiBzZXREZXNjcmlwdGlvbihlLnRhcmdldC52YWx1ZSl9XG4gICAgICAgICAgICAgIG1heExlbmd0aD17NTAwfVxuICAgICAgICAgICAgLz5cbiAgICAgICAgICA8L2Rpdj5cblxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiZmxleCBnYXAtMyBwdC0yXCI+XG4gICAgICAgICAgICA8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzc05hbWU9XCJidG4tc2Vjb25kYXJ5IGZsZXgtMVwiIG9uQ2xpY2s9e29uQ2xvc2V9PlxuICAgICAgICAgICAgICBDYW5jZWxcbiAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgICBpZD1cImNyZWF0ZS1yb29tLXN1Ym1pdFwiXG4gICAgICAgICAgICAgIHR5cGU9XCJzdWJtaXRcIlxuICAgICAgICAgICAgICBjbGFzc05hbWU9XCJidG4tYmx1ZSBmbGV4LTFcIlxuICAgICAgICAgICAgICBkaXNhYmxlZD17aXNMb2FkaW5nIHx8ICFuYW1lLnRyaW0oKX1cbiAgICAgICAgICAgID5cbiAgICAgICAgICAgICAge2lzTG9hZGluZyA/IChcbiAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtMlwiPlxuICAgICAgICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwidy00IGgtNCBib3JkZXItMiBib3JkZXItd2hpdGUvMzAgYm9yZGVyLXQtd2hpdGUgcm91bmRlZC1mdWxsIGFuaW1hdGUtc3Bpbi1zbG93XCIgLz5cbiAgICAgICAgICAgICAgICAgIENyZWF0aW5nLi4uXG4gICAgICAgICAgICAgICAgPC9zcGFuPlxuICAgICAgICAgICAgICApIDogKFxuICAgICAgICAgICAgICAgICdDcmVhdGUgUm9vbSdcbiAgICAgICAgICAgICAgKX1cbiAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICA8L2Zvcm0+XG4gICAgICA8L2Rpdj5cbiAgICA8L2Rpdj5cbiAgKVxufVxuIl0sImZpbGUiOiJFOi9wcm9qZWN0L2NvZ2FsbGVyeS9jbGllbnQvc3JjL2NvbXBvbmVudHMvbW9kYWxzL0NyZWF0ZVJvb21Nb2RhbC50c3gifQ==

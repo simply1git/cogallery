@@ -1,0 +1,252 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/modals/CreateEventModal.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ae620a6a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ae620a6a"; const useState = __vite__cjsImport3_react["useState"];
+import { X, CalendarDays } from "/node_modules/.vite/deps/lucide-react.js?v=ae620a6a";
+import { createEvent } from "/src/services/eventService.ts";
+import { useAuth } from "/src/hooks/useAuth.ts";
+import { toast } from "/node_modules/.vite/deps/sonner.js?v=ae620a6a";
+export function CreateEventModal({ isOpen, roomId, onClose, onCreated }) {
+  _s();
+  const { user } = useAuth();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  if (!isOpen) return null;
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!user || !title.trim()) return;
+    setIsLoading(true);
+    const { data, error } = await createEvent(roomId, title.trim(), description.trim() || void 0, user.id);
+    setIsLoading(false);
+    if (error || !data) {
+      toast.error(error ?? "Failed to create event");
+      return;
+    }
+    toast.success(`Event "${data.title}" created!`);
+    setTitle("");
+    setDescription("");
+    onClose();
+    onCreated?.(data);
+  }
+  return /* @__PURE__ */ jsxDEV("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4", onClick: onClose, children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "absolute inset-0 bg-black/70 backdrop-blur-sm" }, void 0, false, {
+      fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+      lineNumber: 64,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV(
+      "div",
+      {
+        className: "relative w-full max-w-md glass-md rounded-2xl p-6 animate-scale-in",
+        onClick: (e) => e.stopPropagation(),
+        children: [
+          /* @__PURE__ */ jsxDEV("div", { className: "flex items-center justify-between mb-6", children: [
+            /* @__PURE__ */ jsxDEV("div", { className: "flex items-center gap-3", children: [
+              /* @__PURE__ */ jsxDEV("div", { className: "w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center", children: /* @__PURE__ */ jsxDEV(CalendarDays, { size: 20, className: "text-blue-400" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                lineNumber: 72,
+                columnNumber: 15
+              }, this) }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                lineNumber: 71,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("div", { children: [
+                /* @__PURE__ */ jsxDEV("h2", { className: "text-xl font-bold text-[#f4f4f5]", children: "New Event" }, void 0, false, {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                  lineNumber: 75,
+                  columnNumber: 15
+                }, this),
+                /* @__PURE__ */ jsxDEV("p", { className: "text-sm text-[#a1a1aa]", children: "A day, theme, or occasion in this room" }, void 0, false, {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                  lineNumber: 76,
+                  columnNumber: 15
+                }, this)
+              ] }, void 0, true, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                lineNumber: 74,
+                columnNumber: 13
+              }, this)
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+              lineNumber: 70,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("button", { onClick: onClose, className: "btn-icon", children: /* @__PURE__ */ jsxDEV(X, { size: 18 }, void 0, false, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+              lineNumber: 80,
+              columnNumber: 13
+            }, this) }, void 0, false, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+              lineNumber: 79,
+              columnNumber: 11
+            }, this)
+          ] }, void 0, true, {
+            fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+            lineNumber: 69,
+            columnNumber: 9
+          }, this),
+          /* @__PURE__ */ jsxDEV("form", { onSubmit: handleSubmit, className: "space-y-4", children: [
+            /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("label", { className: "input-label", children: "Event Title *" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                lineNumber: 86,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV(
+                "input",
+                {
+                  id: "event-title",
+                  type: "text",
+                  className: "input-base",
+                  placeholder: "e.g. Day 1 — Beach",
+                  value: title,
+                  onChange: (e) => setTitle(e.target.value),
+                  required: true,
+                  autoFocus: true,
+                  maxLength: 120
+                },
+                void 0,
+                false,
+                {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                  lineNumber: 87,
+                  columnNumber: 13
+                },
+                this
+              )
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+              lineNumber: 85,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("label", { className: "input-label", children: "Description" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                lineNumber: 101,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV(
+                "textarea",
+                {
+                  id: "event-description",
+                  className: "input-base resize-none",
+                  placeholder: "What happened here?",
+                  rows: 3,
+                  value: description,
+                  onChange: (e) => setDescription(e.target.value),
+                  maxLength: 500
+                },
+                void 0,
+                false,
+                {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                  lineNumber: 102,
+                  columnNumber: 13
+                },
+                this
+              )
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+              lineNumber: 100,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("div", { className: "flex gap-3 pt-2", children: [
+              /* @__PURE__ */ jsxDEV("button", { type: "button", className: "btn-secondary flex-1", onClick: onClose, children: "Cancel" }, void 0, false, {
+                fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                lineNumber: 114,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV(
+                "button",
+                {
+                  id: "create-event-submit",
+                  type: "submit",
+                  className: "btn-blue flex-1",
+                  disabled: isLoading || !title.trim(),
+                  children: isLoading ? /* @__PURE__ */ jsxDEV("span", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ jsxDEV("span", { className: "w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" }, void 0, false, {
+                      fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                      lineNumber: 123,
+                      columnNumber: 19
+                    }, this),
+                    "Creating..."
+                  ] }, void 0, true, {
+                    fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                    lineNumber: 122,
+                    columnNumber: 15
+                  }, this) : "Create Event"
+                },
+                void 0,
+                false,
+                {
+                  fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+                  lineNumber: 115,
+                  columnNumber: 13
+                },
+                this
+              )
+            ] }, void 0, true, {
+              fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+              lineNumber: 113,
+              columnNumber: 11
+            }, this)
+          ] }, void 0, true, {
+            fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+            lineNumber: 84,
+            columnNumber: 9
+          }, this)
+        ]
+      },
+      void 0,
+      true,
+      {
+        fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+        lineNumber: 65,
+        columnNumber: 7
+      },
+      this
+    )
+  ] }, void 0, true, {
+    fileName: "E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx",
+    lineNumber: 63,
+    columnNumber: 5
+  }, this);
+}
+_s(CreateEventModal, "udY236p5pUqmgRwmD7K+Mu4wd+4=", false, function() {
+  return [useAuth];
+});
+_c = CreateEventModal;
+var _c;
+$RefreshReg$(_c, "CreateEventModal");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("E:/project/cogallery/client/src/components/modals/CreateEventModal.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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O0FBQUE7QUFBQSx5QkFHQSxJQUVBO0FBQUE7QUFBQSxnQkFaSjtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUEsY0FjQTtBQUFBLGlCQWhCRjtBQUFBO0FBQUE7QUFBQTtBQUFBLG1CQWlCQTtBQUFBLGVBOUNGO0FBQUE7QUFBQTtBQUFBO0FBQUEsaUJBK0NBO0FBQUE7QUFBQTtBQUFBLE1BbEVGO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQSxJQW1FQTtBQUFBLE9BckVGO0FBQUE7QUFBQTtBQUFBO0FBQUEsU0FzRUE7QUFFSjtBQUFDTixHQXJHZUwsa0JBQWdCO0FBQUEsVUFDYkYsT0FBTztBQUFBO0FBQUEsS0FEVkU7QUFBZ0IsSUFBQXlCO0FBQUEsYUFBQUEsSUFBQSIsIm5hbWVzIjpbInVzZVN0YXRlIiwiWCIsIkNhbGVuZGFyRGF5cyIsImNyZWF0ZUV2ZW50IiwidXNlQXV0aCIsInRvYXN0IiwiQ3JlYXRlRXZlbnRNb2RhbCIsImlzT3BlbiIsInJvb21JZCIsIm9uQ2xvc2UiLCJvbkNyZWF0ZWQiLCJfcyIsInVzZXIiLCJ0aXRsZSIsInNldFRpdGxlIiwiZGVzY3JpcHRpb24iLCJzZXREZXNjcmlwdGlvbiIsImlzTG9hZGluZyIsInNldElzTG9hZGluZyIsImhhbmRsZVN1Ym1pdCIsImUiLCJwcmV2ZW50RGVmYXVsdCIsInRyaW0iLCJkYXRhIiwiZXJyb3IiLCJ1bmRlZmluZWQiLCJpZCIsInN1Y2Nlc3MiLCJzdG9wUHJvcGFnYXRpb24iLCJ0YXJnZXQiLCJ2YWx1ZSIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkNyZWF0ZUV2ZW50TW9kYWwudHN4Il0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IHVzZVN0YXRlIH0gZnJvbSAncmVhY3QnXG5pbXBvcnQgeyBYLCBDYWxlbmRhckRheXMgfSBmcm9tICdsdWNpZGUtcmVhY3QnXG5pbXBvcnQgeyBjcmVhdGVFdmVudCB9IGZyb20gJ0Avc2VydmljZXMvZXZlbnRTZXJ2aWNlJ1xuaW1wb3J0IHsgdXNlQXV0aCB9IGZyb20gJ0AvaG9va3MvdXNlQXV0aCdcbmltcG9ydCB7IHRvYXN0IH0gZnJvbSAnc29ubmVyJ1xuaW1wb3J0IHR5cGUgeyBFdmVudCB9IGZyb20gJ0AvdHlwZXMnXG5cbmludGVyZmFjZSBDcmVhdGVFdmVudE1vZGFsUHJvcHMge1xuICBpc09wZW46IGJvb2xlYW5cbiAgcm9vbUlkOiBzdHJpbmdcbiAgb25DbG9zZTogKCkgPT4gdm9pZFxuICBvbkNyZWF0ZWQ/OiAoZXZlbnQ6IEV2ZW50KSA9PiB2b2lkXG59XG5cbmV4cG9ydCBmdW5jdGlvbiBDcmVhdGVFdmVudE1vZGFsKHsgaXNPcGVuLCByb29tSWQsIG9uQ2xvc2UsIG9uQ3JlYXRlZCB9OiBDcmVhdGVFdmVudE1vZGFsUHJvcHMpIHtcbiAgY29uc3QgeyB1c2VyIH0gPSB1c2VBdXRoKClcbiAgY29uc3QgW3RpdGxlLCBzZXRUaXRsZV0gPSB1c2VTdGF0ZSgnJylcbiAgY29uc3QgW2Rlc2NyaXB0aW9uLCBzZXREZXNjcmlwdGlvbl0gPSB1c2VTdGF0ZSgnJylcbiAgY29uc3QgW2lzTG9hZGluZywgc2V0SXNMb2FkaW5nXSA9IHVzZVN0YXRlKGZhbHNlKVxuXG4gIGlmICghaXNPcGVuKSByZXR1cm4gbnVsbFxuXG4gIGFzeW5jIGZ1bmN0aW9uIGhhbmRsZVN1Ym1pdChlOiBSZWFjdC5Gb3JtRXZlbnQpIHtcbiAgICBlLnByZXZlbnREZWZhdWx0KClcbiAgICBpZiAoIXVzZXIgfHwgIXRpdGxlLnRyaW0oKSkgcmV0dXJuXG5cbiAgICBzZXRJc0xvYWRpbmcodHJ1ZSlcbiAgICBjb25zdCB7IGRhdGEsIGVycm9yIH0gPSBhd2FpdCBjcmVhdGVFdmVudChyb29tSWQsIHRpdGxlLnRyaW0oKSwgZGVzY3JpcHRpb24udHJpbSgpIHx8IHVuZGVmaW5lZCwgdXNlci5pZClcbiAgICBzZXRJc0xvYWRpbmcoZmFsc2UpXG5cbiAgICBpZiAoZXJyb3IgfHwgIWRhdGEpIHtcbiAgICAgIHRvYXN0LmVycm9yKGVycm9yID8/ICdGYWlsZWQgdG8gY3JlYXRlIGV2ZW50JylcbiAgICAgIHJldHVyblxuICAgIH1cblxuICAgIHRvYXN0LnN1Y2Nlc3MoYEV2ZW50IFwiJHtkYXRhLnRpdGxlfVwiIGNyZWF0ZWQhYClcbiAgICBzZXRUaXRsZSgnJylcbiAgICBzZXREZXNjcmlwdGlvbignJylcbiAgICBvbkNsb3NlKClcbiAgICBvbkNyZWF0ZWQ/LihkYXRhKVxuICB9XG5cbiAgcmV0dXJuIChcbiAgICA8ZGl2IGNsYXNzTmFtZT1cImZpeGVkIGluc2V0LTAgei01MCBmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWNlbnRlciBwLTRcIiBvbkNsaWNrPXtvbkNsb3NlfT5cbiAgICAgIDxkaXYgY2xhc3NOYW1lPVwiYWJzb2x1dGUgaW5zZXQtMCBiZy1ibGFjay83MCBiYWNrZHJvcC1ibHVyLXNtXCIgLz5cbiAgICAgIDxkaXZcbiAgICAgICAgY2xhc3NOYW1lPVwicmVsYXRpdmUgdy1mdWxsIG1heC13LW1kIGdsYXNzLW1kIHJvdW5kZWQtMnhsIHAtNiBhbmltYXRlLXNjYWxlLWluXCJcbiAgICAgICAgb25DbGljaz17KGUpID0+IGUuc3RvcFByb3BhZ2F0aW9uKCl9XG4gICAgICA+XG4gICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiZmxleCBpdGVtcy1jZW50ZXIganVzdGlmeS1iZXR3ZWVuIG1iLTZcIj5cbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGdhcC0zXCI+XG4gICAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInctMTAgaC0xMCByb3VuZGVkLXhsIGJnLWJsdWUtNTAwLzE1IGJvcmRlciBib3JkZXItYmx1ZS01MDAvMjUgZmxleCBpdGVtcy1jZW50ZXIganVzdGlmeS1jZW50ZXJcIj5cbiAgICAgICAgICAgICAgPENhbGVuZGFyRGF5cyBzaXplPXsyMH0gY2xhc3NOYW1lPVwidGV4dC1ibHVlLTQwMFwiIC8+XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgIDxkaXY+XG4gICAgICAgICAgICAgIDxoMiBjbGFzc05hbWU9XCJ0ZXh0LXhsIGZvbnQtYm9sZCB0ZXh0LVsjZjRmNGY1XVwiPk5ldyBFdmVudDwvaDI+XG4gICAgICAgICAgICAgIDxwIGNsYXNzTmFtZT1cInRleHQtc20gdGV4dC1bI2ExYTFhYV1cIj5BIGRheSwgdGhlbWUsIG9yIG9jY2FzaW9uIGluIHRoaXMgcm9vbTwvcD5cbiAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgIDxidXR0b24gb25DbGljaz17b25DbG9zZX0gY2xhc3NOYW1lPVwiYnRuLWljb25cIj5cbiAgICAgICAgICAgIDxYIHNpemU9ezE4fSAvPlxuICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICA8L2Rpdj5cblxuICAgICAgICA8Zm9ybSBvblN1Ym1pdD17aGFuZGxlU3VibWl0fSBjbGFzc05hbWU9XCJzcGFjZS15LTRcIj5cbiAgICAgICAgICA8ZGl2PlxuICAgICAgICAgICAgPGxhYmVsIGNsYXNzTmFtZT1cImlucHV0LWxhYmVsXCI+RXZlbnQgVGl0bGUgKjwvbGFiZWw+XG4gICAgICAgICAgICA8aW5wdXRcbiAgICAgICAgICAgICAgaWQ9XCJldmVudC10aXRsZVwiXG4gICAgICAgICAgICAgIHR5cGU9XCJ0ZXh0XCJcbiAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiaW5wdXQtYmFzZVwiXG4gICAgICAgICAgICAgIHBsYWNlaG9sZGVyPVwiZS5nLiBEYXkgMSDigJQgQmVhY2hcIlxuICAgICAgICAgICAgICB2YWx1ZT17dGl0bGV9XG4gICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0VGl0bGUoZS50YXJnZXQudmFsdWUpfVxuICAgICAgICAgICAgICByZXF1aXJlZFxuICAgICAgICAgICAgICBhdXRvRm9jdXNcbiAgICAgICAgICAgICAgbWF4TGVuZ3RoPXsxMjB9XG4gICAgICAgICAgICAvPlxuICAgICAgICAgIDwvZGl2PlxuXG4gICAgICAgICAgPGRpdj5cbiAgICAgICAgICAgIDxsYWJlbCBjbGFzc05hbWU9XCJpbnB1dC1sYWJlbFwiPkRlc2NyaXB0aW9uPC9sYWJlbD5cbiAgICAgICAgICAgIDx0ZXh0YXJlYVxuICAgICAgICAgICAgICBpZD1cImV2ZW50LWRlc2NyaXB0aW9uXCJcbiAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiaW5wdXQtYmFzZSByZXNpemUtbm9uZVwiXG4gICAgICAgICAgICAgIHBsYWNlaG9sZGVyPVwiV2hhdCBoYXBwZW5lZCBoZXJlP1wiXG4gICAgICAgICAgICAgIHJvd3M9ezN9XG4gICAgICAgICAgICAgIHZhbHVlPXtkZXNjcmlwdGlvbn1cbiAgICAgICAgICAgICAgb25DaGFuZ2U9eyhlKSA9PiBzZXREZXNjcmlwdGlvbihlLnRhcmdldC52YWx1ZSl9XG4gICAgICAgICAgICAgIG1heExlbmd0aD17NTAwfVxuICAgICAgICAgICAgLz5cbiAgICAgICAgICA8L2Rpdj5cblxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiZmxleCBnYXAtMyBwdC0yXCI+XG4gICAgICAgICAgICA8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzc05hbWU9XCJidG4tc2Vjb25kYXJ5IGZsZXgtMVwiIG9uQ2xpY2s9e29uQ2xvc2V9PkNhbmNlbDwvYnV0dG9uPlxuICAgICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgICBpZD1cImNyZWF0ZS1ldmVudC1zdWJtaXRcIlxuICAgICAgICAgICAgICB0eXBlPVwic3VibWl0XCJcbiAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiYnRuLWJsdWUgZmxleC0xXCJcbiAgICAgICAgICAgICAgZGlzYWJsZWQ9e2lzTG9hZGluZyB8fCAhdGl0bGUudHJpbSgpfVxuICAgICAgICAgICAgPlxuICAgICAgICAgICAgICB7aXNMb2FkaW5nID8gKFxuICAgICAgICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGdhcC0yXCI+XG4gICAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ3LTQgaC00IGJvcmRlci0yIGJvcmRlci13aGl0ZS8zMCBib3JkZXItdC13aGl0ZSByb3VuZGVkLWZ1bGwgYW5pbWF0ZS1zcGluLXNsb3dcIiAvPlxuICAgICAgICAgICAgICAgICAgQ3JlYXRpbmcuLi5cbiAgICAgICAgICAgICAgICA8L3NwYW4+XG4gICAgICAgICAgICAgICkgOiAoXG4gICAgICAgICAgICAgICAgJ0NyZWF0ZSBFdmVudCdcbiAgICAgICAgICAgICAgKX1cbiAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICA8L2Zvcm0+XG4gICAgICA8L2Rpdj5cbiAgICA8L2Rpdj5cbiAgKVxufVxuIl0sImZpbGUiOiJFOi9wcm9qZWN0L2NvZ2FsbGVyeS9jbGllbnQvc3JjL2NvbXBvbmVudHMvbW9kYWxzL0NyZWF0ZUV2ZW50TW9kYWwudHN4In0=

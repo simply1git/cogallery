@@ -1,0 +1,242 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/shared/Footer.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ae620a6a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("E:/project/cogallery/client/src/components/shared/Footer.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+export function Footer() {
+  const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+  return /* @__PURE__ */ jsxDEV("footer", { className: "border-t border-white/10 bg-[#0f0f0f]", children: /* @__PURE__ */ jsxDEV("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "grid grid-cols-1 md:grid-cols-4 gap-8 mb-8", children: [
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("h3", { className: "text-sm font-semibold text-[#f4f4f5] mb-4", children: "CoGallery" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 29,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("p", { className: "text-sm text-[#a1a1aa]", children: "Permanent photo sharing for trips, events & memories." }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 30,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+        lineNumber: 28,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("h4", { className: "text-sm font-semibold text-[#f4f4f5] mb-4", children: "Product" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 37,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("ul", { className: "space-y-2 text-sm text-[#a1a1aa]", children: [
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#features", className: "hover:text-[#f4f4f5]", children: "Features" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 39,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 39,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#pricing", className: "hover:text-[#f4f4f5]", children: "Pricing" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 40,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 40,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#roadmap", className: "hover:text-[#f4f4f5]", children: "Roadmap" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 41,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 41,
+            columnNumber: 15
+          }, this)
+        ] }, void 0, true, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 38,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+        lineNumber: 36,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("h4", { className: "text-sm font-semibold text-[#f4f4f5] mb-4", children: "Resources" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 47,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("ul", { className: "space-y-2 text-sm text-[#a1a1aa]", children: [
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#docs", className: "hover:text-[#f4f4f5]", children: "Documentation" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 49,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 49,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#blog", className: "hover:text-[#f4f4f5]", children: "Blog" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 50,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 50,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#support", className: "hover:text-[#f4f4f5]", children: "Support" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 51,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 51,
+            columnNumber: 15
+          }, this)
+        ] }, void 0, true, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 48,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+        lineNumber: 46,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("h4", { className: "text-sm font-semibold text-[#f4f4f5] mb-4", children: "Legal" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 57,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("ul", { className: "space-y-2 text-sm text-[#a1a1aa]", children: [
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#privacy", className: "hover:text-[#f4f4f5]", children: "Privacy" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 59,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 59,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#terms", className: "hover:text-[#f4f4f5]", children: "Terms" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 60,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 60,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("li", { children: /* @__PURE__ */ jsxDEV("a", { href: "#contact", className: "hover:text-[#f4f4f5]", children: "Contact" }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 61,
+            columnNumber: 19
+          }, this) }, void 0, false, {
+            fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+            lineNumber: 61,
+            columnNumber: 15
+          }, this)
+        ] }, void 0, true, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 58,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+        lineNumber: 56,
+        columnNumber: 11
+      }, this)
+    ] }, void 0, true, {
+      fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+      lineNumber: 26,
+      columnNumber: 9
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "border-t border-white/10 pt-8", children: /* @__PURE__ */ jsxDEV("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsxDEV("p", { className: "text-sm text-[#a1a1aa]", children: [
+        "© ",
+        currentYear,
+        " CoGallery. All rights reserved."
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+        lineNumber: 69,
+        columnNumber: 13
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "flex items-center gap-4", children: [
+        /* @__PURE__ */ jsxDEV("a", { href: "#twitter", className: "text-[#52525b] hover:text-[#a1a1aa] transition-colors", children: "Twitter" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 73,
+          columnNumber: 15
+        }, this),
+        /* @__PURE__ */ jsxDEV("a", { href: "#github", className: "text-[#52525b] hover:text-[#a1a1aa] transition-colors", children: "GitHub" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 76,
+          columnNumber: 15
+        }, this),
+        /* @__PURE__ */ jsxDEV("a", { href: "#discord", className: "text-[#52525b] hover:text-[#a1a1aa] transition-colors", children: "Discord" }, void 0, false, {
+          fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+          lineNumber: 79,
+          columnNumber: 15
+        }, this)
+      ] }, void 0, true, {
+        fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+        lineNumber: 72,
+        columnNumber: 13
+      }, this)
+    ] }, void 0, true, {
+      fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+      lineNumber: 68,
+      columnNumber: 11
+    }, this) }, void 0, false, {
+      fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+      lineNumber: 67,
+      columnNumber: 9
+    }, this)
+  ] }, void 0, true, {
+    fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+    lineNumber: 25,
+    columnNumber: 7
+  }, this) }, void 0, false, {
+    fileName: "E:/project/cogallery/client/src/components/shared/Footer.tsx",
+    lineNumber: 24,
+    columnNumber: 5
+  }, this);
+}
+_c = Footer;
+var _c;
+$RefreshReg$(_c, "Footer");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("E:/project/cogallery/client/src/components/shared/Footer.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("E:/project/cogallery/client/src/components/shared/Footer.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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WWVhciIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkZvb3Rlci50c3giXSwic291cmNlc0NvbnRlbnQiOlsiZXhwb3J0IGZ1bmN0aW9uIEZvb3RlcigpIHtcclxuICBjb25zdCBjdXJyZW50WWVhciA9IG5ldyBEYXRlKCkuZ2V0RnVsbFllYXIoKVxyXG5cclxuICByZXR1cm4gKFxyXG4gICAgPGZvb3RlciBjbGFzc05hbWU9XCJib3JkZXItdCBib3JkZXItd2hpdGUvMTAgYmctWyMwZjBmMGZdXCI+XHJcbiAgICAgIDxkaXYgY2xhc3NOYW1lPVwibWF4LXctN3hsIG14LWF1dG8gcHgtNCBzbTpweC02IGxnOnB4LTggcHktMTJcIj5cclxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImdyaWQgZ3JpZC1jb2xzLTEgbWQ6Z3JpZC1jb2xzLTQgZ2FwLTggbWItOFwiPlxyXG4gICAgICAgICAgey8qIEJyYW5kICovfVxyXG4gICAgICAgICAgPGRpdj5cclxuICAgICAgICAgICAgPGgzIGNsYXNzTmFtZT1cInRleHQtc20gZm9udC1zZW1pYm9sZCB0ZXh0LVsjZjRmNGY1XSBtYi00XCI+Q29HYWxsZXJ5PC9oMz5cclxuICAgICAgICAgICAgPHAgY2xhc3NOYW1lPVwidGV4dC1zbSB0ZXh0LVsjYTFhMWFhXVwiPlxyXG4gICAgICAgICAgICAgIFBlcm1hbmVudCBwaG90byBzaGFyaW5nIGZvciB0cmlwcywgZXZlbnRzICYgbWVtb3JpZXMuXHJcbiAgICAgICAgICAgIDwvcD5cclxuICAgICAgICAgIDwvZGl2PlxyXG5cclxuICAgICAgICAgIHsvKiBQcm9kdWN0ICovfVxyXG4gICAgICAgICAgPGRpdj5cclxuICAgICAgICAgICAgPGg0IGNsYXNzTmFtZT1cInRleHQtc20gZm9udC1zZW1pYm9sZCB0ZXh0LVsjZjRmNGY1XSBtYi00XCI+UHJvZHVjdDwvaDQ+XHJcbiAgICAgICAgICAgIDx1bCBjbGFzc05hbWU9XCJzcGFjZS15LTIgdGV4dC1zbSB0ZXh0LVsjYTFhMWFhXVwiPlxyXG4gICAgICAgICAgICAgIDxsaT48YSBocmVmPVwiI2ZlYXR1cmVzXCIgY2xhc3NOYW1lPVwiaG92ZXI6dGV4dC1bI2Y0ZjRmNV1cIj5GZWF0dXJlczwvYT48L2xpPlxyXG4gICAgICAgICAgICAgIDxsaT48YSBocmVmPVwiI3ByaWNpbmdcIiBjbGFzc05hbWU9XCJob3Zlcjp0ZXh0LVsjZjRmNGY1XVwiPlByaWNpbmc8L2E+PC9saT5cclxuICAgICAgICAgICAgICA8bGk+PGEgaHJlZj1cIiNyb2FkbWFwXCIgY2xhc3NOYW1lPVwiaG92ZXI6dGV4dC1bI2Y0ZjRmNV1cIj5Sb2FkbWFwPC9hPjwvbGk+XHJcbiAgICAgICAgICAgIDwvdWw+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuXHJcbiAgICAgICAgICB7LyogUmVzb3VyY2VzICovfVxyXG4gICAgICAgICAgPGRpdj5cclxuICAgICAgICAgICAgPGg0IGNsYXNzTmFtZT1cInRleHQtc20gZm9udC1zZW1pYm9sZCB0ZXh0LVsjZjRmNGY1XSBtYi00XCI+UmVzb3VyY2VzPC9oND5cclxuICAgICAgICAgICAgPHVsIGNsYXNzTmFtZT1cInNwYWNlLXktMiB0ZXh0LXNtIHRleHQtWyNhMWExYWFdXCI+XHJcbiAgICAgICAgICAgICAgPGxpPjxhIGhyZWY9XCIjZG9jc1wiIGNsYXNzTmFtZT1cImhvdmVyOnRleHQtWyNmNGY0ZjVdXCI+RG9jdW1lbnRhdGlvbjwvYT48L2xpPlxyXG4gICAgICAgICAgICAgIDxsaT48YSBocmVmPVwiI2Jsb2dcIiBjbGFzc05hbWU9XCJob3Zlcjp0ZXh0LVsjZjRmNGY1XVwiPkJsb2c8L2E+PC9saT5cclxuICAgICAgICAgICAgICA8bGk+PGEgaHJlZj1cIiNzdXBwb3J0XCIgY2xhc3NOYW1lPVwiaG92ZXI6dGV4dC1bI2Y0ZjRmNV1cIj5TdXBwb3J0PC9hPjwvbGk+XHJcbiAgICAgICAgICAgIDwvdWw+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuXHJcbiAgICAgICAgICB7LyogTGVnYWwgKi99XHJcbiAgICAgICAgICA8ZGl2PlxyXG4gICAgICAgICAgICA8aDQgY2xhc3NOYW1lPVwidGV4dC1zbSBmb250LXNlbWlib2xkIHRleHQtWyNmNGY0ZjVdIG1iLTRcIj5MZWdhbDwvaDQ+XHJcbiAgICAgICAgICAgIDx1bCBjbGFzc05hbWU9XCJzcGFjZS15LTIgdGV4dC1zbSB0ZXh0LVsjYTFhMWFhXVwiPlxyXG4gICAgICAgICAgICAgIDxsaT48YSBocmVmPVwiI3ByaXZhY3lcIiBjbGFzc05hbWU9XCJob3Zlcjp0ZXh0LVsjZjRmNGY1XVwiPlByaXZhY3k8L2E+PC9saT5cclxuICAgICAgICAgICAgICA8bGk+PGEgaHJlZj1cIiN0ZXJtc1wiIGNsYXNzTmFtZT1cImhvdmVyOnRleHQtWyNmNGY0ZjVdXCI+VGVybXM8L2E+PC9saT5cclxuICAgICAgICAgICAgICA8bGk+PGEgaHJlZj1cIiNjb250YWN0XCIgY2xhc3NOYW1lPVwiaG92ZXI6dGV4dC1bI2Y0ZjRmNV1cIj5Db250YWN0PC9hPjwvbGk+XHJcbiAgICAgICAgICAgIDwvdWw+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuICAgICAgICA8L2Rpdj5cclxuXHJcbiAgICAgICAgey8qIEJvdHRvbSAqL31cclxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImJvcmRlci10IGJvcmRlci13aGl0ZS8xMCBwdC04XCI+XHJcbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktYmV0d2VlblwiPlxyXG4gICAgICAgICAgICA8cCBjbGFzc05hbWU9XCJ0ZXh0LXNtIHRleHQtWyNhMWExYWFdXCI+XHJcbiAgICAgICAgICAgICAgwqkge2N1cnJlbnRZZWFyfSBDb0dhbGxlcnkuIEFsbCByaWdodHMgcmVzZXJ2ZWQuXHJcbiAgICAgICAgICAgIDwvcD5cclxuICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtNFwiPlxyXG4gICAgICAgICAgICAgIDxhIGhyZWY9XCIjdHdpdHRlclwiIGNsYXNzTmFtZT1cInRleHQtWyM1MjUyNWJdIGhvdmVyOnRleHQtWyNhMWExYWFdIHRyYW5zaXRpb24tY29sb3JzXCI+XHJcbiAgICAgICAgICAgICAgICBUd2l0dGVyXHJcbiAgICAgICAgICAgICAgPC9hPlxyXG4gICAgICAgICAgICAgIDxhIGhyZWY9XCIjZ2l0aHViXCIgY2xhc3NOYW1lPVwidGV4dC1bIzUyNTI1Yl0gaG92ZXI6dGV4dC1bI2ExYTFhYV0gdHJhbnNpdGlvbi1jb2xvcnNcIj5cclxuICAgICAgICAgICAgICAgIEdpdEh1YlxyXG4gICAgICAgICAgICAgIDwvYT5cclxuICAgICAgICAgICAgICA8YSBocmVmPVwiI2Rpc2NvcmRcIiBjbGFzc05hbWU9XCJ0ZXh0LVsjNTI1MjViXSBob3Zlcjp0ZXh0LVsjYTFhMWFhXSB0cmFuc2l0aW9uLWNvbG9yc1wiPlxyXG4gICAgICAgICAgICAgICAgRGlzY29yZFxyXG4gICAgICAgICAgICAgIDwvYT5cclxuICAgICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuICAgICAgICA8L2Rpdj5cclxuICAgICAgPC9kaXY+XHJcbiAgICA8L2Zvb3Rlcj5cclxuICApXHJcbn1cclxuIl0sImZpbGUiOiJFOi9wcm9qZWN0L2NvZ2FsbGVyeS9jbGllbnQvc3JjL2NvbXBvbmVudHMvc2hhcmVkL0Zvb3Rlci50c3gifQ==
