@@ -210,9 +210,9 @@ export function PhotoDetailModal({
       )}
 
       {/* Main content */}
-      <div className="flex w-full h-full max-w-7xl mx-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-col md:flex-row w-full h-full max-w-7xl mx-auto" onClick={(e) => e.stopPropagation()}>
         {/* Media area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 min-w-0 relative">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 min-w-0 relative h-1/2 md:h-full">
           
           {/* P2P Status Overlay */}
           {photo.s3Key.startsWith('p2p:') && p2pStatus !== 'done' && (
@@ -274,7 +274,7 @@ export function PhotoDetailModal({
         </div>
 
         {/* Side panel */}
-        <div className="w-80 flex-shrink-0 flex flex-col bg-[#0a0a0a] border-l border-white/[0.08]">
+        <div className="w-full md:w-80 flex-shrink-0 flex flex-col bg-[#0a0a0a] border-t md:border-t-0 md:border-l border-white/[0.08] h-1/2 md:h-full">
           {/* Top actions */}
           <div className="p-4 border-b border-white/[0.08] flex items-center justify-between">
             <span className="text-sm font-medium text-[#f4f4f5] truncate flex-1 mr-2">

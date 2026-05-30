@@ -75,8 +75,8 @@ function getOrCreateChannel(eventId: string, userId: string) {
         }))
 
         // High-performance streaming configuration
-        const MAX_CHUNK_SIZE = 16 * 1024 // 16KB chunks for maximum mobile/iOS compatibility
-        dc.bufferedAmountLowThreshold = 65536 // 64KB threshold for back-pressure
+        const MAX_CHUNK_SIZE = 64 * 1024 // 64KB chunks for maximum throughput
+        dc.bufferedAmountLowThreshold = 2 * 1024 * 1024 // 2MB threshold for back-pressure
 
         const buffer = await cached.blob.arrayBuffer()
         let offset = 0

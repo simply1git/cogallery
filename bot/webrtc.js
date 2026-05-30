@@ -37,8 +37,8 @@ export async function handleFileRequest(payload, channel, activePeers) {
       size: cached.size,
     }))
 
-    const MAX_CHUNK_SIZE = 16 * 1024 // 16KB
-    const LOW_THRESHOLD = 65536 // 64KB
+    const MAX_CHUNK_SIZE = 64 * 1024 // 64KB
+    const LOW_THRESHOLD = 2 * 1024 * 1024 // 2MB
 
     let offset = 0
     const total = cached.size
