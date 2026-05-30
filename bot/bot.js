@@ -51,7 +51,24 @@ async function main() {
   // 2. Fetch all events and start listening
   await seedExistingFiles(userId)
 
-  // 3. Keep alive and handle graceful shutdown
+  // 3. Listen for new photos being uploaded in real-time
+  console.log("👂 Listening for new photo uploads...")
+  supabase.channel('db-changes')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'photos' }, (payload) => {
+      const photo = payload.new
+      console.log(`📸 New photo detected: ${photo.id}`)
+      
+      // Ensure we are subscribed to this event's P2P channel
+      subscribeToEvent(photo.event_id, userId)
+      
+      // Immediately try to leech it from the original uploader (who is currently online)
+      if (photo.uploader_id !== userId) {
+        requestFileFromSwarm(photo.event_id, photo, userId)
+      }
+    })
+    .subscribe()
+
+  // 4. Keep alive and handle graceful shutdown
   console.log("🟢 Bot is running and connected to WebRTC network.")
   console.log("Press Ctrl+C to stop.")
 
