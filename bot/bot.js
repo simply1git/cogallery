@@ -63,7 +63,7 @@ async function seedExistingFiles(userId) {
   // Get all photos across all events
   const { data: photos, error: photoError } = await supabase
     .from('photos')
-    .select('id, event_id, uploader_id, file_path')
+    .select('id, event_id, uploader_id')
 
   if (photoError) {
     console.error("Failed to fetch photos:", photoError.message)
