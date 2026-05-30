@@ -5,10 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node bot.js"
   },
   "dependencies": {
-    "puppeteer": "^22.10.0",
-    "dotenv": "^16.4.5"
+    "@supabase/supabase-js": "^2.43.4",
+    "dotenv": "^16.4.5",
+    "node-datachannel": "^0.6.2"
   }
 }
