@@ -508,9 +508,9 @@ export function EventDetailPage() {
               <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-[#18181b] border border-white/[0.05]">
                 <div className="flex items-center gap-2 truncate">
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-                    {member.userId.slice(0, 1).toUpperCase()}
+                    {(member.displayName || member.userId).slice(0, 1).toUpperCase()}
                   </div>
-                  <span className="text-sm text-slate-300 truncate">User {member.userId.slice(0, 4)}</span>
+                  <span className="text-sm text-slate-300 truncate">{member.displayName || `User ${member.userId.slice(0, 6)}`}</span>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button onClick={() => handleUpdateStatus(member.userId, 'approved')} className="p-1.5 rounded-md text-emerald-400 hover:bg-emerald-500/20 transition-colors" title="Admit">

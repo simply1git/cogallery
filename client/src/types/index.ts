@@ -38,6 +38,7 @@ export interface RoomMember {
   id: string
   roomId: string
   userId: string
+  displayName?: string
   role: UserRole
   status: 'pending' | 'approved' | 'rejected'
   invitedById?: string
@@ -71,6 +72,7 @@ export interface EventMember {
   id: string
   eventId: string
   userId: string
+  displayName?: string
   role: UserRole
   status: 'pending' | 'approved' | 'rejected'
   joinedAt: string

@@ -22,6 +22,7 @@ function mapMember(data: any): RoomMember {
     id: data.id,
     roomId: data.room_id,
     userId: data.user_id,
+    displayName: data.profiles?.display_name || undefined,
     role: data.role as UserRole,
     status: data.status || 'approved',
     invitedById: data.invited_by_id,
@@ -93,7 +94,7 @@ export async function getRoomsByUser(userId: string): Promise<RoomWithMembers[]>
       .from('rooms')
       .select(`
         *,
-        room_members(id, user_id, role, status, invited_at, invited_by_id)
+        room_members(id, user_id, role, status, invited_at, invited_by_id, profiles(display_name))
       `)
       .in('id', Array.from(roomIds))
       .order('created_at', { ascending: false })
@@ -121,7 +122,7 @@ export async function getRoomById(
       .from('rooms')
       .select(`
         *,
-        room_members(id, user_id, role, status, invited_at, invited_by_id)
+        room_members(id, user_id, role, status, invited_at, invited_by_id, profiles(display_name))
       `)
       .eq('id', roomId)
       .single()

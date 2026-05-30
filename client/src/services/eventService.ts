@@ -22,6 +22,7 @@ function mapEventMember(data: any): EventMember {
     id: data.id,
     eventId: data.event_id,
     userId: data.user_id,
+    displayName: data.profiles?.display_name || undefined,
     role: data.role,
     status: data.status || 'approved',
     joinedAt: data.joined_at || data.created_at,
@@ -60,7 +61,7 @@ export async function getEventsByRoom(roomId: string): Promise<EventWithDetails[
       .from('events')
       .select(`
         *,
-        event_members(id, event_id, user_id, role, status, joined_at),
+        event_members(id, event_id, user_id, role, status, joined_at, profiles(display_name)),
         photos(id)
       `)
       .eq('room_id', roomId)
@@ -86,7 +87,7 @@ export async function getEventsByUser(userId: string): Promise<EventWithDetails[
       .from('events')
       .select(`
         *,
-        event_members!inner(id, event_id, user_id, role, status, joined_at),
+        event_members!inner(id, event_id, user_id, role, status, joined_at, profiles(display_name)),
         photos(id)
       `)
       .eq('event_members.user_id', userId)
@@ -130,7 +131,7 @@ export async function getEventById(
       .from('events')
       .select(`
         *,
-        event_members(id, event_id, user_id, role, status, joined_at),
+        event_members(id, event_id, user_id, role, status, joined_at, profiles(display_name)),
         photos(id)
       `)
       .eq('id', eventId)
