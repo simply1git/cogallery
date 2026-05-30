@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import { initStore, hasFile, saveFile } from './fileStore.js'
 import { handleFileRequest, requestFile } from './webrtc.js'
 import nodeDataChannel from 'node-datachannel'
+import ws from 'ws'
 
 dotenv.config()
 
@@ -16,7 +17,12 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !BOT_EMAIL || !BOT_PASSWORD) {
   process.exit(1)
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { headers: { 'x-my-custom-header': 'seedbox-bot' } },
+  realtime: {
+    transport: ws
+  }
+})
 
 const activePeers = new Map() // offerId -> PeerConnection
 const eventChannels = new Map() // eventId -> Supabase Channel
