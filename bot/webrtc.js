@@ -105,7 +105,7 @@ export async function handleFileRequest(payload, channel, activePeers) {
 /**
  * Initiates a request to download a file from other peers in the swarm.
  */
-export function requestFile(eventId, photoId, userId, channel, activePeers, onFileReceived) {
+export function requestFile(eventId, photoId, userId, targetUploaderId, channel, activePeers, onFileReceived) {
   return new Promise((resolve) => {
     const offerId = `${userId}-${Date.now()}-${Math.random().toString(36).slice(2)}`
     let resolved = false
@@ -162,7 +162,7 @@ export function requestFile(eventId, photoId, userId, channel, activePeers, onFi
       channel.send({
         type: 'broadcast',
         event: 'ice-candidate',
-        payload: { targetId: null, offerId, candidate: { candidate, sdpMid: mid, sdpMLineIndex: 0 } },
+        payload: { targetId: targetUploaderId, offerId, candidate: { candidate, sdpMid: mid, sdpMLineIndex: 0 } },
       })
     })
 

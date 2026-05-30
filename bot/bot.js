@@ -180,7 +180,7 @@ function requestFileFromSwarm(eventId, photo, userId) {
   if (!channel) return
 
   console.log(`[Leech] Requesting missing file ${photo.id} from swarm...`)
-  requestFile(eventId, photo.id, userId, channel, activePeers, async (photoId, buffer, filename, mimeType) => {
+  requestFile(eventId, photo.id, userId, photo.uploader_id, channel, activePeers, async (photoId, buffer, filename, mimeType) => {
     // We successfully received a file we were missing! Save it to disk.
     await saveFile(photoId, buffer, filename, mimeType)
   })
