@@ -25,7 +25,7 @@ async function main() {
   console.log("🚀 Starting Native CoGallery WebRTC Seedbox Bot...")
   
   await initStore()
-  nodeDataChannel.initLogger('Fatal')
+  // nodeDataChannel.initLogger('Fatal')
 
   // 1. Authenticate Bot
   console.log(`🔐 Authenticating as ${BOT_EMAIL}...`)

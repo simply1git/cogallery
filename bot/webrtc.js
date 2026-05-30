@@ -8,7 +8,7 @@ const ICE_SERVERS = [
 ]
 
 // Initialize the node-datachannel library logging (optional, can be quiet)
-nodeDataChannel.initLogger('Fatal')
+// nodeDataChannel.initLogger('Fatal')
 
 /**
  * Handles an incoming file request from a leecher by spinning up a PeerConnection
