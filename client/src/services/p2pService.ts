@@ -16,7 +16,7 @@ import { getCachedFile } from './photoCache'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CHUNK_SIZE = 64 * 1024 // 64KB chunks for DataChannel
+
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },

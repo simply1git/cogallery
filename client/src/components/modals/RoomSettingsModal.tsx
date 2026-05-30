@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Image as ImageIcon, Save, Trash2, Camera } from 'lucide-react'
+import { X, Image as ImageIcon, Save, Camera } from 'lucide-react'
 import { updateRoom, updateRoomThumbnail } from '@/services/roomService'
 import { uploadThumbnail } from '@/services/uploadService'
 import { toast } from 'sonner'
