@@ -51,3 +51,5 @@ supabase/
 
 # GitHub
 .github/workflows/secrets/
+
+scratch/
