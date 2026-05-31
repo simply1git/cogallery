@@ -50,7 +50,14 @@ export function generateVideoThumbnail(file: File): Promise<string> {
     const url = URL.createObjectURL(file)
     video.src = url
 
+    // Timeout to prevent hanging on large videos (especially on mobile)
+    const timer = setTimeout(() => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Thumbnail generation timed out'))
+    }, 3000)
+
     video.onerror = () => {
+      clearTimeout(timer)
       URL.revokeObjectURL(url)
       reject(new Error('Failed to load video'))
     }
@@ -60,6 +67,7 @@ export function generateVideoThumbnail(file: File): Promise<string> {
     }
 
     video.onseeked = () => {
+      clearTimeout(timer)
       const { width, height } = scaleDown(video.videoWidth, video.videoHeight, MAX_THUMB_DIM)
       const canvas = document.createElement('canvas')
       canvas.width = width
