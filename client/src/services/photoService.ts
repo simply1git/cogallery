@@ -63,15 +63,6 @@ export interface PhotoUploadOptions {
   onProgress?: (progress: number) => void
 }
 
-/**
- * P2P Upload Flow:
- * 1. Generate a tiny thumbnail locally (~10KB)
- * 2. Save metadata + thumbnail_base64 to Supabase DB
- * 3. Cache the full file in IndexedDB
- * 4. File is now servable to peers via WebRTC
- * 
- * NO cloud storage upload happens.
- */
 export async function uploadPhotoWithMetadata(
   opts: PhotoUploadOptions
 ): Promise<{ data: Photo | null; error: string | null }> {
@@ -80,15 +71,13 @@ export async function uploadPhotoWithMetadata(
   try {
     onProgress?.(5)
 
-    // 1. Detect media type
     const mediaType = getMediaType(file)
     if (!mediaType) {
       return { data: null, error: `Unsupported file type: ${file.type}` }
     }
 
-    onProgress?.(15)
+    onProgress?.(10)
 
-    // 2. Generate thumbnail locally
     let thumbnailBase64 = ''
     try {
       thumbnailBase64 = await generateThumbnail(file)
@@ -96,10 +85,10 @@ export async function uploadPhotoWithMetadata(
       console.warn('Thumbnail generation failed, continuing without:', e)
     }
 
-    onProgress?.(50)
+    onProgress?.(15)
 
-    // 3. Save metadata + thumbnail to Supabase DB (no file upload!)
-    const { data, error } = await supabase
+    // Save metadata to Supabase DB to get a unique photo ID
+    const { data: photoRow, error: dbError } = await supabase
       .from('photos')
       .insert({
         event_id: eventId,
@@ -108,23 +97,80 @@ export async function uploadPhotoWithMetadata(
         filename: file.name,
         file_size_bytes: file.size,
         media_type: mediaType,
-        s3_key: `p2p:${userId}:${Date.now()}`, // P2P marker, not a real S3 key
-        s3_url: 'https://p2p.local/dummy', // Satisfies the "valid_url" DB constraint
+        s3_key: `oracle:pending`,
+        s3_url: 'https://pending', // will update after upload
         thumbnail_base64: thumbnailBase64,
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (dbError) throw dbError
+    const photoId = photoRow.id
+    onProgress?.(20)
 
-    onProgress?.(80)
+    // Oracle Backend URL
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+    const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+    
+    // Check for existing chunks (Resumable upload)
+    let uploadedChunks: number[] = []
+    try {
+      const statusRes = await fetch(`${backendUrl}/upload/status/${photoId}`)
+      if (statusRes.ok) {
+        const statusData = await statusRes.json()
+        if (statusData.completed) {
+          uploadedChunks = Array.from({ length: totalChunks }, (_, i) => i)
+        } else if (statusData.chunks) {
+          uploadedChunks = statusData.chunks
+        }
+      }
+    } catch (e) {
+      console.warn('Could not check upload status, starting fresh', e)
+    }
 
-    // 4. Cache full file in IndexedDB (persists across refreshes)
-    await cacheFile(data.id, file, file.name, file.type)
+    for (let i = 0; i < totalChunks; i++) {
+      if (uploadedChunks.includes(i)) continue; // Skip uploaded chunk
+      
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const chunk = file.slice(start, end)
+      const arrayBuffer = await chunk.arrayBuffer()
+      
+      const res = await fetch(`${backendUrl}/upload/chunk`, {
+        method: 'POST',
+        headers: {
+          'x-photo-id': photoId,
+          'x-chunk-index': i.toString(),
+          'x-total-chunks': totalChunks.toString(),
+          'x-filename': encodeURIComponent(file.name),
+          'x-mime-type': file.type || 'application/octet-stream',
+          'Content-Type': 'application/octet-stream'
+        },
+        body: arrayBuffer
+      })
+      
+      if (!res.ok) {
+        throw new Error(`Upload failed at chunk ${i}`)
+      }
+      
+      const percent = 20 + Math.round(((i + 1) / totalChunks) * 80)
+      onProgress?.(percent)
+    }
+
+    // Finalize URL in database
+    const finalUrl = `${backendUrl}/stream/${photoId}`
+    await supabase.from('photos').update({
+      s3_key: `oracle:${photoId}`,
+      s3_url: finalUrl
+    }).eq('id', photoId)
+
+    photoRow.s3_url = finalUrl
+    photoRow.s3_key = `oracle:${photoId}`
 
     onProgress?.(100)
 
-    return { data: mapPhoto(data), error: null }
+    return { data: mapPhoto(photoRow), error: null }
   } catch (err: any) {
     return { data: null, error: err.message }
   }

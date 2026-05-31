@@ -41,14 +41,7 @@ export function PhotoDetailModal({
   const [commentText, setCommentText] = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [activeTab, setActiveTab] = useState<'reactions' | 'comments' | 'info'>('reactions')
-  const [_isPlaying, _setIsPlaying] = useState(false)
   const [showMobilePanel, setShowMobilePanel] = useState(false)
-  
-  // P2P State
-  const [p2pUrl, setP2pUrl] = useState<string | null>(null)
-  const [p2pProgress, setP2pProgress] = useState<number>(0)
-  const [p2pStatus, setP2pStatus] = useState<'idle' | 'requesting' | 'streaming' | 'done' | 'offline'>('idle')
-  const [p2pBlob, setP2pBlob] = useState<Blob | null>(null)
 
   const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
   const hasPrev = currentIndex > 0
@@ -64,57 +57,8 @@ export function PhotoDetailModal({
   useEffect(() => {
     if (photo) {
       loadDetails(photo)
-      
-      // Reset P2P state
-      setP2pUrl(null)
-      setP2pBlob(null)
-      setP2pProgress(0)
-      
-      const isP2P = photo.s3Key.startsWith('p2p:')
-      
-      if (isP2P && user) {
-        // First check if we already have it in our own cache (we are the uploader)
-        getCachedFile(photo.id).then(cached => {
-          if (cached) {
-            setP2pStatus('done')
-            setP2pBlob(cached.blob)
-            setP2pUrl(URL.createObjectURL(cached.blob))
-          } else {
-            // Not in local cache, request from peers
-            setP2pStatus('requesting')
-            
-            requestFile(
-              photo.eventId,
-              photo.id,
-              user.id,
-              (progress) => {
-                setP2pStatus('streaming')
-                setP2pProgress(progress)
-              },
-              undefined, // we handle the blob in the Promise resolution
-              30000 // 30s timeout — give the bot enough time to connect
-            ).then((res) => {
-              if (res) {
-                setP2pStatus('done')
-                setP2pBlob(res.blob)
-                setP2pUrl(URL.createObjectURL(res.blob))
-              } else {
-                setP2pStatus('offline')
-              }
-            })
-          }
-        })
-      } else {
-        setP2pStatus('idle')
-      }
     }
-    
-    return () => {
-      // Cleanup object URL
-      if (p2pUrl) URL.revokeObjectURL(p2pUrl)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photo?.id, user?.id])
+  }, [photo, loadDetails])
 
   // Keyboard navigation
   useEffect(() => {
@@ -155,14 +99,7 @@ export function PhotoDetailModal({
 
   async function handleDownload() {
     if (!photo) return
-    
-    if (p2pBlob) {
-      // P2P download
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(p2pBlob)
-      a.download = photo.filename
-      a.click()
-    } else if (photo.s3Url) {
+    if (photo.s3Url) {
       // Cloud download
       const res = await fetch(photo.s3Url)
       const blob = await res.blob()
@@ -171,7 +108,7 @@ export function PhotoDetailModal({
       a.download = photo.filename
       a.click()
     } else {
-      toast.error('Original file is currently unavailable (uploader offline).')
+      toast.error('Original file is currently unavailable.')
     }
   }
 
@@ -216,56 +153,21 @@ export function PhotoDetailModal({
         {/* Media area */}
         <div className={`flex-1 flex flex-col items-center justify-center p-3 md:p-8 min-w-0 relative ${showMobilePanel ? 'hidden md:flex' : ''}`}>
           
-          {/* P2P Status Overlay */}
-          {photo.s3Key.startsWith('p2p:') && p2pStatus !== 'done' && (
-            <div className="absolute top-4 md:top-10 left-1/2 -translate-x-1/2 z-20 bg-black/80 backdrop-blur-md border border-white/10 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm flex items-center gap-2 shadow-xl animate-fade-in">
-              {p2pStatus === 'requesting' && (
-                <>
-                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-blue-500 animate-pulse" />
-                  Connecting to peers...
-                </>
-              )}
-              {p2pStatus === 'streaming' && (
-                <>
-                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-blue-500 animate-pulse" />
-                  Streaming ({p2pProgress}%)
-                </>
-              )}
-              {p2pStatus === 'offline' && (
-                <>
-                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-red-500" />
-                  Uploader offline. Preview only.
-                </>
-              )}
-            </div>
-          )}
-
           {isVideo ? (
             <div className="relative max-h-full w-full flex items-center justify-center">
-              {/* Show preview thumbnail if P2P video is not yet loaded */}
-              {photo.s3Key.startsWith('p2p:') && p2pStatus !== 'done' && photo.thumbnailBase64 ? (
-                <img
-                  src={photo.thumbnailBase64}
-                  className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain opacity-50 blur-sm"
-                  alt="Video preview"
-                />
-              ) : (
-                <video
-                  src={p2pUrl || photo.s3Url}
-                  className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain"
-                  controls
-                  autoPlay={!!p2pUrl}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
+              <video
+                src={photo.s3Url}
+                className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain"
+                controls
+                autoPlay
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           ) : (
             <img
-              src={p2pUrl || photo.s3Url || photo.thumbnailBase64}
+              src={photo.s3Url || photo.thumbnailBase64}
               alt={photo.filename}
-              className={`max-w-full max-h-[60vh] md:max-h-[85vh] object-contain rounded-xl animate-scale-in transition-all duration-500 ${
-                !p2pUrl && !photo.s3Url ? 'blur-sm scale-[0.98]' : ''
-              }`}
+              className={`max-w-full max-h-[60vh] md:max-h-[85vh] object-contain rounded-xl animate-scale-in transition-all duration-500`}
             />
           )}
 

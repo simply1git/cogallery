@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'cogallery-seedbox',
-    script: './bot.js',
+    script: './server.js',
     instances: 1, // Single instance since it shares local state
     autorestart: true,
     watch: false,
