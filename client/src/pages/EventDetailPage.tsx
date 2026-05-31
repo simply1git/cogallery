@@ -371,10 +371,10 @@ export function EventDetailPage() {
       )}
 
       {/* Event Header */}
-      <div className="flex items-start justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-4 mb-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#f4f4f5]">{event.title}</h1>
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#f4f4f5]">{event.title}</h1>
             <PresenceAvatars users={onlineUsers} />
           </div>
           {event.description && (
@@ -403,7 +403,7 @@ export function EventDetailPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto pb-1 -mb-1">
           {canManageEvent && (
             <button
               onClick={() => setShowInvite(true)}
@@ -626,11 +626,11 @@ export function EventDetailPage() {
       {/* Floating Action Bar for Selection Mode */}
       {isSelectionMode && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slide-up">
-          <div className="bg-[#18181b]/95 backdrop-blur-md border border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-4">
-            <div className="px-4 text-sm font-medium text-white border-r border-white/10">
+          <div className="bg-[#18181b]/95 backdrop-blur-md border border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-2 sm:gap-4 max-w-[95vw]">
+            <div className="px-2 sm:px-4 text-xs sm:text-sm font-medium text-white border-r border-white/10 whitespace-nowrap">
               {selectedIds.size} selected
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={handleSelectAll}
                 className="btn-ghost text-sm px-3"

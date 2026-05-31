@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   X, ChevronLeft, ChevronRight, Download, Trash2,
-  MessageCircle, Camera, Calendar, HardDrive, Image as ImageIcon, Layout
+  MessageCircle, Camera, Calendar, HardDrive, Image as ImageIcon, Layout,
+  ChevronUp, ChevronDown
 } from 'lucide-react'
 import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/services/photoService'
 import { useAuth } from '@/hooks/useAuth'
@@ -41,6 +42,7 @@ export function PhotoDetailModal({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [activeTab, setActiveTab] = useState<'reactions' | 'comments' | 'info'>('reactions')
   const [_isPlaying, _setIsPlaying] = useState(false)
+  const [showMobilePanel, setShowMobilePanel] = useState(false)
   
   // P2P State
   const [p2pUrl, setP2pUrl] = useState<string | null>(null)
@@ -90,7 +92,7 @@ export function PhotoDetailModal({
                 setP2pProgress(progress)
               },
               undefined, // we handle the blob in the Promise resolution
-              10000 // 10s timeout
+              30000 // 30s timeout — give the bot enough time to connect
             ).then((res) => {
               if (res) {
                 setP2pStatus('done')
@@ -187,72 +189,72 @@ export function PhotoDetailModal({
   return (
     <div className="lightbox-overlay animate-fade-in" onClick={onClose}>
       {/* Close */}
-      <button className="absolute top-4 right-4 z-10 btn-icon" onClick={onClose}>
-        <X size={22} />
+      <button className="absolute top-3 right-3 z-30 btn-icon bg-black/60 backdrop-blur-sm border border-white/10" onClick={onClose}>
+        <X size={20} />
       </button>
 
       {/* Nav arrows */}
       {hasPrev && (
         <button
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 border border-white/10 p-3"
+          className="absolute left-2 md:left-4 top-1/3 md:top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 border border-white/10 p-2 md:p-3"
           onClick={(e) => { e.stopPropagation(); onNavigate(allPhotos[currentIndex - 1]) }}
         >
-          <ChevronLeft size={22} />
+          <ChevronLeft size={20} />
         </button>
       )}
       {hasNext && (
         <button
-          className="absolute right-[340px] top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 border border-white/10 p-3"
+          className="absolute right-2 md:right-[340px] top-1/3 md:top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 border border-white/10 p-2 md:p-3"
           onClick={(e) => { e.stopPropagation(); onNavigate(allPhotos[currentIndex + 1]) }}
         >
-          <ChevronRight size={22} />
+          <ChevronRight size={20} />
         </button>
       )}
 
       {/* Main content */}
       <div className="flex flex-col md:flex-row w-full h-full max-w-7xl mx-auto" onClick={(e) => e.stopPropagation()}>
         {/* Media area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 min-w-0 relative h-1/2 md:h-full">
+        <div className={`flex-1 flex flex-col items-center justify-center p-3 md:p-8 min-w-0 relative ${showMobilePanel ? 'hidden md:flex' : ''}`}>
           
           {/* P2P Status Overlay */}
           {photo.s3Key.startsWith('p2p:') && p2pStatus !== 'done' && (
-            <div className="absolute top-10 left-1/2 -translate-x-1/2 z-20 bg-black/80 backdrop-blur-md border border-white/10 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-xl animate-fade-in">
+            <div className="absolute top-4 md:top-10 left-1/2 -translate-x-1/2 z-20 bg-black/80 backdrop-blur-md border border-white/10 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm flex items-center gap-2 shadow-xl animate-fade-in">
               {p2pStatus === 'requesting' && (
                 <>
-                  <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-blue-500 animate-pulse" />
                   Connecting to peers...
                 </>
               )}
               {p2pStatus === 'streaming' && (
                 <>
-                  <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-                  Streaming full resolution ({p2pProgress}%)
+                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-blue-500 animate-pulse" />
+                  Streaming ({p2pProgress}%)
                 </>
               )}
               {p2pStatus === 'offline' && (
                 <>
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  Uploader offline. Showing preview only.
+                  <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-red-500" />
+                  Uploader offline. Preview only.
                 </>
               )}
             </div>
           )}
 
           {isVideo ? (
-            <div className="relative max-h-full">
+            <div className="relative max-h-full w-full flex items-center justify-center">
               {/* Show preview thumbnail if P2P video is not yet loaded */}
               {photo.s3Key.startsWith('p2p:') && p2pStatus !== 'done' && photo.thumbnailBase64 ? (
                 <img
                   src={photo.thumbnailBase64}
-                  className="max-w-full max-h-[85vh] rounded-xl object-contain opacity-50 blur-sm"
+                  className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain opacity-50 blur-sm"
                   alt="Video preview"
                 />
               ) : (
                 <video
                   src={p2pUrl || photo.s3Url}
-                  className="max-w-full max-h-[85vh] rounded-xl object-contain"
+                  className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain"
                   controls
-                  autoPlay={!!p2pUrl} // Autoplay when stream finishes
+                  autoPlay={!!p2pUrl}
                   onClick={(e) => e.stopPropagation()}
                 />
               )}
@@ -261,20 +263,36 @@ export function PhotoDetailModal({
             <img
               src={p2pUrl || photo.s3Url || photo.thumbnailBase64}
               alt={photo.filename}
-              className={`max-w-full max-h-[85vh] object-contain rounded-xl animate-scale-in transition-all duration-500 ${
+              className={`max-w-full max-h-[60vh] md:max-h-[85vh] object-contain rounded-xl animate-scale-in transition-all duration-500 ${
                 !p2pUrl && !photo.s3Url ? 'blur-sm scale-[0.98]' : ''
               }`}
             />
           )}
 
-          {/* Counter */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/50">
-            {currentIndex + 1} / {allPhotos.length}
+          {/* Counter + mobile panel toggle */}
+          <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
+            <span className="text-xs md:text-sm text-white/50">
+              {currentIndex + 1} / {allPhotos.length}
+            </span>
+            <button
+              className="md:hidden btn-icon bg-black/60 backdrop-blur-sm border border-white/10 p-1.5"
+              onClick={() => setShowMobilePanel(!showMobilePanel)}
+            >
+              {showMobilePanel ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </button>
           </div>
         </div>
 
         {/* Side panel */}
-        <div className="w-full md:w-80 flex-shrink-0 flex flex-col bg-[#0a0a0a] border-t md:border-t-0 md:border-l border-white/[0.08] h-1/2 md:h-full">
+        <div className={`w-full md:w-80 flex-shrink-0 flex flex-col bg-[#0a0a0a] border-t md:border-t-0 md:border-l border-white/[0.08] md:h-full ${showMobilePanel ? 'h-full' : 'hidden md:flex'}`}>
+          {/* Mobile back button */}
+          <button
+            className="md:hidden flex items-center gap-2 px-4 py-2 text-sm text-[#71717a] hover:text-white border-b border-white/[0.08]"
+            onClick={() => setShowMobilePanel(false)}
+          >
+            <ChevronDown size={16} />
+            Back to photo
+          </button>
           {/* Top actions */}
           <div className="p-4 border-b border-white/[0.08] flex items-center justify-between">
             <span className="text-sm font-medium text-[#f4f4f5] truncate flex-1 mr-2">

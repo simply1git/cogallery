@@ -14,7 +14,7 @@ const ICE_SERVERS = [
  * Handles an incoming file request from a leecher by spinning up a PeerConnection
  * and streaming the file from disk to the DataChannel.
  */
-export async function handleFileRequest(payload, channel, activePeers) {
+export async function handleFileRequest(payload, channel, activePeers, botUserId) {
   const { requesterId, photoId, offerId } = payload
   
   // Get file from disk cache
@@ -95,7 +95,7 @@ export async function handleFileRequest(payload, channel, activePeers) {
     channel.send({
       type: 'broadcast',
       event: 'offer',
-      payload: { targetId: requesterId, offerId, sdp },
+      payload: { targetId: requesterId, senderId: botUserId, offerId, sdp },
     })
   })
 

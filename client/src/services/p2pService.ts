@@ -121,7 +121,7 @@ function getOrCreateChannel(eventId: string, userId: string) {
       channel.send({
         type: 'broadcast',
         event: 'offer',
-        payload: { targetId: requesterId, offerId, sdp: offer.sdp },
+        payload: { targetId: requesterId, senderId: userId, offerId, sdp: offer.sdp },
       })
     })
     .on('broadcast', { event: 'answer' }, async (payload) => {
@@ -132,11 +132,14 @@ function getOrCreateChannel(eventId: string, userId: string) {
     })
     // ─── LEECHER LOGIC ───
     .on('broadcast', { event: 'offer' }, async (payload) => {
-      const { offerId, sdp, targetId } = payload.payload
+      const { offerId, sdp, targetId, senderId } = payload.payload
       if (targetId !== userId) return
       
       const req = pendingRequests.get(offerId)
       if (!req) return
+
+      // Remember who sent the offer so we can route ICE candidates back to them
+      const seederUserId = senderId || null
 
       req.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
 
@@ -180,7 +183,7 @@ function getOrCreateChannel(eventId: string, userId: string) {
           channel.send({
             type: 'broadcast',
             event: 'ice-candidate',
-            payload: { targetId: payload.payload.targetId, offerId, candidate: e.candidate.toJSON() },
+            payload: { targetId: seederUserId, offerId, candidate: e.candidate.toJSON() },
           })
         }
       }

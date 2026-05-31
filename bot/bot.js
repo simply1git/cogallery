@@ -126,7 +126,7 @@ function subscribeToEvent(eventId, userId) {
     // When someone asks for a file, we check our disk and send it
     .on('broadcast', { event: 'file-request' }, async (payload) => {
       if (payload.payload.requesterId === userId) return
-      handleFileRequest(payload.payload, channel, activePeers)
+      handleFileRequest(payload.payload, channel, activePeers, userId)
     })
     
     // When the remote peer answers our local offer
