@@ -24,6 +24,7 @@ import { LiveNotes } from '@/components/events/LiveNotes'
 import type { EventWithDetails, Photo, RoomWithMembers } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
 import { downloadFilesAsZip } from '@/services/downloadService'
+import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
 
 export function EventDetailPage() {
@@ -216,6 +217,22 @@ export function EventDetailPage() {
     }
     
     setIsDownloadingZip(false)
+  }
+
+  const handleBatchIndividualDownload = async () => {
+    if (selectedIds.size === 0) return
+    const selectedPhotos = photos.filter(p => selectedIds.has(p.id))
+    
+    // Download them individually sequentially to not crash the browser
+    for (const p of selectedPhotos) {
+      await downloadFile(p.s3Url, p.filename)
+      // Small pause between downloads to allow the browser to process
+      await new Promise(res => setTimeout(res, 300))
+    }
+    
+    toast.success(`Started download of ${selectedPhotos.length} files`)
+    setIsSelectionMode(false)
+    setSelectedIds(new Set())
   }
 
   const handleBatchDelete = async () => {
@@ -650,6 +667,16 @@ export function EventDetailPage() {
               </button>
               
               <button
+                onClick={handleBatchIndividualDownload}
+                disabled={selectedIds.size === 0 || isDownloadingZip}
+                className="btn-secondary"
+                title="Download Individually"
+              >
+                <Download size={16} />
+                <span className="hidden sm:inline">Originals</span>
+              </button>
+
+              <button
                 onClick={handleBatchDownload}
                 disabled={selectedIds.size === 0 || isDownloadingZip}
                 className="btn-primary"
@@ -662,7 +689,7 @@ export function EventDetailPage() {
                 ) : (
                   <span className="flex items-center gap-2">
                     <Download size={16} />
-                    Download ZIP
+                    <span className="hidden sm:inline">ZIP</span>
                   </span>
                 )}
               </button>

@@ -48,6 +48,9 @@ app.get('/upload/status/:photoId', async (req, res) => {
   }
 });
 
+// In-memory locks to prevent race conditions when chunks finish concurrently
+const assemblyLocks = new Set();
+
 // Upload chunk
 app.post('/upload/chunk', express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
   const photoId = req.headers['x-photo-id'];
@@ -76,6 +79,12 @@ app.post('/upload/chunk', express.raw({ type: '*/*', limit: '50mb' }), async (re
   const partFiles = files.filter(f => f.endsWith('.part'));
   
   if (partFiles.length === totalChunks) {
+    if (assemblyLocks.has(photoId)) {
+      return res.json({ success: true, message: 'Chunk received, assembly already in progress' });
+    }
+    
+    assemblyLocks.add(photoId);
+    
     try {
       const finalPath = path.join(CACHE_DIR, `${photoId}.data`);
       const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
@@ -98,6 +107,7 @@ app.post('/upload/chunk', express.raw({ type: '*/*', limit: '50mb' }), async (re
       
       // Cleanup temp chunks
       await fs.rm(chunkDir, { recursive: true, force: true }).catch(() => {});
+      assemblyLocks.delete(photoId);
       
       console.log(`[Upload] Merged ${photoId} successfully (${totalSize} bytes)`);
       return res.json({ status: 'completed' });

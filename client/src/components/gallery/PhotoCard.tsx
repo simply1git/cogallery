@@ -54,7 +54,7 @@ export const PhotoCard = memo(function PhotoCard({
       {/* Media */}
       <div className="relative bg-[#0f0f0f]">
         {imgError && !photo.thumbnailBase64 ? (
-          <div className="w-full aspect-[4/3] bg-[#141414] flex flex-col items-center justify-center gap-2 text-[#52525b]">
+          <div className="w-full bg-[#141414] flex flex-col items-center justify-center gap-2 text-[#52525b] py-12">
             {isVideo ? <Film size={32} /> : <ImageIcon size={32} />}
             <span className="text-xs font-medium px-2 text-center break-all">{photo.filename}</span>
           </div>
@@ -62,7 +62,7 @@ export const PhotoCard = memo(function PhotoCard({
           <img
             src={(!isVideo && photo.s3Url && !imgError) ? photo.s3Url : photo.thumbnailBase64}
             alt={photo.filename}
-            className="w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] min-h-[160px]"
+            className="w-full h-auto block transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
             decoding="async"
             onError={() => setImgError(true)}
