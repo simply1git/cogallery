@@ -127,11 +127,15 @@ export function EventDetailPage() {
     eventId: eventId!,
     onNewPhoto: (photo) => {
       // Only show banner if upload wasn't by current user
-      if (photo.uploaderId !== user?.id) {
+      if (photo.uploaderId !== user?.id && photo.s3Url !== 'https://pending') {
         setNewPhotoCount((c) => c + 1)
       }
       setPhotos((prev) => {
-        if (prev.find((p) => p.id === photo.id)) return prev
+        const existing = prev.find((p) => p.id === photo.id)
+        if (existing) {
+          // Replace with updated photo
+          return prev.map(p => p.id === photo.id ? photo : p)
+        }
         return [photo, ...prev]
       })
     },
@@ -144,7 +148,10 @@ export function EventDetailPage() {
   // Upload success handler
   function handleUploadSuccess(photo: Photo) {
     setPhotos((prev) => {
-      if (prev.find((p) => p.id === photo.id)) return prev
+      const existing = prev.find((p) => p.id === photo.id)
+      if (existing) {
+        return prev.map(p => p.id === photo.id ? photo : p)
+      }
       return [photo, ...prev]
     })
     setEvent((prev) => prev ? { ...prev, photoCount: prev.photoCount + 1 } : prev)

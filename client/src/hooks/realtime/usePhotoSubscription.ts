@@ -56,6 +56,33 @@ export function usePhotoSubscription({
         .on(
           'postgres_changes',
           {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'photos',
+            filter: `event_id=eq.${eventId}`,
+          },
+          (payload) => {
+            const raw = payload.new as any
+            const photo: Photo = {
+              id: raw.id,
+              eventId: raw.event_id,
+              roomId: raw.room_id,
+              uploaderId: raw.uploader_id,
+              filename: raw.filename,
+              fileSizeBytes: raw.file_size_bytes,
+              mediaType: raw.media_type,
+              s3Key: raw.s3_key,
+              s3Url: raw.s3_url,
+              thumbnailUrl: raw.thumbnail_url,
+              createdAt: raw.created_at,
+              thumbnailBase64: raw.thumbnail_base64,
+            }
+            callbacksRef.current.onNewPhoto?.(photo) // Can reuse onNewPhoto to trigger a state update
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
             event: 'DELETE',
             schema: 'public',
             table: 'photos',
