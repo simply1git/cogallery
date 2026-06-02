@@ -8,8 +8,6 @@ import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/servi
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
-import { requestFile } from '@/services/p2pService'
-import { getCachedFile } from '@/services/photoCache'
 import { toast } from 'sonner'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']

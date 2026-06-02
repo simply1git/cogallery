@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Photo, PhotoWithReactions, Reaction, Comment, MediaType } from '@/types'
 import { generateThumbnail } from './thumbnailService'
-import { cacheFile, removeCachedFile } from './photoCache'
 import { getMediaType } from './uploadService'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -267,8 +266,6 @@ export async function deletePhotoById(
     const { error } = await supabase.from('photos').delete().eq('id', photoId)
     if (error) throw error
 
-    // Remove from local IndexedDB cache
-    await removeCachedFile(photoId)
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
