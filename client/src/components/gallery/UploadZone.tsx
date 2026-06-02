@@ -80,6 +80,8 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                 updateFile(fileIndex, { status: 'done', progress: 100 });
                 onUploadSuccess?.(data);
                 toast.success(`Uploaded: ${file.name}`);
+                // Haptic feedback for mobile
+                if (navigator.vibrate) navigator.vibrate(50);
               }
             }).catch(() => {
               updateFile(fileIndex, { status: 'error', error: 'Unexpected error' });
@@ -113,12 +115,22 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
 
   return (
     <div className="space-y-4">
-      {/* Drop zone */}
+      {/* Shared hidden input */}
+      <input {...getInputProps()} />
+
+      {/* MOBILE: Floating Action Button (FAB) */}
+      <button
+        {...getRootProps()}
+        className="md:hidden fixed bottom-6 right-6 z-50 bg-blue-500 text-white p-4 rounded-full shadow-xl hover:bg-blue-600 transition-transform active:scale-95 pb-safe pr-safe"
+      >
+        <UploadCloud size={24} />
+      </button>
+
+      {/* DESKTOP: Drop zone */}
       <div
         {...getRootProps()}
-        className={`upload-zone p-10 ${isDragActive ? 'upload-zone-active' : ''}`}
+        className={`hidden md:block upload-zone p-10 ${isDragActive ? 'upload-zone-active' : ''}`}
       >
-        <input {...getInputProps()} />
         <div className="flex flex-col items-center gap-3 text-center">
           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
             isDragActive

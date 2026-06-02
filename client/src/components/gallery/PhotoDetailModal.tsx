@@ -4,6 +4,7 @@ import {
   MessageCircle, Camera, Calendar, HardDrive, Image as ImageIcon, Layout,
   ChevronUp, ChevronDown
 } from 'lucide-react'
+import { motion, PanInfo } from 'framer-motion'
 import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/services/photoService'
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
@@ -140,23 +141,42 @@ export function PhotoDetailModal({
       {/* Main content */}
       <div className="flex flex-col md:flex-row w-full h-full max-w-7xl mx-auto" onClick={(e) => e.stopPropagation()}>
         {/* Media area */}
-        <div className={`flex-1 flex flex-col items-center justify-center p-3 md:p-8 min-w-0 relative ${showMobilePanel ? 'hidden md:flex' : ''}`}>
+        <div className={`flex-1 flex flex-col items-center justify-center p-3 md:p-8 min-w-0 relative overflow-hidden ${showMobilePanel ? 'hidden md:flex' : ''}`}>
           
           {isVideo ? (
-            <div className="relative max-h-full w-full flex items-center justify-center">
+            <motion.div 
+              drag
+              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              onDragEnd={(e, info) => {
+                const swipeThreshold = 50;
+                if (info.offset.x > swipeThreshold && hasPrev) onNavigate(allPhotos[currentIndex - 1]);
+                else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
+                else if (info.offset.y > swipeThreshold * 2) onClose();
+              }}
+              className="relative max-h-full w-full flex items-center justify-center touch-none"
+            >
               <video
                 src={photo.s3Url}
-                className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain"
+                className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain pointer-events-auto"
                 controls
                 autoPlay
                 onClick={(e) => e.stopPropagation()}
               />
-            </div>
+            </motion.div>
           ) : (
-            <img
+            <motion.img
+              drag
+              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              onDragEnd={(e, info) => {
+                const swipeThreshold = 50;
+                if (info.offset.x > swipeThreshold && hasPrev) onNavigate(allPhotos[currentIndex - 1]);
+                else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
+                else if (info.offset.y > swipeThreshold * 2) onClose();
+              }}
               src={photo.s3Url || photo.thumbnailBase64}
               alt={photo.filename}
-              className={`max-w-full max-h-[60vh] md:max-h-[85vh] object-contain rounded-xl animate-scale-in transition-all duration-500`}
+              className={`max-w-full max-h-[60vh] md:max-h-[85vh] object-contain rounded-xl touch-none cursor-grab active:cursor-grabbing animate-scale-in`}
+              draggable={false}
             />
           )}
 
