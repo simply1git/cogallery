@@ -118,60 +118,49 @@ export async function uploadPhotoWithMetadata(
     const photoId = photoRow.id
     onProgress?.(20)
 
-    // Oracle Backend URL
+    // Oracle Backend URL for generating the presigned URL
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-    const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+    const r2PublicUrl = import.meta.env.VITE_R2_PUBLIC_URL || 'https://pub-04f27384d5c64a548df89c922d72431a.r2.dev'
     
-    // Check for existing chunks (Resumable upload)
-    let uploadedChunks: number[] = []
-    try {
-      const statusRes = await fetch(`${backendUrl}/upload/status/${photoId}`)
-      if (statusRes.ok) {
-        const statusData = await statusRes.json()
-        if (statusData.completed) {
-          uploadedChunks = Array.from({ length: totalChunks }, (_, i) => i)
-        } else if (statusData.chunks) {
-          uploadedChunks = statusData.chunks
+    // 1. Get Presigned URL
+    const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+    const urlRes = await fetch(`${backendUrl}/upload/presigned-url?filename=${encodeURIComponent(r2Key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`)
+    
+    if (!urlRes.ok) {
+      throw new Error('Failed to securely generate upload URL')
+    }
+    const { url: presignedUrl } = await urlRes.json()
+
+    // 2. Upload DIRECTLY to Cloudflare R2 (Bypassing the tunnel)
+    // We use XMLHttpRequest instead of fetch to get upload progress!
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', presignedUrl, true)
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+      
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = 20 + Math.round((e.loaded / e.total) * 80)
+          onProgress?.(percent)
         }
       }
-    } catch (e) {
-      console.warn('Could not check upload status, starting fresh', e)
-    }
-
-    for (let i = 0; i < totalChunks; i++) {
-      if (uploadedChunks.includes(i)) continue; // Skip uploaded chunk
       
-      const start = i * CHUNK_SIZE
-      const end = Math.min(start + CHUNK_SIZE, file.size)
-      const chunk = file.slice(start, end)
-      const arrayBuffer = await chunk.arrayBuffer()
-      
-      const res = await fetch(`${backendUrl}/upload/chunk`, {
-        method: 'POST',
-        headers: {
-          'x-photo-id': photoId,
-          'x-chunk-index': i.toString(),
-          'x-total-chunks': totalChunks.toString(),
-          'x-filename': encodeURIComponent(file.name),
-          'x-mime-type': file.type || 'application/octet-stream',
-          'Content-Type': 'application/octet-stream'
-        },
-        body: arrayBuffer
-      })
-      
-      if (!res.ok) {
-        throw new Error(`Upload failed at chunk ${i}`)
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve()
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`))
+        }
       }
       
-      const percent = 20 + Math.round(((i + 1) / totalChunks) * 80)
-      onProgress?.(percent)
-    }
+      xhr.onerror = () => reject(new Error('Upload failed due to network error'))
+      xhr.send(file)
+    })
 
     // Finalize URL in database
-    const finalUrl = `${backendUrl}/stream/${photoId}`
+    const finalUrl = `${r2PublicUrl}/${r2Key}`
     const { error: updateError } = await supabase.from('photos').update({
-      s3_key: `oracle:${photoId}`,
+      s3_key: r2Key,
       s3_url: finalUrl
     }).eq('id', photoId)
 

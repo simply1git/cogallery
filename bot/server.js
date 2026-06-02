@@ -4,6 +4,22 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// R2 Configuration
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  },
+});
+const BUCKET_NAME = process.env.R2_BUCKET_NAME || 'cogallery-photos';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'file-cache');
@@ -25,6 +41,31 @@ await fs.mkdir(TEMP_DIR, { recursive: true }).catch(() => {});
 // Health Check
 app.get('/status', (req, res) => {
   res.json({ status: 'online', service: 'CoGallery Oracle Backend' });
+});
+
+// Generate Pre-signed URL for direct R2 upload
+app.get('/upload/presigned-url', async (req, res) => {
+  try {
+    const { filename, contentType } = req.query;
+    if (!filename || !contentType) {
+      return res.status(400).json({ error: 'Missing filename or contentType' });
+    }
+    
+    // We can use the filename as the key, or prepend a UUID. The client passes a unique filename.
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: filename,
+      ContentType: contentType,
+    });
+    
+    // URL expires in 1 hour
+    const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+    
+    return res.json({ url: presignedUrl, key: filename });
+  } catch (error) {
+    console.error('Presigned URL error:', error);
+    return res.status(500).json({ error: 'Failed to generate upload URL' });
+  }
 });
 
 // Check upload progress (for resuming)
