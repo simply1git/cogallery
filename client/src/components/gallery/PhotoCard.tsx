@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Heart, MessageCircle, Play, Trash2 } from 'lucide-react'
+import { useState, memo } from 'react'
+import { Heart, MessageCircle, Play, Trash2, Download, Film, Image as ImageIcon } from 'lucide-react'
 import type { Photo } from '@/types'
+import { downloadFile } from '@/utils/download'
 
 interface PhotoCardProps {
   photo: Photo
@@ -14,7 +15,7 @@ interface PhotoCardProps {
   onSelect?: () => void
 }
 
-export function PhotoCard({
+export const PhotoCard = memo(function PhotoCard({
   photo,
   onClick,
   onDelete,
@@ -37,18 +38,25 @@ export function PhotoCard({
     }
   }
 
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    downloadFile(photo.s3Url, photo.filename)
+  }
+
   return (
     <div
       className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-all duration-200 ${
         selected ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)]' : 'border-white/[0.06] hover:border-white/[0.15]'
       }`}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}
       onClick={handleClick}
     >
       {/* Media */}
       <div className="relative bg-[#0f0f0f]">
         {imgError && !photo.thumbnailBase64 ? (
-          <div className="w-full aspect-square bg-[#141414] flex items-center justify-center">
-            <span className="text-[#52525b] text-xs">Preview unavailable</span>
+          <div className="w-full aspect-[4/3] bg-[#141414] flex flex-col items-center justify-center gap-2 text-[#52525b]">
+            {isVideo ? <Film size={32} /> : <ImageIcon size={32} />}
+            <span className="text-xs font-medium px-2 text-center break-all">{photo.filename}</span>
           </div>
         ) : (
           <img
@@ -56,6 +64,7 @@ export function PhotoCard({
             alt={photo.filename}
             className="w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] min-h-[160px]"
             loading="lazy"
+            decoding="async"
             onError={() => setImgError(true)}
           />
         )}
@@ -70,7 +79,7 @@ export function PhotoCard({
             </div>
             {/* Video badge */}
             <div className="absolute top-2 left-2 pointer-events-none">
-              <span className="badge-purple text-[10px] px-1.5 py-0.5">VIDEO</span>
+              <span className="badge-purple text-[10px] px-1.5 py-0.5 shadow-md">VIDEO</span>
             </div>
           </>
         )}
@@ -83,7 +92,7 @@ export function PhotoCard({
             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
               selected 
                 ? 'bg-blue-500 border-blue-500' 
-                : 'bg-black/50 border-white/50 group-hover:border-white/80'
+                : 'bg-black/50 border-white/50 group-hover:border-white/80 backdrop-blur-md'
             }`}
           >
             {selected && (
@@ -96,32 +105,45 @@ export function PhotoCard({
       )}
 
       {/* Hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <div className="absolute bottom-0 left-0 right-0 p-3 flex items-end justify-between">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-2">
+          {/* Top of hover area - actions */}
+          <div className="flex items-center justify-end gap-2 mb-1 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+            <button
+              onClick={handleDownload}
+              className="p-1.5 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:scale-105 transition-all"
+              title="Download"
+            >
+              <Download size={14} />
+            </button>
+            {canDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete?.() }}
+                className="p-1.5 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 hover:bg-red-500/40 hover:scale-105 transition-all"
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+          
+          {/* Bottom of hover area - info */}
           <div className="flex items-center gap-3">
             {reactionCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-white/80">
-                <Heart size={12} fill="currentColor" />
+              <span className="flex items-center gap-1 text-xs text-white shadow-sm font-medium">
+                <Heart size={12} fill="currentColor" className="text-red-500" />
                 {reactionCount}
               </span>
             )}
             {commentCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-white/80">
+              <span className="flex items-center gap-1 text-xs text-white shadow-sm font-medium">
                 <MessageCircle size={12} />
                 {commentCount}
               </span>
             )}
           </div>
-          {canDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete?.() }}
-              className="p-1.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/40 transition-colors"
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
         </div>
       </div>
     </div>
   )
-}
+})

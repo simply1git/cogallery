@@ -139,34 +139,58 @@ export async function uploadPhotoWithMetadata(
       console.warn('Could not check upload status, starting fresh', e)
     }
 
-    for (let i = 0; i < totalChunks; i++) {
-      if (uploadedChunks.includes(i)) continue; // Skip uploaded chunk
-      
-      const start = i * CHUNK_SIZE
-      const end = Math.min(start + CHUNK_SIZE, file.size)
-      const chunk = file.slice(start, end)
-      const arrayBuffer = await chunk.arrayBuffer()
-      
-      const res = await fetch(`${backendUrl}/upload/chunk`, {
-        method: 'POST',
-        headers: {
-          'x-photo-id': photoId,
-          'x-chunk-index': i.toString(),
-          'x-total-chunks': totalChunks.toString(),
-          'x-filename': encodeURIComponent(file.name),
-          'x-mime-type': file.type || 'application/octet-stream',
-          'Content-Type': 'application/octet-stream'
-        },
-        body: arrayBuffer
-      })
-      
-      if (!res.ok) {
-        throw new Error(`Upload failed at chunk ${i}`)
+    const MAX_CONCURRENT = 4;
+    const pendingChunks = Array.from({ length: totalChunks }, (_, i) => i).filter(i => !uploadedChunks.includes(i));
+    let completedCount = totalChunks - pendingChunks.length;
+    
+    // Concurrent chunk upload queue for state of the art upload speeds
+    await new Promise<void>((resolve, reject) => {
+      let active = 0;
+      let index = 0;
+      let hasError = false;
+
+      function next() {
+        if (hasError) return;
+        if (index >= pendingChunks.length && active === 0) {
+          resolve();
+          return;
+        }
+        while (active < MAX_CONCURRENT && index < pendingChunks.length) {
+          const chunkIndex = pendingChunks[index++];
+          active++;
+          
+          const start = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+          
+          chunk.arrayBuffer().then(arrayBuffer => {
+            return fetch(`${backendUrl}/upload/chunk`, {
+              method: 'POST',
+              headers: {
+                'x-photo-id': photoId,
+                'x-chunk-index': chunkIndex.toString(),
+                'x-total-chunks': totalChunks.toString(),
+                'x-filename': encodeURIComponent(file.name),
+                'x-mime-type': file.type || 'application/octet-stream',
+                'Content-Type': 'application/octet-stream'
+              },
+              body: arrayBuffer
+            })
+          }).then(res => {
+            if (!res.ok) throw new Error(`Upload failed at chunk ${chunkIndex}`);
+            active--;
+            completedCount++;
+            const percent = 20 + Math.round((completedCount / totalChunks) * 80);
+            onProgress?.(percent);
+            next();
+          }).catch(err => {
+            hasError = true;
+            reject(err);
+          });
+        }
       }
-      
-      const percent = 20 + Math.round(((i + 1) / totalChunks) * 80)
-      onProgress?.(percent)
-    }
+      next();
+    });
 
     // Finalize URL in database
     const finalUrl = `${backendUrl}/stream/${photoId}`

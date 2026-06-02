@@ -8,6 +8,7 @@ import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/servi
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
+import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']
@@ -97,17 +98,7 @@ export function PhotoDetailModal({
 
   async function handleDownload() {
     if (!photo) return
-    if (photo.s3Url) {
-      // Cloud download
-      const res = await fetch(photo.s3Url)
-      const blob = await res.blob()
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = photo.filename
-      a.click()
-    } else {
-      toast.error('Original file is currently unavailable.')
-    }
+    await downloadFile(photo.s3Url, photo.filename)
   }
 
   // Group reactions by emoji
