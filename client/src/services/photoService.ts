@@ -6,6 +6,17 @@ import { getMediaType } from './uploadService'
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function mapPhoto(data: any): Photo {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  
+  let finalS3Url = data.s3_url
+  // Auto-heal dead tunnel URLs dynamically based on current .env
+  if (finalS3Url && finalS3Url.includes('/stream/')) {
+    const parts = finalS3Url.split('/stream/')
+    if (parts.length > 1) {
+      finalS3Url = `${backendUrl}/stream/${parts[1]}`
+    }
+  }
+
   return {
     id: data.id,
     eventId: data.event_id,
@@ -16,7 +27,7 @@ function mapPhoto(data: any): Photo {
     fileSizeBytes: data.file_size_bytes,
     mediaType: data.media_type as MediaType,
     s3Key: data.s3_key,
-    s3Url: data.s3_url,
+    s3Url: finalS3Url,
     thumbnailUrl: data.thumbnail_url,
     thumbnailBase64: data.thumbnail_base64,
     takenAt: data.taken_at,
