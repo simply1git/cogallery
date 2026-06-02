@@ -5,8 +5,8 @@
  * This means NO cloud storage is needed for previews.
  */
 
-const MAX_THUMB_DIM = 200
-const THUMB_QUALITY = 0.4 // low quality → tiny size
+const MAX_THUMB_DIM = 800
+const THUMB_QUALITY = 0.8 // high quality
 const VIDEO_SEEK_TIME = 1   // capture frame at 1 second
 
 /**

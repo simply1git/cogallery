@@ -96,7 +96,7 @@ export async function uploadPhotoWithMetadata(
         filename: file.name,
         file_size_bytes: file.size,
         media_type: mediaType,
-        s3_key: `oracle:pending`,
+        s3_key: `oracle:pending:${Date.now()}-${Math.random().toString(36).substring(7)}`,
         s3_url: 'https://pending', // will update after upload
         thumbnail_base64: thumbnailBase64,
       })

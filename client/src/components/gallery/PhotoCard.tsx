@@ -46,13 +46,13 @@ export function PhotoCard({
     >
       {/* Media */}
       <div className="relative bg-[#0f0f0f]">
-        {imgError || !photo.thumbnailBase64 ? (
+        {imgError && !photo.thumbnailBase64 ? (
           <div className="w-full aspect-square bg-[#141414] flex items-center justify-center">
             <span className="text-[#52525b] text-xs">Preview unavailable</span>
           </div>
         ) : (
           <img
-            src={photo.thumbnailBase64}
+            src={(!isVideo && photo.s3Url && !imgError) ? photo.s3Url : photo.thumbnailBase64}
             alt={photo.filename}
             className="w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] min-h-[160px]"
             loading="lazy"
