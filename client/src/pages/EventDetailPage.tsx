@@ -293,7 +293,7 @@ export function EventDetailPage() {
     )
   }
 
-  if (!event) {
+  if (eventError || !event) {
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center animate-slide-up">
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
@@ -319,6 +319,8 @@ export function EventDetailPage() {
       </div>
     )
   }
+
+
 
   // Waiting Room UIs
   if (!hasAccess) {
