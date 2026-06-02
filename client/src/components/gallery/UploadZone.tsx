@@ -46,7 +46,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
       const startIndex = uploads.length
 
       // State of the art parallel file uploads
-      const MAX_CONCURRENT_UPLOADS = 4;
+      const MAX_CONCURRENT_UPLOADS = 12;
       let active = 0;
       let index = 0;
 
