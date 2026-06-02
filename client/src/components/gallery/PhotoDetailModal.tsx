@@ -4,7 +4,7 @@ import {
   MessageCircle, Camera, Calendar, HardDrive, Image as ImageIcon, Layout,
   ChevronUp, ChevronDown
 } from 'lucide-react'
-import { motion, PanInfo } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/services/photoService'
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
@@ -147,7 +147,7 @@ export function PhotoDetailModal({
             <motion.div 
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              onDragEnd={(e, info) => {
+              onDragEnd={(_e, info) => {
                 const swipeThreshold = 50;
                 if (info.offset.x > swipeThreshold && hasPrev) onNavigate(allPhotos[currentIndex - 1]);
                 else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
@@ -167,7 +167,7 @@ export function PhotoDetailModal({
             <motion.img
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              onDragEnd={(e, info) => {
+              onDragEnd={(_e, info) => {
                 const swipeThreshold = 50;
                 if (info.offset.x > swipeThreshold && hasPrev) onNavigate(allPhotos[currentIndex - 1]);
                 else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
