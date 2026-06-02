@@ -45,29 +45,52 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
 
       const startIndex = uploads.length
 
-      for (let i = 0; i < accepted.length; i++) {
-        const fileIndex = startIndex + i
-        const file = accepted[i]
+      // State of the art parallel file uploads
+      const MAX_CONCURRENT_UPLOADS = 4;
+      let active = 0;
+      let index = 0;
 
-        updateFile(fileIndex, { status: 'uploading' })
+      await new Promise<void>((resolve) => {
+        function next() {
+          if (index >= accepted.length && active === 0) {
+            resolve();
+            return;
+          }
+          
+          while (active < MAX_CONCURRENT_UPLOADS && index < accepted.length) {
+            const currentIndex = index++;
+            active++;
+            
+            const fileIndex = startIndex + currentIndex;
+            const file = accepted[currentIndex];
 
-        const { data, error } = await uploadPhotoWithMetadata({
-          file,
-          eventId,
-          roomId,
-          userId,
-          onProgress: (progress) => updateFile(fileIndex, { progress }),
-        })
+            updateFile(fileIndex, { status: 'uploading' });
 
-        if (error || !data) {
-          updateFile(fileIndex, { status: 'error', error: error ?? 'Upload failed' })
-          toast.error(`Failed: ${file.name}`)
-        } else {
-          updateFile(fileIndex, { status: 'done', progress: 100 })
-          onUploadSuccess?.(data)
-          toast.success(`Uploaded: ${file.name}`)
+            uploadPhotoWithMetadata({
+              file,
+              eventId,
+              roomId,
+              userId,
+              onProgress: (progress) => updateFile(fileIndex, { progress }),
+            }).then(({ data, error }) => {
+              if (error || !data) {
+                updateFile(fileIndex, { status: 'error', error: error ?? 'Upload failed' });
+                toast.error(`Failed: ${file.name}`);
+              } else {
+                updateFile(fileIndex, { status: 'done', progress: 100 });
+                onUploadSuccess?.(data);
+                toast.success(`Uploaded: ${file.name}`);
+              }
+            }).catch(() => {
+              updateFile(fileIndex, { status: 'error', error: 'Unexpected error' });
+            }).finally(() => {
+              active--;
+              next();
+            });
+          }
         }
-      }
+        next();
+      });
 
       setIsUploading(false)
     },
