@@ -9,31 +9,78 @@ const MAX_THUMB_DIM = 800
 const THUMB_QUALITY = 0.8 // high quality
 const VIDEO_SEEK_TIME = 1   // capture frame at 1 second
 
+// Fallback manual blob to base64 (used if worker fails or for videos)
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return `data:${blob.type};base64,${btoa(binary)}`
+}
+
+// Initialize the Web Worker (only once)
+let worker: Worker | null = null;
+let jobIdCounter = 0;
+const workerPromises = new Map<number, { resolve: (val: string) => void, reject: (err: any) => void }>();
+
+function getWorker() {
+  if (typeof window === 'undefined') return null;
+  if (!worker) {
+    worker = new Worker(new URL('../workers/imageWorker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e) => {
+      const { id, success, base64, error } = e.data;
+      const promise = workerPromises.get(id);
+      if (promise) {
+        if (success) promise.resolve(base64);
+        else promise.reject(new Error(error));
+        workerPromises.delete(id);
+      }
+    };
+  }
+  return worker;
+}
+
 /**
  * Generate a base64 JPEG thumbnail from an image File.
- * Typically produces a 5-15KB string.
+ * Offloads all processing to a Web Worker so the UI never freezes!
  */
 export function generateImageThumbnail(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('Failed to decode image'))
-      img.onload = () => {
-        const { width, height } = scaleDown(img.width, img.height, MAX_THUMB_DIM)
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')!
-        ctx.drawImage(img, 0, 0, width, height)
-        const dataUrl = canvas.toDataURL('image/jpeg', THUMB_QUALITY)
-        resolve(dataUrl)
+  const w = getWorker();
+  
+  if (!w || !window.OffscreenCanvas) {
+    // Fallback for extremely old browsers that don't support Web Workers or OffscreenCanvas
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onerror = () => reject(new Error('Failed to decode image'))
+        img.onload = () => {
+          const { width, height } = scaleDown(img.width, img.height, MAX_THUMB_DIM)
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')!
+          ctx.drawImage(img, 0, 0, width, height)
+          canvas.toBlob(async (blob) => {
+            if (blob) resolve(await blobToBase64(blob))
+            else reject(new Error('Canvas blob failed'))
+          }, 'image/jpeg', THUMB_QUALITY)
+        }
+        img.src = e.target!.result as string
       }
-      img.src = e.target!.result as string
-    }
-    reader.readAsDataURL(file)
-  })
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // State of the Art Web Worker processing
+  return new Promise((resolve, reject) => {
+    const id = ++jobIdCounter;
+    workerPromises.set(id, { resolve, reject });
+    w.postMessage({ id, file });
+  });
 }
 
 /**
@@ -74,9 +121,20 @@ export function generateVideoThumbnail(file: File): Promise<string> {
       canvas.height = height
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(video, 0, 0, width, height)
-      const dataUrl = canvas.toDataURL('image/jpeg', THUMB_QUALITY)
-      URL.revokeObjectURL(url)
-      resolve(dataUrl)
+      
+      // Use toBlob instead of toDataURL to prevent main thread blocking
+      canvas.toBlob(async (blob) => {
+        URL.revokeObjectURL(url)
+        if (blob) {
+          try {
+            resolve(await blobToBase64(blob))
+          } catch (e) {
+            reject(new Error('Failed to encode video frame'))
+          }
+        } else {
+          reject(new Error('Canvas blob failed'))
+        }
+      }, 'image/jpeg', THUMB_QUALITY)
     }
   })
 }
