@@ -170,10 +170,15 @@ export async function uploadPhotoWithMetadata(
 
     // Finalize URL in database
     const finalUrl = `${backendUrl}/stream/${photoId}`
-    await supabase.from('photos').update({
+    const { error: updateError } = await supabase.from('photos').update({
       s3_key: `oracle:${photoId}`,
       s3_url: finalUrl
     }).eq('id', photoId)
+
+    if (updateError) {
+      console.error('Failed to update URL in DB:', updateError)
+      // Even if DB fails, we still return the updated object locally so the UI works
+    }
 
     photoRow.s3_url = finalUrl
     photoRow.s3_key = `oracle:${photoId}`
