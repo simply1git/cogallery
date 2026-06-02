@@ -33,6 +33,7 @@ export function EventDetailPage() {
 
   const [room, setRoom] = useState<RoomWithMembers | null>(null)
   const [event, setEvent] = useState<EventWithDetails | null>(null)
+  const [eventError, setEventError] = useState<string | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [isLoadingEvent, setIsLoadingEvent] = useState(true)
@@ -63,6 +64,7 @@ export function EventDetailPage() {
     Promise.all([getEventById(eventId), getRoomById(roomId)]).then(([eventRes, roomRes]) => {
       if (eventRes.error || !eventRes.data) {
         console.error('Failed to load event:', eventRes.error)
+        setEventError(eventRes.error || 'Event not found')
         // Don't immediately redirect — show an error state instead
         // The error may be RLS-related, not a true 404
         toast.error(eventRes.error || 'Could not load event')
