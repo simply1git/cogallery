@@ -22,6 +22,8 @@ export async function downloadPhotosAsZip(
         for (let i = 0; i < s3Photos.length; i++) {
           const photo = s3Photos[i];
           const response = await fetch(photo.s3Url!);
+          if (!response.body) continue;
+          
           if (onProgress) onProgress(10 + Math.round(((i + 1) / s3Photos.length) * 80));
           yield {
             name: photo.filename,
