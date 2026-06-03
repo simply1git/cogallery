@@ -25,9 +25,7 @@ export function Header() {
 
             {/* Logo */}
             <Link to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-900/30">
-                <Camera size={17} className="text-white" />
-              </div>
+              <img src="/logo-transparent.png" alt="CoGallery Logo" className="w-8 h-8 object-contain" />
               <span className="text-lg font-bold text-[#f4f4f5] tracking-tight">CoGallery</span>
             </Link>
 
