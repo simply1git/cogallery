@@ -6,6 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import archiver from 'archiver';
+import https from 'https';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -203,6 +205,62 @@ app.get('/stream/:photoId', async (req, res) => {
   } catch (err) {
     res.status(404).json({ error: 'File not found' });
   }
+});
+
+// Fallback ZIP streaming endpoint for iOS/Safari
+app.post('/api/download-zip', [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
+  // If sent via form urlencoded, req.body.photos is a stringified JSON array
+  let photos = req.body.photos;
+  if (typeof photos === 'string') {
+    try { photos = JSON.parse(photos); } catch (e) {}
+  }
+  const filename = req.body.filename;
+
+  if (!photos || !Array.isArray(photos)) {
+    return res.status(400).json({ error: 'Missing photos array' });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'application/zip',
+    'Content-Disposition': `attachment; filename="${filename || 'gallery'}.zip"`,
+    'Access-Control-Expose-Headers': 'Content-Disposition'
+  });
+
+  const archive = archiver('zip', {
+    zlib: { level: 0 } // No compression for speed (photos/videos are already compressed)
+  });
+
+  archive.on('error', (err) => {
+    console.error('Archiver error:', err);
+    res.status(500).end();
+  });
+
+  archive.pipe(res);
+
+  // Append each file from its URL stream sequentially to avoid overwhelming server sockets
+  for (const photo of photos) {
+    if (!photo.url || !photo.filename) continue;
+    try {
+      await new Promise((resolve) => {
+        const reqStream = photo.url.startsWith('https') ? https : null; // Assuming S3 presigned URLs are HTTPS
+        if (!reqStream) return resolve();
+
+        reqStream.get(photo.url, (response) => {
+          if (response.statusCode === 200) {
+            archive.append(response, { name: photo.filename });
+            response.on('end', resolve);
+            response.on('error', resolve);
+          } else {
+            resolve();
+          }
+        }).on('error', resolve);
+      });
+    } catch (e) {
+      console.error('Error fetching photo for zip:', e);
+    }
+  }
+
+  archive.finalize();
 });
 
 const PORT = process.env.PORT || 3000;
