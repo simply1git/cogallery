@@ -1,7 +1,7 @@
 import { downloadZip } from 'client-zip'
 import type { Photo } from '@/types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
 export async function downloadPhotosAsZip(
   photos: Photo[],
