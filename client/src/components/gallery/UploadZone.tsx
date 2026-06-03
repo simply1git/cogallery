@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { UploadCloud, X, CheckCircle2, AlertCircle, Film, ImageIcon, Loader2 } from 'lucide-react'
-import { uploadPhotoWithMetadata } from '@/services/photoService'
+import { UploadCloud, X, CheckCircle2, Film, ImageIcon, Loader2 } from 'lucide-react'
 import { getMediaType, formatFileSize, ACCEPTED_MEDIA_TYPES } from '@/services/uploadService'
+import { uploadQueueService } from '@/services/uploadQueueService'
+import { useUploadQueue } from '@/hooks/useUploadQueue'
 import type { Photo } from '@/types'
-import { toast } from 'sonner'
 
 interface UploadZoneProps {
   eventId: string
@@ -13,90 +13,17 @@ interface UploadZoneProps {
   onUploadSuccess?: (photo: Photo) => void
 }
 
-interface FileUploadState {
-  file: File
-  progress: number
-  status: 'pending' | 'uploading' | 'done' | 'error'
-  error?: string
-  mediaType: 'image' | 'video' | null
-}
-
-export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZoneProps) {
-  const [uploads, setUploads] = useState<FileUploadState[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-
-  const updateFile = (index: number, patch: Partial<FileUploadState>) => {
-    setUploads((prev) => prev.map((u, i) => (i === index ? { ...u, ...patch } : u)))
-  }
+export function UploadZone({ eventId, roomId, userId }: UploadZoneProps) {
+  // Use global persistent queue instead of local memory state
+  const { uploads, removeItem, retryItem, clearCompleted } = useUploadQueue()
 
   const onDrop = useCallback(
     async (accepted: File[]) => {
       if (accepted.length === 0) return
-
-      const newUploads: FileUploadState[] = accepted.map((file) => ({
-        file,
-        progress: 0,
-        status: 'pending',
-        mediaType: getMediaType(file),
-      }))
-
-      setUploads((prev) => [...prev, ...newUploads])
-      setIsUploading(true)
-
-      const startIndex = uploads.length
-
-      // State of the art parallel file uploads
-      const MAX_CONCURRENT_UPLOADS = 12;
-      let active = 0;
-      let index = 0;
-
-      await new Promise<void>((resolve) => {
-        function next() {
-          if (index >= accepted.length && active === 0) {
-            resolve();
-            return;
-          }
-          
-          while (active < MAX_CONCURRENT_UPLOADS && index < accepted.length) {
-            const currentIndex = index++;
-            active++;
-            
-            const fileIndex = startIndex + currentIndex;
-            const file = accepted[currentIndex];
-
-            updateFile(fileIndex, { status: 'uploading' });
-
-            uploadPhotoWithMetadata({
-              file,
-              eventId,
-              roomId,
-              userId,
-              onProgress: (progress) => updateFile(fileIndex, { progress }),
-            }).then(({ data, error }) => {
-              if (error || !data) {
-                updateFile(fileIndex, { status: 'error', error: error ?? 'Upload failed' });
-                toast.error(`Failed: ${file.name}`);
-              } else {
-                updateFile(fileIndex, { status: 'done', progress: 100 });
-                onUploadSuccess?.(data);
-                toast.success(`Uploaded: ${file.name}`);
-                // Haptic feedback for mobile
-                if (navigator.vibrate) navigator.vibrate(50);
-              }
-            }).catch(() => {
-              updateFile(fileIndex, { status: 'error', error: 'Unexpected error' });
-            }).finally(() => {
-              active--;
-              next();
-            });
-          }
-        }
-        next();
-      });
-
-      setIsUploading(false)
+      // Instantly cache to IndexedDB and trigger background processing
+      await uploadQueueService.addFiles(accepted, { eventId, roomId, userId })
     },
-    [eventId, roomId, userId, uploads.length, onUploadSuccess]
+    [eventId, roomId, userId]
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -105,13 +32,12 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
     // No file size limit
   })
 
-  const removeUpload = (index: number) => {
-    setUploads((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const completedCount = uploads.filter((u) => u.status === 'done').length
-  const errorCount = uploads.filter((u) => u.status === 'error').length
-  const totalCount = uploads.length
+  // Filter uploads specific to this room (in case user switches rooms while uploading)
+  const roomUploads = uploads.filter(u => u.roomId === roomId)
+  const completedCount = roomUploads.filter(u => u.status === 'done').length
+  const errorCount = roomUploads.filter(u => u.status === 'error').length
+  const totalCount = roomUploads.length
+  const isUploading = roomUploads.some(u => u.status === 'uploading')
 
   return (
     <div className="space-y-4">
@@ -163,86 +89,97 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
       </div>
 
       {/* Upload list */}
-      {uploads.length > 0 && (
+      {roomUploads.length > 0 && (
         <div className="space-y-2">
           {/* Summary */}
           {totalCount > 1 && (
-            <div className="flex items-center gap-2 text-sm text-[#a1a1aa]">
-              <span>{completedCount}/{totalCount} uploaded</span>
-              {errorCount > 0 && (
-                <span className="text-red-400">• {errorCount} failed</span>
-              )}
-              {isUploading && (
-                <Loader2 size={14} className="animate-spin-slow text-blue-400" />
+            <div className="flex items-center gap-2 text-sm text-[#a1a1aa] justify-between">
+              <div className="flex items-center gap-2">
+                <span>{completedCount}/{totalCount} uploaded</span>
+                {errorCount > 0 && (
+                  <span className="text-red-400">• {errorCount} failed</span>
+                )}
+                {isUploading && (
+                  <Loader2 size={14} className="animate-spin-slow text-blue-400" />
+                )}
+              </div>
+              {/* Clear done */}
+              {completedCount > 0 && !isUploading && (
+                <button
+                  onClick={clearCompleted}
+                  className="text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+                >
+                  Clear completed
+                </button>
               )}
             </div>
           )}
 
           {/* Individual files */}
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            {uploads.map((u, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[#0f0f0f] border border-white/[0.06]">
-                {/* Icon */}
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/[0.05]">
-                  {u.mediaType === 'video' ? (
-                    <Film size={16} className="text-purple-400" />
-                  ) : (
-                    <ImageIcon size={16} className="text-blue-400" />
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[#f4f4f5] truncate">{u.file.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-[#71717a]">{formatFileSize(u.file.size)}</span>
-                    {u.status === 'uploading' && (
-                      <>
-                        <span className="text-[#52525b]">•</span>
-                        <span className="text-xs text-blue-400">{u.progress}%</span>
-                      </>
-                    )}
-                    {u.status === 'error' && (
-                      <span className="text-xs text-red-400 truncate">{u.error}</span>
+            {roomUploads.map((u) => {
+              const mediaType = getMediaType(u.file)
+              return (
+                <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl bg-[#0f0f0f] border border-white/[0.06]">
+                  {/* Icon */}
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/[0.05]">
+                    {mediaType === 'video' ? (
+                      <Film size={16} className="text-purple-400" />
+                    ) : (
+                      <ImageIcon size={16} className="text-blue-400" />
                     )}
                   </div>
-                  {/* Progress bar */}
-                  {u.status === 'uploading' && (
-                    <div className="mt-1.5 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${u.progress}%` }}
-                      />
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#f4f4f5] truncate">{u.file.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-[#71717a]">{formatFileSize(u.file.size)}</span>
+                      {u.status === 'uploading' && (
+                        <>
+                          <span className="text-[#52525b]">•</span>
+                          <span className="text-xs text-blue-400">{Math.round(u.progress)}%</span>
+                        </>
+                      )}
+                      {u.status === 'error' && (
+                        <span className="text-xs text-red-400 truncate">{u.error}</span>
+                      )}
+                      {u.status === 'queued' && (
+                        <span className="text-xs text-amber-500 truncate">Queued...</span>
+                      )}
                     </div>
-                  )}
-                </div>
+                    {/* Progress bar */}
+                    {u.status === 'uploading' && (
+                      <div className="mt-1.5 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                          style={{ width: `${u.progress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                {/* Status icon */}
-                <div className="flex-shrink-0">
-                  {u.status === 'done' && <CheckCircle2 size={18} className="text-emerald-400" />}
-                  {u.status === 'error' && <AlertCircle size={18} className="text-red-400" />}
-                  {u.status === 'uploading' && (
-                    <Loader2 size={18} className="text-blue-400 animate-spin-slow" />
-                  )}
-                  {u.status === 'pending' && (
-                    <button onClick={() => removeUpload(i)} className="btn-icon p-1">
-                      <X size={16} />
-                    </button>
-                  )}
+                  {/* Status icon */}
+                  <div className="flex-shrink-0 flex items-center gap-2">
+                    {u.status === 'done' && <CheckCircle2 size={18} className="text-emerald-400" />}
+                    {u.status === 'uploading' && (
+                      <Loader2 size={18} className="text-blue-400 animate-spin-slow" />
+                    )}
+                    {u.status === 'error' && (
+                      <button onClick={() => retryItem(u.id)} className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 bg-rose-500/10 rounded">
+                        Retry
+                      </button>
+                    )}
+                    {u.status !== 'uploading' && (
+                      <button onClick={() => removeItem(u.id)} className="btn-icon p-1" title="Remove">
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-
-          {/* Clear done */}
-          {completedCount > 0 && !isUploading && (
-            <button
-              onClick={() => setUploads((prev) => prev.filter((u) => u.status !== 'done'))}
-              className="text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
-            >
-              Clear completed ({completedCount})
-            </button>
-          )}
         </div>
       )}
     </div>

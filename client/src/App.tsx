@@ -11,6 +11,7 @@ import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { SeedboxBotPage } from '@/pages/SeedboxBotPage'
 import { Layout } from '@/components/shared/Layout'
 import { useAuth } from '@/hooks/useAuth'
+import { uploadQueueService } from '@/services/uploadQueueService'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading } = useAuth()
@@ -88,6 +89,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Initialize the background IndexedDB offline upload queue
+    uploadQueueService.init();
     setIsLoading(false)
   }, [])
 
