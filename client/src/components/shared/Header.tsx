@@ -19,7 +19,7 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-[#080808]/90 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-[#080808]/90 backdrop-blur-xl pt-safe">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-15 py-3">
 

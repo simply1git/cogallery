@@ -19,6 +19,7 @@
       radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, 0.08), transparent),
       radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.05), transparent);
     min-height: 100vh;
+    overscroll-behavior-y: none;
   }
 
   * { box-sizing: border-box; }

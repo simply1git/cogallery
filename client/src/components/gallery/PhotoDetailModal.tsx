@@ -116,7 +116,7 @@ export function PhotoDetailModal({
   return (
     <div className="lightbox-overlay animate-fade-in" onClick={onClose}>
       {/* Close */}
-      <button className="absolute top-3 right-3 z-30 btn-icon bg-black/60 backdrop-blur-sm border border-white/10" onClick={onClose}>
+      <button className="absolute top-3 right-3 z-30 btn-icon bg-black/60 backdrop-blur-sm border border-white/10 mt-safe" onClick={onClose}>
         <X size={20} />
       </button>
 
