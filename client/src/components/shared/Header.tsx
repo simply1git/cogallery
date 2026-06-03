@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Camera, LogOut, LayoutDashboard, Menu, X, Settings } from 'lucide-react'
+import { LogOut, LayoutDashboard, Menu, X, Settings } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut } from '@/services/authService'
 import { useState } from 'react'
