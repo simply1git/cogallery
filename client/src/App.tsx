@@ -14,7 +14,7 @@ import { MaintenancePage } from '@/pages/MaintenancePage'
 import { Layout } from '@/components/shared/Layout'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadQueueService } from '@/services/uploadQueueService'
-import { supabase } from '@/supabaseClient'
+import { supabase } from '@/lib/supabase'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading } = useAuth()
@@ -99,13 +99,14 @@ function AppRoutes() {
 }
 
 function App() {
-  const { isLoading } = useAuth()
+  const { isLoading: isAuthLoading } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
   const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false)
 
   // Start processing the upload queue when the app loads
   useEffect(() => {
-    uploadQueueService.startProcessing()
-    return () => uploadQueueService.pauseProcessing()
+    uploadQueueService.init()
+    setIsLoading(false)
   }, [])
 
   // Listen to Global Config for Panic Switches
@@ -121,7 +122,7 @@ function App() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'global_config' },
-        (payload) => {
+        (payload: any) => {
           if (payload.new && 'maintenance_mode' in payload.new) {
             setMaintenanceMode(payload.new.maintenance_mode)
           }
@@ -134,7 +135,7 @@ function App() {
     }
   }, [])
 
-  if (isLoading) {
+  if (isLoading || isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-10 h-10 border-2 border-white/10 border-t-blue-500 rounded-full animate-spin-slow" />
