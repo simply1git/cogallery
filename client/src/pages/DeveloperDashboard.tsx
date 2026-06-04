@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, Users, Shield, Server, Terminal, Lock, HardDrive } from 'lucide-react'
+import { Activity, Users, Shield, Server, Terminal, HardDrive } from 'lucide-react'
 import { AdminUser, TelemetryData, getAllUsers, getTelemetry, checkIsAdmin } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'

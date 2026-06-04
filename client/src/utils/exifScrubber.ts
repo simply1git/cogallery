@@ -51,7 +51,7 @@ export async function scrubExif(file: File): Promise<File> {
   chunks.push(new Uint8Array(buffer, lastOffset));
 
   // Assemble the new blob
-  const cleanBlob = new Blob(chunks, { type: file.type });
+  const cleanBlob = new Blob(chunks as BlobPart[], { type: file.type });
   
   // Create a new File object with the same name and dates
   return new File([cleanBlob], file.name, {

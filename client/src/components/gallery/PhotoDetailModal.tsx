@@ -61,7 +61,7 @@ export function PhotoDetailModal({
       setSecureUrl(null)
       // Extract S3 key from the public URL (temporary fallback since we don't have the raw key in Photo)
       const s3Key = photo.s3Url.split('.r2.dev/')[1] || photo.filename
-      getSecureMediaUrl(s3Key).then(setSecureUrl).catch(err => toast.error('Failed to load secure media'))
+      getSecureMediaUrl(s3Key).then(setSecureUrl).catch(() => toast.error('Failed to load secure media'))
     }
   }, [photo, loadDetails])
 
