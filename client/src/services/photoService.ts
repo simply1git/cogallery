@@ -77,6 +77,7 @@ export async function uploadPhotoWithMetadata(
   opts: PhotoUploadOptions
 ): Promise<{ data: Photo | null; error: string | null }> {
   const { file, eventId, roomId, userId, onProgress } = opts
+  let photoId: string | null = null;
 
   try {
     onProgress?.(5)
@@ -115,7 +116,7 @@ export async function uploadPhotoWithMetadata(
       .single()
 
     if (dbError) throw dbError
-    const photoId = photoRow.id
+    photoId = photoRow.id
     onProgress?.(20)
 
     // Oracle Backend URL for generating the presigned URL
@@ -180,6 +181,10 @@ export async function uploadPhotoWithMetadata(
 
     return { data: mapPhoto(photoRow), error: null }
   } catch (err: any) {
+    if (photoId) {
+      // Rollback the ghost preview from Supabase if the upload failed!
+      await supabase.from('photos').delete().eq('id', photoId).catch(console.error);
+    }
     return { data: null, error: err.message }
   }
 }
