@@ -10,10 +10,7 @@ import util from 'util';
 const execPromise = util.promisify(exec);
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
-import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, GetObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createClient } from '@supabase/supabase-js';
-// Some commonJS modules in ESM require this workaround if default export is missing:
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const archiver = require('archiver');
@@ -22,20 +19,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// R2 Configuration
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: process.env.R2_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-  },
-});
-const BUCKET_NAME = process.env.R2_BUCKET_NAME || 'cogallery-photos';
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CACHE_DIR = path.join(__dirname, 'file-cache');
-const TEMP_DIR = path.join(__dirname, 'temp-chunks');
+const CACHE_DIR = path.join(__dirname, 'uploads');
+const TEMP_DIR = path.join(__dirname, 'uploads/temp');
 
 const app = express();
 
@@ -50,6 +36,25 @@ app.use(express.json({ limit: '50mb' }));
 // Ensure directories exist
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 await fs.mkdir(TEMP_DIR, { recursive: true }).catch(() => {});
+
+// --- DISK JANITOR ---
+// Clean up temp chunks older than 24 hours every day
+setInterval(async () => {
+  try {
+    const now = Date.now();
+    const dirs = await fs.readdir(TEMP_DIR);
+    for (const dir of dirs) {
+      const dirPath = path.join(TEMP_DIR, dir);
+      const stat = await fs.stat(dirPath);
+      if (now - stat.mtimeMs > 24 * 60 * 60 * 1000) {
+        await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
+        console.log(`[Janitor] Cleaned abandoned upload: ${dir}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Janitor] Cleanup error:', err);
+  }
+}, 24 * 60 * 60 * 1000);
 
 // --- ZERO-TRUST SECURITY MIDDLEWARE ---
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
@@ -134,22 +139,17 @@ app.post('/developer/nuke-user', authenticateJWT, async (req, res) => {
 
     if (fetchError) throw fetchError;
 
-    // 3. Batch delete from Cloudflare R2
+    // 3. Batch delete from Local Storage
     if (photos && photos.length > 0) {
-      const BUCKET = process.env.R2_BUCKET_NAME || 'cogallery-photos';
-      // AWS SDK allows max 1000 objects per DeleteObjectsCommand
-      const chunks = [];
-      for (let i = 0; i < photos.length; i += 1000) {
-        chunks.push(photos.slice(i, i + 1000));
-      }
-
-      for (const chunk of chunks) {
-        const objectsToDelete = chunk.map(p => ({ Key: p.filename }));
-        const command = new DeleteObjectsCommand({
-          Bucket: BUCKET,
-          Delete: { Objects: objectsToDelete }
-        });
-        await s3Client.send(command);
+      for (const p of photos) {
+        try {
+          const dataPath = path.join(CACHE_DIR, `${p.filename}.data`);
+          const metaPath = path.join(CACHE_DIR, `${p.filename}.meta.json`);
+          await fs.unlink(dataPath).catch(() => {});
+          await fs.unlink(metaPath).catch(() => {});
+        } catch (e) {
+          console.error(`Failed to delete local file ${p.filename}:`, e);
+        }
       }
     }
 
@@ -164,107 +164,17 @@ app.post('/developer/nuke-user', authenticateJWT, async (req, res) => {
   }
 });
 
-// Generate Pre-signed URL for direct R2 upload
-app.get('/upload/presigned-url', authenticateJWT, uploadLimiter, async (req, res) => {
-  try {
-    const { filename, contentType } = req.query;
-    if (!filename || !contentType) {
-      return res.status(400).json({ error: 'Missing filename or contentType' });
-    }
-    
-    // We can use the filename as the key, or prepend a UUID. The client passes a unique filename.
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: filename,
-      ContentType: contentType,
-    });
-    
-    // URL expires in 1 hour
-    const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
-    
-    return res.json({ url: presignedUrl, key: filename });
-  } catch (error) {
-    console.error('Presigned URL error:', error);
-    return res.status(500).json({ error: 'Failed to generate upload URL' });
-  }
-});
-
-// --- EPHEMERAL PRESIGNED GET URL ---
+// --- EPHEMERAL SECURE GET URL (ZERO TRUST) ---
 app.post('/media/presign-get', authenticateJWT, async (req, res) => {
   try {
     const { key } = req.body;
     if (!key) return res.status(400).json({ error: 'Missing key' });
     
-    const command = new GetObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key
-    });
-    // URL Self-Destructs in 60 seconds
-    const url = await getSignedUrl(r2Client, command, { expiresIn: 60 });
+    // Generate a short-lived JWT token that grants read access to this specific file
+    const streamToken = jwt.sign({ key }, JWT_SECRET, { expiresIn: '60s' });
+    const url = `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
+    
     res.json({ url });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// --- MULTIPART UPLOAD ENDPOINTS ---
-app.post('/upload/multipart/create', authenticateJWT, uploadLimiter, async (req, res) => {
-  try {
-    const { filename, contentType } = req.body;
-    const command = new CreateMultipartUploadCommand({
-      Bucket: BUCKET_NAME,
-      Key: filename,
-      ContentType: contentType
-    });
-    const { UploadId } = await r2Client.send(command);
-    res.json({ uploadId: UploadId, key: filename });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/upload/multipart/sign-part', authenticateJWT, uploadLimiter, async (req, res) => {
-  try {
-    const { key, uploadId, partNumber } = req.body;
-    const command = new UploadPartCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-      UploadId: uploadId,
-      PartNumber: partNumber
-    });
-    const url = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
-    res.json({ url });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/upload/multipart/complete', authenticateJWT, uploadLimiter, async (req, res) => {
-  try {
-    const { key, uploadId, parts } = req.body;
-    const command = new CompleteMultipartUploadCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-      UploadId: uploadId,
-      MultipartUpload: { Parts: parts }
-    });
-    await r2Client.send(command);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/upload/multipart/abort', authenticateJWT, uploadLimiter, async (req, res) => {
-  try {
-    const { key, uploadId } = req.body;
-    const command = new AbortMultipartUploadCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-      UploadId: uploadId
-    });
-    await r2Client.send(command);
-    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -295,7 +205,7 @@ app.get('/upload/status/:photoId', async (req, res) => {
 const assemblyLocks = new Set();
 
 // Upload chunk
-app.post('/upload/chunk', express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
+app.post('/upload/chunk', authenticateJWT, express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
   const photoId = req.headers['x-photo-id'];
   const chunkIndex = parseInt(req.headers['x-chunk-index'], 10);
   const totalChunks = parseInt(req.headers['x-total-chunks'], 10);
@@ -366,6 +276,21 @@ app.post('/upload/chunk', express.raw({ type: '*/*', limit: '50mb' }), async (re
 // Stream Media (Video/Image) with HTTP 206 Partial Content support
 app.get('/stream/:photoId', async (req, res) => {
   const { photoId } = req.params;
+  const token = req.query.t;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Missing access token (Zero Trust)' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.key !== photoId) {
+      return res.status(403).json({ error: 'Token does not match file' });
+    }
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+
   const dataPath = path.join(CACHE_DIR, `${photoId}.data`);
   const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
   

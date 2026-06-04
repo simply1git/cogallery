@@ -121,7 +121,6 @@ export async function uploadPhotoWithMetadata(
 
     // Oracle Backend URL for generating the presigned URL
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-    const r2PublicUrl = import.meta.env.VITE_R2_PUBLIC_URL || 'https://pub-04f27384d5c64a548df89c922d72431a.r2.dev'
     
     // 1. Determine Upload Strategy
     const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
@@ -129,146 +128,76 @@ export async function uploadPhotoWithMetadata(
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData.session?.access_token
 
-    if (file.size > 20 * 1024 * 1024) {
-      // --- MULTIPART UPLOAD STRATEGY (For files > 20MB) ---
-      const CHUNK_SIZE = 10 * 1024 * 1024;
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    // --- LOCAL ORACLE CHUNKED UPLOAD STRATEGY ---
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    
+    const chunkProgress = new Array(totalChunks).fill(0);
+    let hasError = false;
+    
+    const uploadChunk = async (chunkIndex: number) => {
+      if (hasError) return;
+      const start = chunkIndex * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const blob = file.slice(start, end);
       
-      const createRes = await fetch(`${backendUrl}/upload/multipart/create`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          'ngrok-skip-browser-warning': 'true',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ filename: r2Key, contentType: file.type || 'application/octet-stream' })
-      });
-      if (!createRes.ok) throw new Error('Failed to create multipart upload');
-      const { uploadId } = await createRes.json();
-      
-      const parts: { ETag: string; PartNumber: number }[] = [];
-      const chunkProgress = new Array(totalChunks).fill(0);
-      let hasError = false;
-      
-      const uploadChunk = async (chunkIndex: number) => {
-        if (hasError) return;
-        const start = chunkIndex * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const blob = file.slice(start, end);
-        const partNumber = chunkIndex + 1;
-        
-        // Sign part
-        const signRes = await fetch(`${backendUrl}/upload/multipart/sign-part`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'ngrok-skip-browser-warning': 'true',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ key: r2Key, uploadId, partNumber })
-        });
-        if (!signRes.ok) throw new Error(`Failed to sign part ${partNumber}`);
-        const { url: partUrl } = await signRes.json();
-        
-        // Upload part
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', partUrl, true);
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              chunkProgress[chunkIndex] = e.loaded;
-              const totalLoaded = chunkProgress.reduce((a, b) => a + b, 0);
-              const percent = 20 + Math.round((totalLoaded / file.size) * 80);
-              onProgress?.(percent);
-            }
-          };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              const etag = xhr.getResponseHeader('ETag');
-              if (etag) {
-                parts.push({ ETag: etag, PartNumber: partNumber });
-              }
-              resolve();
-            } else {
-              reject(new Error(`Part ${partNumber} failed`));
-            }
-          };
-          xhr.onerror = () => reject(new Error('Network error on part upload'));
-          xhr.send(blob);
-        });
-      };
-      
-      // Parallel upload with concurrency of 4
-      try {
-        const concurrency = 4;
-        let currentIndex = 0;
-        const workers = Array(concurrency).fill(null).map(async () => {
-          while (currentIndex < totalChunks) {
-            const index = currentIndex++;
-            await uploadChunk(index);
-          }
-        });
-        await Promise.all(workers);
-        
-        // Complete multipart
-        parts.sort((a, b) => a.PartNumber - b.PartNumber);
-        const completeRes = await fetch(`${backendUrl}/upload/multipart/complete`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'ngrok-skip-browser-warning': 'true',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ key: r2Key, uploadId, parts })
-        });
-        if (!completeRes.ok) throw new Error('Failed to complete multipart upload');
-        
-      } catch (err) {
-        hasError = true;
-        await fetch(`${backendUrl}/upload/multipart/abort`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'ngrok-skip-browser-warning': 'true',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ key: r2Key, uploadId })
-        }).catch(console.error);
-        throw err;
-      }
-      
-    } else {
-      // --- STANDARD UPLOAD STRATEGY (For files <= 20MB) ---
-      const urlRes = await fetch(`${backendUrl}/upload/presigned-url?filename=${encodeURIComponent(r2Key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`, {
-        headers: { 
-          'ngrok-skip-browser-warning': 'true',
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (!urlRes.ok) throw new Error('Failed to securely generate upload URL')
-      const { url: presignedUrl } = await urlRes.json()
-
       await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('PUT', presignedUrl, true)
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${backendUrl}/upload/chunk`, true);
+        
+        xhr.setRequestHeader('x-photo-id', r2Key);
+        xhr.setRequestHeader('x-chunk-index', chunkIndex.toString());
+        xhr.setRequestHeader('x-total-chunks', totalChunks.toString());
+        xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
+        xhr.setRequestHeader('x-mime-type', file.type || 'application/octet-stream');
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
+
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
-            const percent = 20 + Math.round((e.loaded / e.total) * 80)
-            onProgress?.(percent)
+            chunkProgress[chunkIndex] = e.loaded;
+            const totalLoaded = chunkProgress.reduce((a, b) => a + b, 0);
+            const percent = 20 + Math.round((totalLoaded / file.size) * 80);
+            onProgress?.(Math.min(percent, 99));
           }
-        }
+        };
+
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve()
-          else reject(new Error(`Upload failed with status ${xhr.status}`))
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
+            hasError = true;
+            reject(new Error(`Chunk ${chunkIndex} failed with status ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          hasError = true;
+          reject(new Error('Network error on chunk upload'));
+        };
+        xhr.send(blob);
+      });
+    };
+    
+    // Upload with concurrency of 2
+    try {
+      const concurrency = 2;
+      let currentIndex = 0;
+      const workers = Array(concurrency).fill(null).map(async () => {
+        while (currentIndex < totalChunks) {
+          const index = currentIndex++;
+          await uploadChunk(index);
         }
-        xhr.onerror = () => reject(new Error('Upload failed due to network error'))
-        xhr.send(file)
-      })
+      });
+      await Promise.all(workers);
+    } catch (err) {
+      throw err;
     }
 
     // Finalize URL in database
-    const finalUrl = `${r2PublicUrl}/${r2Key}`
+    // Note: Since we are using zero-trust streams, the s3_url stored here is just a placeholder.
+    // The actual viewing URL is generated dynamically via getSecureMediaUrl.
+    const finalUrl = `${backendUrl}/stream/${r2Key}`
     const { error: updateError } = await supabase.from('photos').update({
       s3_key: r2Key,
       s3_url: finalUrl
@@ -276,11 +205,10 @@ export async function uploadPhotoWithMetadata(
 
     if (updateError) {
       console.error('Failed to update URL in DB:', updateError)
-      // Even if DB fails, we still return the updated object locally so the UI works
     }
 
     photoRow.s3_url = finalUrl
-    photoRow.s3_key = `oracle:${photoId}`
+    photoRow.s3_key = r2Key
 
     onProgress?.(100)
 
@@ -317,7 +245,7 @@ export async function getSecureMediaUrl(s3Key: string): Promise<string> {
 
   if (!res.ok) throw new Error('Failed to get secure media url');
   const { url } = await res.json();
-  return url;
+  return url.startsWith('http') ? url : `${backendUrl}${url}`;
 }
 
 // ─── Photo Listing ───────────────────────────────────────────────────────────
