@@ -60,7 +60,7 @@ export const PhotoCard = memo(function PhotoCard({
           </div>
         ) : (
           <img
-            src={(!isVideo && photo.s3Url && !imgError) ? photo.s3Url : photo.thumbnailBase64}
+            src={(photo.thumbnailBase64 && !imgError) ? photo.thumbnailBase64 : (photo.s3Url && !imgError ? photo.s3Url : '')}
             alt={photo.filename}
             className="w-full h-auto block transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"

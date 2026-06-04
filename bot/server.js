@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 // Some commonJS modules in ESM require this workaround if default export is missing:
 import { createRequire } from 'module';
@@ -38,6 +38,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['*']
 }));
+app.use(express.json({ limit: '50mb' }));
 
 // Ensure directories exist
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
@@ -70,6 +71,69 @@ app.get('/upload/presigned-url', async (req, res) => {
   } catch (error) {
     console.error('Presigned URL error:', error);
     return res.status(500).json({ error: 'Failed to generate upload URL' });
+  }
+});
+
+// --- MULTIPART UPLOAD ENDPOINTS ---
+app.post('/upload/multipart/create', async (req, res) => {
+  try {
+    const { filename, contentType } = req.body;
+    const command = new CreateMultipartUploadCommand({
+      Bucket: BUCKET_NAME,
+      Key: filename,
+      ContentType: contentType
+    });
+    const { UploadId } = await r2Client.send(command);
+    res.json({ uploadId: UploadId, key: filename });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/upload/multipart/sign-part', async (req, res) => {
+  try {
+    const { key, uploadId, partNumber } = req.body;
+    const command = new UploadPartCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber
+    });
+    const url = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+    res.json({ url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/upload/multipart/complete', async (req, res) => {
+  try {
+    const { key, uploadId, parts } = req.body;
+    const command = new CompleteMultipartUploadCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: parts }
+    });
+    await r2Client.send(command);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/upload/multipart/abort', async (req, res) => {
+  try {
+    const { key, uploadId } = req.body;
+    const command = new AbortMultipartUploadCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      UploadId: uploadId
+    });
+    await r2Client.send(command);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
