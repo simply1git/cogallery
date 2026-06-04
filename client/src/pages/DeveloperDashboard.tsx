@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Activity, Users, Shield, Server, Terminal, HardDrive } from 'lucide-react'
-import { AdminUser, TelemetryData, getAllUsers, getTelemetry, checkIsAdmin } from '@/services/adminService'
+import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2 } from 'lucide-react'
+import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -9,8 +9,13 @@ export function DeveloperDashboard() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [telemetry, setTelemetry] = useState<TelemetryData | null>(null)
-  const [activeTab, setActiveTab] = useState<'users' | 'server'>('server')
+  const [activeTab, setActiveTab] = useState<'users' | 'server' | 'settings'>('server')
   const navigate = useNavigate()
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [globalConfig, setGlobalConfig] = useState<GlobalConfig | null>(null)
+
+  const refreshUsers = () => getAllUsers().then(setUsers).catch(err => toast.error(err.message))
+  const refreshConfig = () => getGlobalConfig().then(setGlobalConfig).catch(console.error)
 
   useEffect(() => {
     checkIsAdmin().then(admin => {
@@ -24,9 +29,8 @@ export function DeveloperDashboard() {
 
   useEffect(() => {
     if (!isAdmin) return
-    if (activeTab === 'users') {
-      getAllUsers().then(setUsers).catch(err => toast.error(err.message))
-    }
+    if (activeTab === 'users') refreshUsers()
+    if (activeTab === 'settings') refreshConfig()
   }, [isAdmin, activeTab])
 
   useEffect(() => {
@@ -40,6 +44,67 @@ export function DeveloperDashboard() {
 
   if (isAdmin === null) return <div className="p-8 flex justify-center"><Activity className="animate-spin" /></div>
   if (!isAdmin) return null
+
+  const handleQuotaChange = async (u: AdminUser) => {
+    const raw = prompt(`Enter new quota in bytes for ${u.display_name} (Current: ${u.max_storage_bytes})`, String(u.max_storage_bytes))
+    if (!raw) return
+    const quota = parseInt(raw)
+    if (isNaN(quota)) return toast.error('Invalid number')
+    try {
+      setIsProcessing(true)
+      await updateUserQuota(u.id, quota)
+      toast.success('Quota updated')
+      refreshUsers()
+    } catch(e: any) { toast.error(e.message) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleToggleBan = async (u: AdminUser) => {
+    const isBanned = u.account_status === 'banned'
+    const verb = isBanned ? 'Unban' : 'Ban'
+    if (!confirm(`Are you sure you want to ${verb} ${u.display_name}?`)) return
+    try {
+      setIsProcessing(true)
+      await toggleUserBan(u.id, !isBanned)
+      toast.success(`${verb} successful`)
+      refreshUsers()
+    } catch(e: any) { toast.error(e.message) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleNukeUser = async (u: AdminUser) => {
+    if (!confirm(`⚡ WARNING ⚡\nAre you sure you want to PERMANENTLY NUKE ${u.display_name}?\n\nThis will physically delete all their photos from the Cloudflare R2 bucket and wipe their database records. This cannot be undone.`)) return
+    try {
+      setIsProcessing(true)
+      toast.loading('Vacuuming R2 bucket...', { id: 'nuke' })
+      const res = await nukeUser(u.id)
+      toast.success(`User nuked. Deleted ${res.deletedFiles} files from R2.`, { id: 'nuke' })
+      refreshUsers()
+    } catch(e: any) { toast.error(e.message, { id: 'nuke' }) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleToggleMaintenance = async () => {
+    if (!globalConfig) return
+    try {
+      setIsProcessing(true)
+      await updateGlobalConfig(!globalConfig.maintenance_mode, globalConfig.signups_disabled, globalConfig.read_only_mode)
+      toast.success('Maintenance mode toggled. Realtime clients updated.')
+      refreshConfig()
+    } catch(e: any) { toast.error(e.message) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleToggleSignups = async () => {
+    if (!globalConfig) return
+    try {
+      setIsProcessing(true)
+      await updateGlobalConfig(globalConfig.maintenance_mode, !globalConfig.signups_disabled, globalConfig.read_only_mode)
+      toast.success('Signups toggled.')
+      refreshConfig()
+    } catch(e: any) { toast.error(e.message) }
+    finally { setIsProcessing(false) }
+  }
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8">
@@ -75,6 +140,14 @@ export function DeveloperDashboard() {
             }`}
           >
             <Users size={16} /> User Management
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5'
+            }`}
+          >
+            <Settings size={16} /> Global Config
           </button>
         </div>
 
@@ -125,13 +198,15 @@ export function DeveloperDashboard() {
                     <th className="px-6 py-4">Quota</th>
                     <th className="px-6 py-4">Joined</th>
                     <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {users.map(u => {
                     const usagePercent = u.max_storage_bytes ? (u.used_storage_bytes / u.max_storage_bytes) * 100 : 0
+                    const isBanned = u.account_status === 'banned'
                     return (
-                      <tr key={u.id} className="hover:bg-white/[0.02]">
+                      <tr key={u.id} className={`hover:bg-white/[0.02] ${isBanned ? 'opacity-50' : ''}`}>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <img src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} className="w-8 h-8 rounded-full bg-white/10" />
@@ -154,15 +229,69 @@ export function DeveloperDashboard() {
                         <td className="px-6 py-4">
                           {u.is_admin ? (
                             <span className="badge-purple bg-purple-500/20 text-purple-400">Admin</span>
+                          ) : isBanned ? (
+                            <span className="badge-red bg-red-500/20 text-red-400">Banned</span>
                           ) : (
-                            <span className="badge-gray bg-white/10">User</span>
+                            <span className="badge-gray bg-white/10">Active</span>
                           )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => handleQuotaChange(u)} disabled={isProcessing} className="btn-icon p-2 border border-white/10 hover:bg-white/10"><Edit2 size={14}/></button>
+                            <button onClick={() => handleToggleBan(u)} disabled={isProcessing} className="btn-icon p-2 border border-white/10 hover:bg-white/10">
+                              {isBanned ? <Activity size={14} className="text-green-400"/> : <Ban size={14} className="text-orange-400"/>}
+                            </button>
+                            {!u.is_admin && (
+                              <button onClick={() => handleNukeUser(u)} disabled={isProcessing} className="btn-icon p-2 border border-red-500/50 hover:bg-red-500/20 text-red-400">
+                                <Trash2 size={14}/>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && globalConfig && (
+          <div className="bg-[#111] border border-red-500/30 rounded-xl overflow-hidden animate-fade-in p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-white mb-2">Global Panic Switches</h3>
+              <p className="text-white/50 text-sm">These switches broadcast directly to all connected users via Supabase Realtime.</p>
+            </div>
+            
+            <div className="space-y-4 max-w-lg">
+              <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg bg-black/50">
+                <div>
+                  <h4 className="font-medium text-white">Maintenance Mode</h4>
+                  <p className="text-xs text-white/50">Instantly redirects all users to a maintenance screen.</p>
+                </div>
+                <button 
+                  onClick={handleToggleMaintenance} 
+                  disabled={isProcessing}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${globalConfig.maintenance_mode ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}
+                >
+                  {globalConfig.maintenance_mode ? 'ON (Site Offline)' : 'OFF'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg bg-black/50">
+                <div>
+                  <h4 className="font-medium text-white">Disable Signups</h4>
+                  <p className="text-xs text-white/50">Removes the registration form from the auth page.</p>
+                </div>
+                <button 
+                  onClick={handleToggleSignups} 
+                  disabled={isProcessing}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${globalConfig.signups_disabled ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}
+                >
+                  {globalConfig.signups_disabled ? 'ON (Signups Closed)' : 'OFF'}
+                </button>
+              </div>
             </div>
           </div>
         )}

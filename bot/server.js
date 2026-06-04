@@ -10,8 +10,9 @@ import util from 'util';
 const execPromise = util.promisify(exec);
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
-import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, GetObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createClient } from '@supabase/supabase-js';
 // Some commonJS modules in ESM require this workaround if default export is missing:
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -107,6 +108,58 @@ app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
       logs: pm2Logs
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/developer/nuke-user', authenticateJWT, async (req, res) => {
+  try {
+    const { target_uid, supabaseUrl, supabaseAnonKey } = req.body;
+    const token = req.headers.authorization.split(' ')[1];
+
+    if (!target_uid || !supabaseUrl || !supabaseAnonKey) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // 1. Init Supabase client with the Admin's JWT token
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
+    // 2. Fetch all photos for this user (Since we use the admin token, God View RLS allows us to see all photos)
+    const { data: photos, error: fetchError } = await supabase
+      .from('photos')
+      .select('filename')
+      .eq('uploader_id', target_uid);
+
+    if (fetchError) throw fetchError;
+
+    // 3. Batch delete from Cloudflare R2
+    if (photos && photos.length > 0) {
+      const BUCKET = process.env.R2_BUCKET_NAME || 'cogallery-photos';
+      // AWS SDK allows max 1000 objects per DeleteObjectsCommand
+      const chunks = [];
+      for (let i = 0; i < photos.length; i += 1000) {
+        chunks.push(photos.slice(i, i + 1000));
+      }
+
+      for (const chunk of chunks) {
+        const objectsToDelete = chunk.map(p => ({ Key: p.filename }));
+        const command = new DeleteObjectsCommand({
+          Bucket: BUCKET,
+          Delete: { Objects: objectsToDelete }
+        });
+        await s3Client.send(command);
+      }
+    }
+
+    // 4. Finally, call the RPC to permanently delete the user from the database
+    const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid });
+    if (rpcError) throw rpcError;
+
+    res.json({ success: true, deletedFiles: photos ? photos.length : 0 });
+  } catch (error) {
+    console.error("Nuke user failed:", error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -10,9 +10,11 @@ import { EventDetailPage } from '@/pages/EventDetailPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { SeedboxBotPage } from '@/pages/SeedboxBotPage'
 import { DeveloperDashboard } from '@/pages/DeveloperDashboard'
+import { MaintenancePage } from '@/pages/MaintenancePage'
 import { Layout } from '@/components/shared/Layout'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadQueueService } from '@/services/uploadQueueService'
+import { supabase } from '@/supabaseClient'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading } = useAuth()
@@ -97,12 +99,39 @@ function AppRoutes() {
 }
 
 function App() {
-  const [isLoading, setIsLoading] = useState(true)
+  const { isLoading } = useAuth()
+  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false)
 
+  // Start processing the upload queue when the app loads
   useEffect(() => {
-    // Initialize the background IndexedDB offline upload queue
-    uploadQueueService.init();
-    setIsLoading(false)
+    uploadQueueService.startProcessing()
+    return () => uploadQueueService.pauseProcessing()
+  }, [])
+
+  // Listen to Global Config for Panic Switches
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { data } = await supabase.from('global_config').select('maintenance_mode').single()
+      if (data) setMaintenanceMode(data.maintenance_mode)
+    }
+    
+    fetchConfig()
+
+    const channel = supabase.channel('global_config_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'global_config' },
+        (payload) => {
+          if (payload.new && 'maintenance_mode' in payload.new) {
+            setMaintenanceMode(payload.new.maintenance_mode)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   if (isLoading) {
@@ -111,6 +140,10 @@ function App() {
         <div className="w-10 h-10 border-2 border-white/10 border-t-blue-500 rounded-full animate-spin-slow" />
       </div>
     )
+  }
+
+  if (maintenanceMode) {
+    return <MaintenancePage />
   }
 
   return (
