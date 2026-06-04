@@ -124,7 +124,11 @@ export async function uploadPhotoWithMetadata(
     
     // 1. Get Presigned URL
     const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-    const urlRes = await fetch(`${backendUrl}/upload/presigned-url?filename=${encodeURIComponent(r2Key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`)
+    const urlRes = await fetch(`${backendUrl}/upload/presigned-url?filename=${encodeURIComponent(r2Key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`, {
+      headers: {
+        'ngrok-skip-browser-warning': 'true'
+      }
+    })
     
     if (!urlRes.ok) {
       throw new Error('Failed to securely generate upload URL')
