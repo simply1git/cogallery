@@ -183,7 +183,11 @@ export async function uploadPhotoWithMetadata(
   } catch (err: any) {
     if (photoId) {
       // Rollback the ghost preview from Supabase if the upload failed!
-      await supabase.from('photos').delete().eq('id', photoId).catch(console.error);
+      try {
+        await supabase.from('photos').delete().eq('id', photoId);
+      } catch (deleteError) {
+        console.error('Failed to rollback ghost preview:', deleteError);
+      }
     }
     return { data: null, error: err.message }
   }
