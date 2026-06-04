@@ -55,7 +55,7 @@ export async function downloadPhotosAsZip(
     // Create an invisible form so the browser handles the download natively:
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = `${API_URL}/api/download-zip`;
+    form.action = `${API_URL}/download-zip`;
     // We don't use _blank here so it triggers as a download in the current window without popping up a new tab that stays open.
     
     const photosInput = document.createElement('input');
