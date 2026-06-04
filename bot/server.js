@@ -24,21 +24,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'uploads');
 const TEMP_DIR = path.join(__dirname, 'uploads/temp');
 
-const supabaseJwksClient = jwksClient({
-  jwksUri: process.env.SUPABASE_URL 
-    ? `${process.env.SUPABASE_URL}/auth/v1/jwks` 
-    : 'https://curbfldkaqeysbggvbyp.supabase.co/auth/v1/jwks',
-  requestHeaders: {
-    apikey: process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1cmJmbGRrYXFleXNiZ2d2YnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4ODc2OTcsImV4cCI6MjA5NTQ2MzY5N30.-8srh-1h8HFWJoNz5AwTuXdIuKodTL2TzrS_LeEdmp0'
-  }
-});
+const supabasePublicKey = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAES1i7lih7PQfCnIBs0bYc6YL/X0fm
+mtrchCOYjNWS0QMtuHTVB0zbjWw8OjXmtI1367dWAPbRK8oKJuVUj2avWw==
+-----END PUBLIC KEY-----`;
 
 function getSupabaseKey(header, callback) {
-  supabaseJwksClient.getSigningKey(header.kid, function(err, key) {
-    if (err) return callback(err);
-    const signingKey = key.publicKey || key.rsaPublicKey;
-    callback(null, signingKey);
-  });
+  // Always return the static public key for ES256 tokens
+  callback(null, supabasePublicKey);
 }
 
 const app = express();
