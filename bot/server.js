@@ -4,6 +4,10 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
+import { exec } from 'child_process';
+import util from 'util';
+const execPromise = util.promisify(exec);
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -73,6 +77,38 @@ const uploadLimiter = rateLimit({
 // Health Check
 app.get('/status', (req, res) => {
   res.json({ status: 'online', service: 'CoGallery Oracle Backend' });
+});
+
+// --- GOD MODE TELEMETRY ---
+app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
+  try {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const cpuLoad = os.loadavg();
+    
+    let pm2Logs = "PM2 not found or not running.";
+    try {
+      const { stdout } = await execPromise('pm2 logs cogallery-seedbox --lines 50 --nostream');
+      pm2Logs = stdout;
+    } catch (e) {
+      console.warn("Failed to fetch PM2 logs", e);
+    }
+
+    res.json({
+      cpuLoad,
+      memory: {
+        total: totalMem,
+        free: freeMem,
+        used: usedMem,
+        percent: Math.round((usedMem / totalMem) * 100)
+      },
+      uptime: os.uptime(),
+      logs: pm2Logs
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Generate Pre-signed URL for direct R2 upload

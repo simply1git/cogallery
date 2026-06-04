@@ -9,6 +9,7 @@ import { RoomDetailPage } from '@/pages/RoomDetailPage'
 import { EventDetailPage } from '@/pages/EventDetailPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { SeedboxBotPage } from '@/pages/SeedboxBotPage'
+import { DeveloperDashboard } from '@/pages/DeveloperDashboard'
 import { Layout } from '@/components/shared/Layout'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadQueueService } from '@/services/uploadQueueService'
@@ -75,6 +76,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SeedboxBotPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Hidden God Mode Dashboard */}
+      <Route
+        path="/developer"
+        element={
+          <ProtectedRoute>
+            <DeveloperDashboard />
           </ProtectedRoute>
         }
       />
