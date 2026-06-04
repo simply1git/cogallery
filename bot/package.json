@@ -17,6 +17,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.3",
+    "jwks-rsa": "^4.0.1",
     "multer": "^2.1.1",
     "node-datachannel": "^0.32.3",
     "ws": "^8.17.0"

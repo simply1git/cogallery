@@ -16,12 +16,27 @@ const require = createRequire(import.meta.url);
 const archiver = require('archiver');
 import https from 'https';
 import dotenv from 'dotenv';
+import jwksClient from 'jwks-rsa';
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'uploads');
 const TEMP_DIR = path.join(__dirname, 'uploads/temp');
+
+const supabaseJwksClient = jwksClient({
+  jwksUri: process.env.SUPABASE_URL 
+    ? `${process.env.SUPABASE_URL}/auth/v1/jwks` 
+    : 'https://curbfldkaqeysbggvbyp.supabase.co/auth/v1/jwks'
+});
+
+function getSupabaseKey(header, callback) {
+  supabaseJwksClient.getSigningKey(header.kid, function(err, key) {
+    if (err) return callback(err);
+    const signingKey = key.publicKey || key.rsaPublicKey;
+    callback(null, signingKey);
+  });
+}
 
 const app = express();
 
@@ -57,14 +72,20 @@ setInterval(async () => {
 }, 24 * 60 * 60 * 1000);
 
 // --- ZERO-TRUST SECURITY MIDDLEWARE ---
+// Keep JWT_SECRET for internal short-lived streaming tokens
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
 
 const authenticateJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (authHeader) {
     const token = authHeader.split(' ')[1];
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-      if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    
+    // Verify using Supabase JWKS (supports both ES256 and RS256)
+    jwt.verify(token, getSupabaseKey, { algorithms: ['RS256', 'ES256'] }, (err, user) => {
+      if (err) {
+        console.error("JWT Verification failed:", err.message);
+        return res.status(403).json({ error: 'Invalid or expired token', details: err.message });
+      }
       req.user = user;
       next();
     });
