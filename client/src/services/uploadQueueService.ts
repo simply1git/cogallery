@@ -1,6 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { uploadPhotoWithMetadata } from './photoService';
 import { toast } from 'sonner';
+import { scrubExif } from '../utils/exifScrubber';
 
 export interface UploadItem {
   id: string; // unique internal id
@@ -86,9 +87,12 @@ export const uploadQueueService = {
     if (!db) return;
 
     for (const file of files) {
+      // Zero-Knowledge Privacy: Scrub EXIF GPS data before it even enters the queue
+      const cleanFile = await scrubExif(file);
+      
       const item: UploadItem = {
         id: crypto.randomUUID(),
-        file,
+        file: cleanFile,
         eventId: metadata.eventId,
         roomId: metadata.roomId,
         userId: metadata.userId,

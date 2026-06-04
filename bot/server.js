@@ -4,7 +4,9 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
+import { S3Client, PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 // Some commonJS modules in ESM require this workaround if default export is missing:
 import { createRequire } from 'module';
@@ -44,13 +46,37 @@ app.use(express.json({ limit: '50mb' }));
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 await fs.mkdir(TEMP_DIR, { recursive: true }).catch(() => {});
 
+// --- ZERO-TRUST SECURITY MIDDLEWARE ---
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
+
+const authenticateJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+      req.user = user;
+      next();
+    });
+  } else {
+    res.status(401).json({ error: 'Authorization header missing' });
+  }
+};
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Max 500 requests per IP
+  message: { error: 'Too many requests, auto-banned for 15 minutes' }
+});
+
+
 // Health Check
 app.get('/status', (req, res) => {
   res.json({ status: 'online', service: 'CoGallery Oracle Backend' });
 });
 
 // Generate Pre-signed URL for direct R2 upload
-app.get('/upload/presigned-url', async (req, res) => {
+app.get('/upload/presigned-url', authenticateJWT, uploadLimiter, async (req, res) => {
   try {
     const { filename, contentType } = req.query;
     if (!filename || !contentType) {
@@ -74,8 +100,26 @@ app.get('/upload/presigned-url', async (req, res) => {
   }
 });
 
+// --- EPHEMERAL PRESIGNED GET URL ---
+app.post('/media/presign-get', authenticateJWT, async (req, res) => {
+  try {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ error: 'Missing key' });
+    
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key
+    });
+    // URL Self-Destructs in 60 seconds
+    const url = await getSignedUrl(r2Client, command, { expiresIn: 60 });
+    res.json({ url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- MULTIPART UPLOAD ENDPOINTS ---
-app.post('/upload/multipart/create', async (req, res) => {
+app.post('/upload/multipart/create', authenticateJWT, uploadLimiter, async (req, res) => {
   try {
     const { filename, contentType } = req.body;
     const command = new CreateMultipartUploadCommand({
@@ -90,7 +134,7 @@ app.post('/upload/multipart/create', async (req, res) => {
   }
 });
 
-app.post('/upload/multipart/sign-part', async (req, res) => {
+app.post('/upload/multipart/sign-part', authenticateJWT, uploadLimiter, async (req, res) => {
   try {
     const { key, uploadId, partNumber } = req.body;
     const command = new UploadPartCommand({
@@ -106,7 +150,7 @@ app.post('/upload/multipart/sign-part', async (req, res) => {
   }
 });
 
-app.post('/upload/multipart/complete', async (req, res) => {
+app.post('/upload/multipart/complete', authenticateJWT, uploadLimiter, async (req, res) => {
   try {
     const { key, uploadId, parts } = req.body;
     const command = new CompleteMultipartUploadCommand({
@@ -122,7 +166,7 @@ app.post('/upload/multipart/complete', async (req, res) => {
   }
 });
 
-app.post('/upload/multipart/abort', async (req, res) => {
+app.post('/upload/multipart/abort', authenticateJWT, uploadLimiter, async (req, res) => {
   try {
     const { key, uploadId } = req.body;
     const command = new AbortMultipartUploadCommand({
@@ -275,7 +319,7 @@ app.get('/stream/:photoId', async (req, res) => {
 });
 
 // Fallback ZIP streaming endpoint for iOS/Safari
-app.post('/api/download-zip', [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
+app.post('/api/download-zip', authenticateJWT, [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
   // If sent via form urlencoded, req.body.photos is a stringified JSON array
   let photos = req.body.photos;
   if (typeof photos === 'string') {

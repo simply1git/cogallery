@@ -5,7 +5,7 @@ import {
   ChevronUp, ChevronDown
 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/services/photoService'
+import { getPhotoDetails, addReaction, addComment, deleteComment, getSecureMediaUrl } from '@/services/photoService'
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
@@ -42,6 +42,7 @@ export function PhotoDetailModal({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [activeTab, setActiveTab] = useState<'reactions' | 'comments' | 'info'>('reactions')
   const [showMobilePanel, setShowMobilePanel] = useState(false)
+  const [secureUrl, setSecureUrl] = useState<string | null>(null)
 
   const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
   const hasPrev = currentIndex > 0
@@ -57,6 +58,10 @@ export function PhotoDetailModal({
   useEffect(() => {
     if (photo) {
       loadDetails(photo)
+      setSecureUrl(null)
+      // Extract S3 key from the public URL (temporary fallback since we don't have the raw key in Photo)
+      const s3Key = photo.s3Url.split('.r2.dev/')[1] || photo.filename
+      getSecureMediaUrl(s3Key).then(setSecureUrl).catch(err => toast.error('Failed to load secure media'))
     }
   }, [photo, loadDetails])
 
@@ -98,8 +103,8 @@ export function PhotoDetailModal({
   }
 
   async function handleDownload() {
-    if (!photo) return
-    await downloadFile(photo.s3Url, photo.filename)
+    if (!photo || !secureUrl) return
+    await downloadFile(secureUrl, photo.filename)
   }
 
   // Group reactions by emoji
@@ -148,23 +153,25 @@ export function PhotoDetailModal({
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               onDragEnd={(_e, info) => {
-                const swipeThreshold = 50;
-                if (info.offset.x > swipeThreshold && hasPrev) onNavigate(allPhotos[currentIndex - 1]);
-                else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
-                else if (info.offset.y > swipeThreshold * 2) onClose();
+                if (Math.abs(info.offset.y) > 100) onClose()
               }}
-              className="relative max-h-full w-full flex items-center justify-center touch-none"
+              className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
             >
-              <video
-                src={photo.s3Url}
-                className="max-w-full max-h-[60vh] md:max-h-[85vh] rounded-xl object-contain pointer-events-auto"
-                controls
-                autoPlay
-                onClick={(e) => e.stopPropagation()}
-              />
+              {secureUrl ? (
+                <video
+                  src={secureUrl}
+                  controls
+                  playsInline
+                  autoPlay
+                  className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+              )}
             </motion.div>
           ) : (
-            <motion.img
+            <motion.div
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               onDragEnd={(_e, info) => {
@@ -173,11 +180,24 @@ export function PhotoDetailModal({
                 else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
                 else if (info.offset.y > swipeThreshold * 2) onClose();
               }}
-              src={photo.s3Url || photo.thumbnailBase64}
-              alt={photo.filename}
-              className={`max-w-full max-h-[60vh] md:max-h-[85vh] object-contain rounded-xl touch-none cursor-grab active:cursor-grabbing animate-scale-in`}
-              draggable={false}
-            />
+              className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
+            >
+              {secureUrl ? (
+                <img
+                  src={secureUrl}
+                  alt={photo.filename}
+                  className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none"
+                  draggable={false}
+                />
+              ) : (
+                <img
+                  src={photo.thumbnailBase64 || photo.s3Url} // fallback to thumbnail while loading secure URL
+                  alt={photo.filename}
+                  className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none blur-sm transition-all"
+                  draggable={false}
+                />
+              )}
+            </motion.div>
           )}
 
           {/* Counter + mobile panel toggle */}

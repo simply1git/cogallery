@@ -126,6 +126,9 @@ export async function uploadPhotoWithMetadata(
     // 1. Determine Upload Strategy
     const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
     
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+
     if (file.size > 20 * 1024 * 1024) {
       // --- MULTIPART UPLOAD STRATEGY (For files > 20MB) ---
       const CHUNK_SIZE = 10 * 1024 * 1024;
@@ -133,7 +136,11 @@ export async function uploadPhotoWithMetadata(
       
       const createRes = await fetch(`${backendUrl}/upload/multipart/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'ngrok-skip-browser-warning': 'true',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ filename: r2Key, contentType: file.type || 'application/octet-stream' })
       });
       if (!createRes.ok) throw new Error('Failed to create multipart upload');
@@ -153,7 +160,11 @@ export async function uploadPhotoWithMetadata(
         // Sign part
         const signRes = await fetch(`${backendUrl}/upload/multipart/sign-part`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          headers: { 
+            'Content-Type': 'application/json', 
+            'ngrok-skip-browser-warning': 'true',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ key: r2Key, uploadId, partNumber })
         });
         if (!signRes.ok) throw new Error(`Failed to sign part ${partNumber}`);
@@ -203,7 +214,11 @@ export async function uploadPhotoWithMetadata(
         parts.sort((a, b) => a.PartNumber - b.PartNumber);
         const completeRes = await fetch(`${backendUrl}/upload/multipart/complete`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          headers: { 
+            'Content-Type': 'application/json', 
+            'ngrok-skip-browser-warning': 'true',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ key: r2Key, uploadId, parts })
         });
         if (!completeRes.ok) throw new Error('Failed to complete multipart upload');
@@ -212,7 +227,11 @@ export async function uploadPhotoWithMetadata(
         hasError = true;
         await fetch(`${backendUrl}/upload/multipart/abort`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          headers: { 
+            'Content-Type': 'application/json', 
+            'ngrok-skip-browser-warning': 'true',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ key: r2Key, uploadId })
         }).catch(console.error);
         throw err;
@@ -221,7 +240,10 @@ export async function uploadPhotoWithMetadata(
     } else {
       // --- STANDARD UPLOAD STRATEGY (For files <= 20MB) ---
       const urlRes = await fetch(`${backendUrl}/upload/presigned-url?filename=${encodeURIComponent(r2Key)}&contentType=${encodeURIComponent(file.type || 'application/octet-stream')}`, {
-        headers: { 'ngrok-skip-browser-warning': 'true' }
+        headers: { 
+          'ngrok-skip-browser-warning': 'true',
+          'Authorization': `Bearer ${token}`
+        }
       })
       if (!urlRes.ok) throw new Error('Failed to securely generate upload URL')
       const { url: presignedUrl } = await urlRes.json()
@@ -274,6 +296,28 @@ export async function uploadPhotoWithMetadata(
     }
     return { data: null, error: err.message }
   }
+}
+
+export async function getSecureMediaUrl(s3Key: string): Promise<string> {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${backendUrl}/media/presign-get`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ key: s3Key })
+  });
+
+  if (!res.ok) throw new Error('Failed to get secure media url');
+  const { url } = await res.json();
+  return url;
 }
 
 // ─── Photo Listing ───────────────────────────────────────────────────────────
