@@ -4,15 +4,18 @@ import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, chec
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
+import { QuotaModal } from '@/components/modals/QuotaModal'
 
 export function DeveloperDashboard() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [telemetry, setTelemetry] = useState<TelemetryData | null>(null)
+  const [telemetryError, setTelemetryError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'users' | 'server' | 'settings'>('server')
   const navigate = useNavigate()
   const [isProcessing, setIsProcessing] = useState(false)
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig | null>(null)
+  const [quotaModalUser, setQuotaModalUser] = useState<AdminUser | null>(null)
 
   const refreshUsers = () => getAllUsers().then(setUsers).catch(err => toast.error(err.message))
   const refreshConfig = () => getGlobalConfig().then(setGlobalConfig).catch(console.error)
@@ -36,7 +39,11 @@ export function DeveloperDashboard() {
   useEffect(() => {
     if (!isAdmin || activeTab !== 'server') return
     // Poll telemetry every 5 seconds
-    const fetchTelemetry = () => getTelemetry().then(setTelemetry).catch(console.error)
+    const fetchTelemetry = () => {
+      getTelemetry()
+        .then(data => { setTelemetry(data); setTelemetryError(null); })
+        .catch(err => setTelemetryError(err.message))
+    }
     fetchTelemetry()
     const interval = setInterval(fetchTelemetry, 5000)
     return () => clearInterval(interval)
@@ -45,15 +52,17 @@ export function DeveloperDashboard() {
   if (isAdmin === null) return <div className="p-8 flex justify-center"><Activity className="animate-spin" /></div>
   if (!isAdmin) return null
 
-  const handleQuotaChange = async (u: AdminUser) => {
-    const raw = prompt(`Enter new quota in bytes for ${u.display_name} (Current: ${u.max_storage_bytes})`, String(u.max_storage_bytes))
-    if (!raw) return
-    const quota = parseInt(raw)
-    if (isNaN(quota)) return toast.error('Invalid number')
+  const handleQuotaChange = (u: AdminUser) => {
+    setQuotaModalUser(u)
+  }
+
+  const handleSaveQuota = async (bytes: number) => {
+    if (!quotaModalUser) return
     try {
       setIsProcessing(true)
-      await updateUserQuota(u.id, quota)
+      await updateUserQuota(quotaModalUser.id, bytes)
       toast.success('Quota updated')
+      setQuotaModalUser(null)
       refreshUsers()
     } catch(e: any) { toast.error(e.message) }
     finally { setIsProcessing(false) }
@@ -152,9 +161,25 @@ export function DeveloperDashboard() {
         </div>
 
         {/* Content */}
-        {activeTab === 'server' && telemetry && (
+        {activeTab === 'server' && (
           <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {telemetryError ? (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-4">
+                <Server className="text-red-400" size={48} />
+                <div>
+                  <h3 className="text-lg font-bold text-red-400">Failed to Connect to Oracle Server</h3>
+                  <p className="text-white/50 text-sm mt-1">{telemetryError}</p>
+                </div>
+                <p className="text-xs text-white/30">Ensure the PM2 backend process is running on your VPS.</p>
+              </div>
+            ) : !telemetry ? (
+              <div className="flex flex-col items-center justify-center py-24 space-y-4">
+                <Activity className="animate-spin text-white/30" size={32} />
+                <p className="text-white/50 text-sm">Connecting to Oracle Server...</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-2">
                 <div className="flex items-center gap-2 text-white/50 mb-4"><Activity size={16}/> CPU Load (1m, 5m, 15m)</div>
                 <div className="text-2xl font-mono">{telemetry.cpuLoad[0].toFixed(2)}</div>
@@ -184,6 +209,8 @@ export function DeveloperDashboard() {
                 {telemetry.logs}
               </pre>
             </div>
+              </>
+            )}
           </div>
         )}
 
@@ -297,6 +324,16 @@ export function DeveloperDashboard() {
         )}
 
       </div>
+      
+      {quotaModalUser && (
+        <QuotaModal
+          isOpen={true}
+          currentBytes={quotaModalUser.max_storage_bytes}
+          userName={quotaModalUser.display_name}
+          onClose={() => setQuotaModalUser(null)}
+          onSave={handleSaveQuota}
+        />
+      )}
     </div>
   )
 }
