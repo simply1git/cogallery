@@ -6,7 +6,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import archiver from 'archiver';
+// Some commonJS modules in ESM require this workaround if default export is missing:
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const archiver = require('archiver');
 import https from 'https';
 import dotenv from 'dotenv';
 
