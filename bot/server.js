@@ -27,7 +27,10 @@ const TEMP_DIR = path.join(__dirname, 'uploads/temp');
 const supabaseJwksClient = jwksClient({
   jwksUri: process.env.SUPABASE_URL 
     ? `${process.env.SUPABASE_URL}/auth/v1/jwks` 
-    : 'https://curbfldkaqeysbggvbyp.supabase.co/auth/v1/jwks'
+    : 'https://curbfldkaqeysbggvbyp.supabase.co/auth/v1/jwks',
+  requestHeaders: {
+    apikey: process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1cmJmbGRrYXFleXNiZ2d2YnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4ODc2OTcsImV4cCI6MjA5NTQ2MzY5N30.-8srh-1h8HFWJoNz5AwTuXdIuKodTL2TzrS_LeEdmp0'
+  }
 });
 
 function getSupabaseKey(header, callback) {
