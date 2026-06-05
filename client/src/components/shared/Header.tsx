@@ -1,15 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, LayoutDashboard, Menu, X, Settings } from 'lucide-react'
+import { LogOut, LayoutDashboard, Menu, X, Settings, Download } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut } from '@/services/authService'
 import { useState } from 'react'
 import { ProfileSettingsModal } from '@/components/modals/ProfileSettingsModal'
+import { usePWAInstall } from '@/hooks/usePWAInstall'
 
 export function Header() {
   const navigate = useNavigate()
   const { user, isAuthenticated, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const { isInstallable, promptInstall } = usePWAInstall()
 
   const handleLogout = async () => {
     await signOut()
@@ -53,6 +55,15 @@ export function Header() {
 
             {/* Right */}
             <div className="flex items-center gap-2">
+              {isInstallable && (
+                <button 
+                  onClick={promptInstall}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 mr-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors text-sm font-medium"
+                >
+                  <Download size={15} />
+                  Install App
+                </button>
+              )}
               {isAuthenticated && user ? (
                 <div className="relative group">
                   <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-white/5 transition-colors">
@@ -126,6 +137,15 @@ export function Header() {
           {/* Mobile menu */}
           {isMenuOpen && (
             <div className="md:hidden border-t border-white/[0.07] py-3 space-y-1 animate-slide-down">
+              {isInstallable && (
+                <button
+                  onClick={promptInstall}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-white/5 rounded-lg mb-2"
+                >
+                  <Download size={15} />
+                  Install CoGallery App
+                </button>
+              )}
               {isAuthenticated ? (
                 <>
                   <Link

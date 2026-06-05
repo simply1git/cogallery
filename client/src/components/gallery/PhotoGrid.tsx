@@ -1,5 +1,6 @@
 import { PhotoCard } from './PhotoCard'
 import type { Photo } from '@/types'
+import { Masonry } from 'masonic'
 
 interface PhotoGridProps {
   photos: Photo[]
@@ -22,11 +23,11 @@ export function PhotoGrid({
 }: PhotoGridProps) {
   if (isLoading) {
     return (
-      <div className="masonry-grid">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
-            className="masonry-item skeleton"
+            className="rounded-xl bg-white/[0.05] animate-pulse"
             style={{ height: `${[180, 240, 160, 280, 200, 220][i % 6]}px` }}
           />
         ))}
@@ -39,19 +40,22 @@ export function PhotoGrid({
   }
 
   return (
-    <div className="masonry-grid">
-      {photos.map((photo, index) => (
+    <Masonry
+      items={photos}
+      columnGutter={16}
+      columnWidth={200}
+      overscanBy={2}
+      render={({ data, index }) => (
         <PhotoCard
-          key={photo.id}
-          photo={photo}
-          onClick={() => onPhotoClick?.(photo, index)}
-          onDelete={() => onPhotoDelete?.(photo)}
-          canDelete={canDelete?.(photo) ?? false}
+          photo={data}
+          onClick={() => onPhotoClick?.(data, index)}
+          onDelete={() => onPhotoDelete?.(data)}
+          canDelete={canDelete?.(data) ?? false}
           selectable={selectedIds !== undefined}
-          selected={selectedIds?.has(photo.id)}
-          onSelect={() => onToggleSelect?.(photo.id)}
+          selected={selectedIds?.has(data.id)}
+          onSelect={() => onToggleSelect?.(data.id)}
         />
-      ))}
-    </div>
+      )}
+    />
   )
 }
