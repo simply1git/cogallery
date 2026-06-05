@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2 } from 'lucide-react'
-import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig } from '@/services/adminService'
+import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, downloadBackup, getBackupUrl } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -90,6 +90,47 @@ export function DeveloperDashboard() {
       toast.success(`User nuked. Deleted ${res.deletedFiles} files from R2.`, { id: 'nuke' })
       refreshUsers()
     } catch(e: any) { toast.error(e.message, { id: 'nuke' }) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleBackup = async () => {
+    try {
+      setIsProcessing(true)
+      toast.loading('Preparing backup zip...', { id: 'backup' })
+      await downloadBackup()
+      toast.success('Backup downloaded successfully.', { id: 'backup' })
+    } catch(e: any) { toast.error(e.message, { id: 'backup' }) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleClearTemp = async () => {
+    if (!confirm('Clear all abandoned temporary chunks?')) return
+    try {
+      setIsProcessing(true)
+      const res = await clearTempStorage()
+      toast.success(`Cleared ${res.deletedCount} temporary chunk folders.`)
+    } catch(e: any) { toast.error(e.message) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleClearOld = async () => {
+    if (!confirm('WARNING: This will delete files older than 30 days from the main storage folder. Continue?')) return
+    try {
+      setIsProcessing(true)
+      const res = await clearOldStorage()
+      toast.success(`Deleted ${res.deletedCount} old files.`)
+    } catch(e: any) { toast.error(e.message) }
+    finally { setIsProcessing(false) }
+  }
+
+  const handleWipeAll = async () => {
+    if (!confirm('DANGER! This will delete ALL files in the main storage and temp folder! Are you sure?')) return
+    if (!confirm('Are you ABSOLUTELY sure? This cannot be undone!')) return
+    try {
+      setIsProcessing(true)
+      await wipeAllStorage()
+      toast.success('All storage files have been wiped.')
+    } catch(e: any) { toast.error(e.message) }
     finally { setIsProcessing(false) }
   }
 
@@ -199,6 +240,66 @@ export function DeveloperDashboard() {
                 <div className="text-xs text-[#00ff00]">PM2 Process Online</div>
               </div>
             </div>
+
+            {/* Storage Management */}
+            {telemetry.storage && telemetry.disk && (
+              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-4 shadow-xl">
+                <div className="flex items-center gap-2 text-white/80 font-semibold mb-4 border-b border-white/10 pb-4">
+                  <HardDrive size={18} className="text-blue-400" />
+                  Disk & Local Storage Management
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Stats */}
+                  <div className="space-y-4">
+                    <div className="bg-black/40 rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-white/50">Disk Used:</span>
+                        <span className="font-mono">{formatFileSize(telemetry.disk.used)} / {formatFileSize(telemetry.disk.total)}</span>
+                      </div>
+                      <div className="w-full bg-black/50 rounded-full h-1.5">
+                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${telemetry.disk.percent}%` }} />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-black/40 rounded-lg p-4">
+                        <div className="text-xs text-white/50 mb-1">Main Storage</div>
+                        <div className="text-lg font-mono">{formatFileSize(telemetry.storage.main.size)}</div>
+                        <div className="text-xs text-white/30">{telemetry.storage.main.count} files</div>
+                      </div>
+                      <div className="bg-black/40 rounded-lg p-4">
+                        <div className="text-xs text-white/50 mb-1">Temp / Chunks</div>
+                        <div className="text-lg font-mono">{formatFileSize(telemetry.storage.temp.size)}</div>
+                        <div className="text-xs text-white/30">{telemetry.storage.temp.count} folders</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <button onClick={handleBackup} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-lg text-sm transition-colors text-left disabled:opacity-50">
+                      <div className="flex items-center gap-2"><Shield size={16}/> Download Full Backup (ZIP)</div>
+                    </button>
+                    
+                    <button onClick={handleClearTemp} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-left disabled:opacity-50">
+                      <div className="flex items-center gap-2"><Trash2 size={16}/> Clear Abandoned Chunks</div>
+                      <span className="text-xs text-white/30">Frees temp space</span>
+                    </button>
+                    
+                    <button onClick={handleClearOld} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-left disabled:opacity-50">
+                      <div className="flex items-center gap-2"><Trash2 size={16}/> Clear &gt;30 Days Old Files</div>
+                      <span className="text-xs text-white/30">Deletes old files</span>
+                    </button>
+
+                    <button onClick={handleWipeAll} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-sm transition-colors text-left mt-2 disabled:opacity-50">
+                      <div className="flex items-center gap-2"><Ban size={16}/> Wipe All Storage</div>
+                      <span className="text-xs text-red-400/50">DANGER</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Terminal */}
             <div className="bg-black border border-white/10 rounded-xl overflow-hidden shadow-2xl">

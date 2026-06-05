@@ -20,6 +20,16 @@ export interface TelemetryData {
     used: number;
     percent: number;
   };
+  disk?: {
+    total: number;
+    free: number;
+    used: number;
+    percent: number;
+  };
+  storage?: {
+    main: { size: number; count: number };
+    temp: { size: number; count: number };
+  };
   uptime: number;
   logs: string;
 }
@@ -116,4 +126,86 @@ export async function getTelemetry(): Promise<TelemetryData> {
 
   if (!res.ok) throw new Error('Failed to fetch telemetry');
   return res.json();
+}
+
+export async function clearTempStorage(): Promise<{ deletedCount: number }> {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${backendUrl}/developer/storage/clear-temp`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}))
+    throw new Error(err.error || 'Failed to clear temp storage')
+  }
+  return res.json()
+}
+
+export async function clearOldStorage(): Promise<{ deletedCount: number }> {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${backendUrl}/developer/storage/clear-old`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}))
+    throw new Error(err.error || 'Failed to clear old storage')
+  }
+  return res.json()
+}
+
+export async function wipeAllStorage(): Promise<void> {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${backendUrl}/developer/storage/wipe-all`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}))
+    throw new Error(err.error || 'Failed to wipe storage')
+  }
+}
+
+export function getBackupUrl(): string {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  // Normally we would use a token in the URL or a short-lived token.
+  // For the backup endpoint, the browser needs to handle the download.
+  // Since it's protected by JWT, we can't just use an <a> tag easily unless we fetch as blob.
+  return `${backendUrl}/developer/storage/backup`
+}
+
+export async function downloadBackup(): Promise<void> {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${backendUrl}/developer/storage/backup`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    throw new Error('Failed to download backup')
+  }
+  
+  const blob = await res.blob()
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'cogallery-backup.zip'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  window.URL.revokeObjectURL(url)
 }
