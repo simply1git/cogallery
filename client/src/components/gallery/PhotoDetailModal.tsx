@@ -59,9 +59,21 @@ export function PhotoDetailModal({
     if (photo) {
       loadDetails(photo)
       setSecureUrl(null)
-      // Extract S3 key from the public URL (temporary fallback since we don't have the raw key in Photo)
-      const s3Key = photo.s3Url.split('.r2.dev/')[1] || photo.filename
-      getSecureMediaUrl(s3Key).then(setSecureUrl).catch(() => toast.error('Failed to load secure media'))
+      
+      // Robust key extraction for backward compatibility with older uploads
+      let s3Key = photo.s3Key;
+      if (!s3Key) {
+        if (photo.s3Url?.includes('.r2.dev/')) s3Key = photo.s3Url.split('.r2.dev/')[1];
+        else if (photo.s3Url?.includes('/stream/')) s3Key = photo.s3Url.split('/stream/')[1];
+        else if (photo.s3Url?.includes('/proxy/')) s3Key = photo.s3Url.split('/proxy/')[1];
+        else s3Key = photo.filename;
+      }
+      
+      if (s3Key) {
+        getSecureMediaUrl(s3Key)
+          .then(setSecureUrl)
+          .catch(() => toast.error('Failed to load secure media'))
+      }
     }
   }, [photo, loadDetails])
 
@@ -191,7 +203,7 @@ export function PhotoDetailModal({
                 />
               ) : (
                 <img
-                  src={photo.thumbnailBase64 || photo.s3Url} // fallback to thumbnail while loading secure URL
+                  src={photo.thumbnailBase64 || ''} // fallback to thumbnail while loading secure URL
                   alt={photo.filename}
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none blur-sm transition-all"
                   draggable={false}

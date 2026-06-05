@@ -21,6 +21,8 @@ import { usePresence } from '@/hooks/realtime/usePresence'
 import { InviteMemberModal } from '@/components/modals/InviteMemberModal'
 import { EventSettingsModal } from '@/components/modals/EventSettingsModal'
 import { LiveNotes } from '@/components/events/LiveNotes'
+import { PageHeaderSkeleton } from '@/components/shared/Skeleton'
+import { EmptyState } from '@/components/shared/EmptyState'
 import type { EventWithDetails, Photo, RoomWithMembers } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
 import { downloadFilesAsZip } from '@/services/downloadService'
@@ -313,8 +315,8 @@ export function EventDetailPage() {
 
   if (isLoadingEvent) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 size={32} className="animate-spin-slow text-[#52525b]" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <PageHeaderSkeleton />
       </div>
     )
   }
@@ -624,21 +626,19 @@ export function EventDetailPage() {
 
       {/* Gallery */}
       {!isLoadingPhotos && photos.length === 0 ? (
-        <div className="text-center py-24">
-          <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-5">
-            <Camera size={36} className="text-[#52525b]" />
-          </div>
-          <h3 className="text-xl font-semibold text-[#f4f4f5] mb-2">No files yet</h3>
-          <p className="text-[#71717a] mb-6 max-w-xs mx-auto">
-            Upload photos and videos to start building this event's gallery.
-          </p>
-          {user && (
-            <button onClick={() => setShowUpload(true)} className="btn-blue">
-              <UploadCloud size={18} />
-              Upload Files
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={Camera}
+          title="No files yet"
+          description="Upload photos and videos to start building this event's gallery."
+          action={
+            user ? (
+              <button onClick={() => setShowUpload(true)} className="btn-blue">
+                <UploadCloud size={18} />
+                Upload Files
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <PhotoGrid
           photos={photos}

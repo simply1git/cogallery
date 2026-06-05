@@ -56,6 +56,9 @@ export async function createRoom(
 
     return { data: mapRoom(data), error: null }
   } catch (err: any) {
+    if (err.code === 'PGRST116') {
+      return { data: null, error: 'Room not found' }
+    }
     return { data: null, error: err.message }
   }
 }
@@ -139,6 +142,9 @@ export async function getRoomById(
 
     return { data: room, error: null }
   } catch (err: any) {
+    if (err.code === 'PGRST116') {
+      return { data: null, error: 'Room not found' }
+    }
     return { data: null, error: err.message }
   }
 }

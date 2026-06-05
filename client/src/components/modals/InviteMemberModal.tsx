@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, UserPlus, Copy, Check, QrCode } from 'lucide-react'
 import { addMemberByEmail } from '@/services/roomService'
 import { useAuth } from '@/hooks/useAuth'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { toast } from 'sonner'
 import type { UserRole } from '@/types'
 import { QRCodeSVG } from 'qrcode.react'
@@ -31,6 +32,8 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
   const shareUrl = eventId 
     ? `${window.location.origin}/room/${roomId}/event/${eventId}`
     : `${window.location.origin}/room/${roomId}`
+
+  useEscapeKey(isOpen, onClose)
 
   if (!isOpen) return null
 
@@ -69,7 +72,7 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-md glass-md rounded-2xl p-6 animate-scale-in"
+        className="relative w-full max-w-md glass-md rounded-2xl p-4 sm:p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
@@ -144,7 +147,7 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
 
           <div>
             <label className="input-label">Role</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
               {ROLE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}

@@ -72,6 +72,7 @@ if (isR2Enabled) {
       accessKeyId: r2AccessKeyId,
       secretAccessKey: r2SecretAccessKey,
     },
+    maxAttempts: 5, // Auto-retry dropped chunks up to 5 times
   })
 }
 

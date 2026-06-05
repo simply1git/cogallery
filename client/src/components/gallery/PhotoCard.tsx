@@ -2,6 +2,8 @@ import { useState, memo } from 'react'
 import { Heart, MessageCircle, Play, Trash2, Download, Film, Image as ImageIcon } from 'lucide-react'
 import type { Photo } from '@/types'
 import { downloadFile } from '@/utils/download'
+import { getSecureMediaUrl } from '@/services/photoService'
+import { toast } from 'sonner'
 
 interface PhotoCardProps {
   photo: Photo
@@ -27,6 +29,7 @@ export const PhotoCard = memo(function PhotoCard({
   onSelect,
 }: PhotoCardProps) {
   const [imgError, setImgError] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
   const isVideo = photo.mediaType === 'video'
 
   const handleClick = (e: React.MouseEvent) => {
@@ -38,9 +41,22 @@ export const PhotoCard = memo(function PhotoCard({
     }
   }
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    downloadFile(photo.s3Url, photo.filename)
+    try {
+      let s3Key = photo.s3Key;
+      if (!s3Key) {
+        if (photo.s3Url?.includes('.r2.dev/')) s3Key = photo.s3Url.split('.r2.dev/')[1];
+        else if (photo.s3Url?.includes('/stream/')) s3Key = photo.s3Url.split('/stream/')[1];
+        else if (photo.s3Url?.includes('/proxy/')) s3Key = photo.s3Url.split('/proxy/')[1];
+        else s3Key = photo.filename;
+      }
+      
+      const secureUrl = await getSecureMediaUrl(s3Key)
+      downloadFile(secureUrl, photo.filename)
+    } catch (err) {
+      toast.error('Failed to generate download link')
+    }
   }
 
   return (
@@ -60,11 +76,14 @@ export const PhotoCard = memo(function PhotoCard({
           </div>
         ) : (
           <img
-            src={(photo.thumbnailBase64 && !imgError) ? photo.thumbnailBase64 : (photo.s3Url && !imgError ? photo.s3Url : '')}
+            src={(photo.thumbnailBase64 && !imgError) ? photo.thumbnailBase64 : ''}
             alt={photo.filename}
-            className="w-full h-auto block transition-transform duration-300 group-hover:scale-[1.02]"
+            className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] ${
+              isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-60'
+            }`}
             loading="lazy"
             decoding="async"
+            onLoad={() => setIsLoaded(true)}
             onError={() => setImgError(true)}
           />
         )}

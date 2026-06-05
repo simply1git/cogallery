@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FolderOpen, Users, CalendarDays, Image, Loader2, Archive } from 'lucide-react'
+import { Plus, FolderOpen, Users, CalendarDays, Image, Archive } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRoomStore } from '@/store/roomStore'
 import { getRoomsByUser } from '@/services/roomService'
 import { CreateRoomModal } from '@/components/modals/CreateRoomModal'
+import { CardSkeleton } from '@/components/shared/Skeleton'
+import { EmptyState } from '@/components/shared/EmptyState'
 import type { RoomWithMembers } from '@/types'
 
 export function DashboardPage() {
@@ -74,32 +76,32 @@ export function DashboardPage() {
 
       {/* Loading */}
       {isLoading && (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 size={32} className="animate-spin-slow text-[#52525b]" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
         </div>
       )}
 
       {/* Empty state */}
       {!isLoading && displayRooms.length === 0 && (
-        <div className="text-center py-24">
-          <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-5">
-            <FolderOpen size={36} className="text-[#52525b]" />
-          </div>
-          <h3 className="text-xl font-semibold text-[#f4f4f5] mb-2">
-            {showArchived ? 'No archived rooms' : 'No rooms yet'}
-          </h3>
-          <p className="text-[#71717a] mb-6 max-w-sm mx-auto">
-            {showArchived
+        <EmptyState
+          icon={FolderOpen}
+          title={showArchived ? 'No archived rooms' : 'No rooms yet'}
+          description={
+            showArchived
               ? 'Archived rooms will appear here.'
-              : 'Create your first room to start organizing photos and videos from your trips and events.'}
-          </p>
-          {!showArchived && (
-            <button onClick={() => setShowCreateRoom(true)} className="btn-blue">
-              <Plus size={18} />
-              Create First Room
-            </button>
-          )}
-        </div>
+              : 'Create your first room to start organizing photos and videos from your trips and events.'
+          }
+          action={
+            !showArchived ? (
+              <button onClick={() => setShowCreateRoom(true)} className="btn-blue">
+                <Plus size={18} />
+                Create First Room
+              </button>
+            ) : undefined
+          }
+        />
       )}
 
       {/* Rooms grid */}

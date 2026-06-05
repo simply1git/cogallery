@@ -51,6 +51,9 @@ export async function createEvent(
 
     return { data: mapEvent(data), error: null }
   } catch (err: any) {
+    if (err.code === 'PGRST116') {
+      return { data: null, error: 'Event not found' }
+    }
     return { data: null, error: err.message }
   }
 }
@@ -149,6 +152,9 @@ export async function getEventById(
       error: null,
     }
   } catch (err: any) {
+    if (err.code === 'PGRST116') {
+      return { data: null, error: 'Event not found' }
+    }
     return { data: null, error: err.message }
   }
 }
@@ -168,6 +174,9 @@ export async function updateEvent(
     if (error) throw error
     return { data: mapEvent(data), error: null }
   } catch (err: any) {
+    if (err.code === 'PGRST116') {
+      return { data: null, error: 'Event not found' }
+    }
     return { data: null, error: err.message }
   }
 }
@@ -319,6 +328,9 @@ export async function getEventUploaders(eventId: string) {
     ))
     return { data: uniqueUploaderIds, error: null }
   } catch (err: any) {
+    if (err.code === 'PGRST116') {
+      return { data: null, error: 'Event not found' }
+    }
     return { data: null, error: err.message }
   }
 }

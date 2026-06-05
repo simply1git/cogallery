@@ -40,10 +40,10 @@
     @apply rounded-xl border border-white/[0.08] bg-[#0f0f0f] shadow-sm;
   }
   .card-hover {
-    @apply card transition-all duration-200 hover:border-white/[0.18] hover:shadow-lg hover:shadow-black/30 hover:-translate-y-0.5;
+    @apply card transition-all duration-300 hover:border-white/[0.18] hover:shadow-lg hover:shadow-black/30 hover:-translate-y-1 hover:scale-[1.01];
   }
   .card-glow {
-    @apply card hover:shadow-[0_0_30px_rgba(59,130,246,0.12)];
+    @apply card transition-all duration-500 hover:border-white/[0.15] hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] hover:-translate-y-1 hover:scale-[1.01];
   }
 
   /* Buttons */

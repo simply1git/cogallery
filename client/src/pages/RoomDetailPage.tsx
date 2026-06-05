@@ -17,6 +17,8 @@ import { PresenceAvatars } from '@/components/shared/PresenceAvatars'
 import { usePresence } from '@/hooks/realtime/usePresence'
 import { toast } from 'sonner'
 import type { EventWithDetails } from '@/types'
+import { CardSkeleton, PageHeaderSkeleton } from '@/components/shared/Skeleton'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 export function RoomDetailPage() {
   const { roomId } = useParams<{ roomId: string }>()
@@ -56,8 +58,13 @@ export function RoomDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 size={32} className="animate-spin-slow text-[#52525b]" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <PageHeaderSkeleton />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
       </div>
     )
   }
@@ -324,26 +331,36 @@ export function RoomDetailPage() {
       </div>
 
       {visibleEvents.length === 0 && !isRoomMember && (
-        <div className="text-center py-20">
-          <CalendarDays size={48} className="text-[#3f3f46] mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-[#f4f4f5] mb-2">No events available</h3>
-          <p className="text-[#a1a1aa]">You don't have access to any events in this room.</p>
-        </div>
+        <EmptyState
+          icon={CalendarDays}
+          title="No events available"
+          description="You don't have access to any events in this room."
+        />
       )}
 
       {/* Members panel */}
       {room.members.filter(m => m.status === 'approved').length > 0 && (
         <div className="mt-10">
-          <h2 className="text-lg font-semibold text-[#f4f4f5] mb-4">Members</h2>
-          <div className="flex flex-wrap gap-3">
-            {room.members.filter(m => m.status === 'approved').map((member) => (
-              <div key={member.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0f0f0f] border border-white/[0.07]">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white">
-                  {member.userId.slice(0, 1).toUpperCase()}
+          <h2 className="text-lg font-semibold text-[#f4f4f5] mb-4 flex items-center gap-2">
+            <Users size={18} className="text-[#71717a]" />
+            Members ({room.members.filter(m => m.status === 'approved').length})
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {room.members.filter(m => m.status === 'approved').map((member) => {
+              const name = member.displayName || `User ${member.userId.slice(0, 6)}`
+              const initial = name.charAt(0).toUpperCase()
+              return (
+                <div key={member.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#0f0f0f] border border-white/[0.07] hover:border-white/[0.15] transition-colors">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
+                    {initial}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-[#e4e4e7] font-medium leading-tight">{name}</span>
+                    <span className="text-[10px] text-[#52525b] capitalize leading-tight">{member.role}</span>
+                  </div>
                 </div>
-                <span className="text-sm text-[#a1a1aa] capitalize">{member.role}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

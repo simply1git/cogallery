@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { createRoom } from '@/services/roomService'
 import { useAuth } from '@/hooks/useAuth'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useRoomStore } from '@/store/roomStore'
 import { toast } from 'sonner'
 
@@ -17,6 +18,8 @@ export function CreateRoomModal({ isOpen, onClose, onCreated }: CreateRoomModalP
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  useEscapeKey(isOpen, onClose)
 
   if (!isOpen) return null
 

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { X, Image as ImageIcon, Save, Camera } from 'lucide-react'
 import { updateRoom, updateRoomThumbnail } from '@/services/roomService'
 import { uploadThumbnail } from '@/services/uploadService'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { toast } from 'sonner'
 import type { Room } from '@/types'
 
@@ -21,6 +22,8 @@ export function RoomSettingsModal({ isOpen, room, onClose, onUpdate }: RoomSetti
   const [isSaving, setIsSaving] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEscapeKey(isOpen, onClose)
 
   if (!isOpen) return null
 
@@ -77,7 +80,7 @@ export function RoomSettingsModal({ isOpen, room, onClose, onUpdate }: RoomSetti
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md glass-md rounded-2xl p-6 animate-scale-in">
+      <div className="relative w-full max-w-md glass-md rounded-2xl p-4 sm:p-6 animate-scale-in max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-[#f4f4f5]">Room Settings</h2>
           <button onClick={onClose} className="btn-icon"><X size={18} /></button>

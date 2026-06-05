@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, CalendarDays } from 'lucide-react'
 import { createEvent } from '@/services/eventService'
 import { useAuth } from '@/hooks/useAuth'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { toast } from 'sonner'
 import type { Event } from '@/types'
 
@@ -17,6 +18,8 @@ export function CreateEventModal({ isOpen, roomId, onClose, onCreated }: CreateE
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  useEscapeKey(isOpen, onClose)
 
   if (!isOpen) return null
 
@@ -44,7 +47,7 @@ export function CreateEventModal({ isOpen, roomId, onClose, onCreated }: CreateE
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-md glass-md rounded-2xl p-6 animate-scale-in"
+        className="relative w-full max-w-md glass-md rounded-2xl p-4 sm:p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
