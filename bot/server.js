@@ -102,6 +102,31 @@ app.get('/status', (req, res) => {
   res.json({ status: 'online', service: 'CoGallery Oracle Backend' });
 });
 
+// --- DEVELOPER STORAGE UTILS ---
+async function getFolderSize(dirPath) {
+  let totalSize = 0;
+  let fileCount = 0;
+  try {
+    const files = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const file of files) {
+      if (file.name.startsWith('.')) continue; // skip hidden files
+      const fullPath = path.join(dirPath, file.name);
+      if (file.isDirectory()) {
+        const sub = await getFolderSize(fullPath);
+        totalSize += sub.size;
+        fileCount += sub.count;
+      } else {
+        const stat = await fs.stat(fullPath);
+        totalSize += stat.size;
+        fileCount += 1;
+      }
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error(`Error calculating folder size for ${dirPath}:`, err);
+  }
+  return { size: totalSize, count: fileCount };
+}
+
 // --- GOD MODE TELEMETRY ---
 app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
   try {
@@ -109,6 +134,25 @@ app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
     const cpuLoad = os.loadavg();
+    
+    // Get disk usage (using statfs)
+    let diskUsage = { total: 0, free: 0, used: 0, percent: 0 };
+    try {
+      const stats = await fs.statfs(__dirname);
+      diskUsage.total = stats.blocks * stats.bsize;
+      diskUsage.free = stats.bfree * stats.bsize;
+      diskUsage.used = diskUsage.total - diskUsage.free;
+      diskUsage.percent = Math.round((diskUsage.used / diskUsage.total) * 100);
+    } catch (e) {
+      console.warn("Failed to fetch disk usage", e);
+    }
+
+    // Get folder sizes
+    const mainStorage = await getFolderSize(CACHE_DIR);
+    const tempStorage = await getFolderSize(TEMP_DIR);
+    // Subtract temp size from main size since TEMP_DIR is inside CACHE_DIR
+    mainStorage.size -= tempStorage.size;
+    mainStorage.count -= tempStorage.count;
     
     let pm2Logs = "PM2 not found or not running.";
     try {
@@ -126,6 +170,11 @@ app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
         used: usedMem,
         percent: Math.round((usedMem / totalMem) * 100)
       },
+      disk: diskUsage,
+      storage: {
+        main: mainStorage,
+        temp: tempStorage
+      },
       uptime: os.uptime(),
       logs: pm2Logs
     });
@@ -133,6 +182,91 @@ app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// --- STORAGE MANAGEMENT ENDPOINTS ---
+
+app.post('/developer/storage/clear-temp', authenticateJWT, async (req, res) => {
+  try {
+    const dirs = await fs.readdir(TEMP_DIR);
+    let deletedCount = 0;
+    for (const dir of dirs) {
+      if (dir.startsWith('.')) continue;
+      const dirPath = path.join(TEMP_DIR, dir);
+      await fs.rm(dirPath, { recursive: true, force: true });
+      deletedCount++;
+    }
+    res.json({ success: true, deletedCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/developer/storage/clear-old', authenticateJWT, async (req, res) => {
+  try {
+    const files = await fs.readdir(CACHE_DIR, { withFileTypes: true });
+    const now = Date.now();
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    let deletedCount = 0;
+    
+    for (const file of files) {
+      if (file.isDirectory() || file.name.startsWith('.')) continue;
+      const filePath = path.join(CACHE_DIR, file.name);
+      const stat = await fs.stat(filePath);
+      
+      if (now - stat.mtimeMs > THIRTY_DAYS_MS) {
+        await fs.unlink(filePath).catch(() => {});
+        deletedCount++;
+      }
+    }
+    res.json({ success: true, deletedCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/developer/storage/wipe-all', authenticateJWT, async (req, res) => {
+  try {
+    // Re-create the directories after wiping
+    await fs.rm(CACHE_DIR, { recursive: true, force: true }).catch(() => {});
+    await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
+    await fs.mkdir(TEMP_DIR, { recursive: true }).catch(() => {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/developer/storage/backup', authenticateJWT, (req, res) => {
+  try {
+    res.attachment('cogallery-backup.zip');
+    const archive = archiver('zip', {
+      zlib: { level: 5 } // Balance between speed and compression
+    });
+
+    archive.on('error', function(err) {
+      res.status(500).send({error: err.message});
+    });
+
+    // on stream closed we can end the request
+    archive.on('end', function() {
+      console.log('Archive wrote %d bytes', archive.pointer());
+    });
+
+    archive.pipe(res);
+    // Append files from the uploads directory, excluding the temp directory
+    archive.directory(CACHE_DIR, false, file => {
+      // Return false to exclude temp directory
+      return file.name.startsWith('temp') ? false : file;
+    });
+    
+    archive.finalize();
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 
 app.post('/developer/nuke-user', authenticateJWT, async (req, res) => {
   try {
