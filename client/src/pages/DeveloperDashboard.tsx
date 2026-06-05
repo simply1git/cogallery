@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2 } from 'lucide-react'
-import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, downloadBackup } from '@/services/adminService'
+import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2, Database, Network } from 'lucide-react'
+import { AdminUser, TelemetryData, GlobalConfig, SupabaseDbSize, SupabaseTableCounts, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, downloadBackup, getSupabaseDbSize, getSupabaseTableCounts } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -11,7 +11,9 @@ export function DeveloperDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [telemetry, setTelemetry] = useState<TelemetryData | null>(null)
   const [telemetryError, setTelemetryError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'users' | 'server' | 'settings'>('server')
+  const [activeTab, setActiveTab] = useState<'users' | 'server' | 'supabase' | 'settings'>('server')
+  const [dbSize, setDbSize] = useState<SupabaseDbSize | null>(null)
+  const [tableCounts, setTableCounts] = useState<SupabaseTableCounts | null>(null)
   const navigate = useNavigate()
   const [isProcessing, setIsProcessing] = useState(false)
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig | null>(null)
@@ -34,6 +36,10 @@ export function DeveloperDashboard() {
     if (!isAdmin) return
     if (activeTab === 'users') refreshUsers()
     if (activeTab === 'settings') refreshConfig()
+    if (activeTab === 'supabase') {
+      getSupabaseDbSize().then(setDbSize)
+      getSupabaseTableCounts().then(setTableCounts)
+    }
   }, [isAdmin, activeTab])
 
   useEffect(() => {
@@ -192,6 +198,14 @@ export function DeveloperDashboard() {
             <Users size={16} /> User Management
           </button>
           <button
+            onClick={() => setActiveTab('supabase')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'supabase' ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5'
+            }`}
+          >
+            <Database size={16} /> Supabase Stats
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
               activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5'
@@ -257,20 +271,49 @@ export function DeveloperDashboard() {
                         <span className="text-white/50">Disk Used:</span>
                         <span className="font-mono">{formatFileSize(telemetry.disk.used)} / {formatFileSize(telemetry.disk.total)}</span>
                       </div>
-                      <div className="w-full bg-black/50 rounded-full h-1.5">
-                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${telemetry.disk.percent}%` }} />
+                      
+                      {/* Advanced Disk Breakdown */}
+                      <div className="w-full h-3 rounded-full flex overflow-hidden bg-black/50 border border-white/10">
+                        {/* OS / System Data (Calculated as Total Used - App Data) */}
+                        <div 
+                          className="bg-gray-500/80 transition-all group relative cursor-help" 
+                          style={{ width: `${Math.max(0, ((telemetry.disk.used - telemetry.storage.main.size - telemetry.storage.temp.size) / telemetry.disk.total) * 100)}%` }}
+                          title="OS & System Software"
+                        />
+                        {/* Platform Developer Data */}
+                        <div 
+                          className="bg-blue-500 transition-all group relative cursor-help" 
+                          style={{ width: `${Math.max(0, ((telemetry.storage.main.size + telemetry.storage.temp.size) / telemetry.disk.total) * 100)}%` }}
+                          title="Platform Developer Data"
+                        />
+                      </div>
+                      
+                      {/* Legend */}
+                      <div className="flex justify-between text-xs pt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-500/80" />
+                          <span className="text-white/50">OS & System <span className="font-mono">({formatFileSize(telemetry.disk.used - telemetry.storage.main.size - telemetry.storage.temp.size)})</span></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500" />
+                          <span className="text-white/50">App Data <span className="font-mono">({formatFileSize(telemetry.storage.main.size + telemetry.storage.temp.size)})</span></span>
+                        </div>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-black/40 rounded-lg p-4">
-                        <div className="text-xs text-white/50 mb-1">Main Storage</div>
-                        <div className="text-lg font-mono">{formatFileSize(telemetry.storage.main.size)}</div>
+                      <div className="bg-black/40 rounded-lg p-4 border border-blue-500/20">
+                        <div className="text-xs text-blue-400 mb-1 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"/> Main Storage
+                        </div>
+                        <div className="text-lg font-mono text-white">{formatFileSize(telemetry.storage.main.size)}</div>
                         <div className="text-xs text-white/30">{telemetry.storage.main.count} files</div>
                       </div>
-                      <div className="bg-black/40 rounded-lg p-4">
-                        <div className="text-xs text-white/50 mb-1">Temp / Chunks</div>
-                        <div className="text-lg font-mono">{formatFileSize(telemetry.storage.temp.size)}</div>
+                      <div className="bg-black/40 rounded-lg p-4 border border-blue-500/20">
+                        <div className="text-xs text-blue-400 mb-1 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"/> Temp / Chunks
+                        </div>
+                        <div className="text-lg font-mono text-white">{formatFileSize(telemetry.storage.temp.size)}</div>
                         <div className="text-xs text-white/30">{telemetry.storage.temp.count} folders</div>
                       </div>
                     </div>
@@ -381,6 +424,125 @@ export function DeveloperDashboard() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'supabase' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* System Architecture Map */}
+            <div className="bg-[#111] border border-white/10 rounded-xl p-6 overflow-hidden shadow-xl">
+              <div className="flex items-center gap-2 text-white/80 font-semibold mb-6">
+                <Network size={18} className="text-green-400" />
+                Live System Architecture Map
+              </div>
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-black/40 rounded-xl border border-white/5">
+                <div className="flex-1 text-center space-y-2 p-4 bg-white/[0.02] rounded-lg border border-white/10">
+                  <div className="mx-auto w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/50 flex items-center justify-center mb-2">
+                    <Activity className="text-blue-400" size={20}/>
+                  </div>
+                  <div className="font-semibold text-white">Frontend</div>
+                  <div className="text-xs text-white/50">Cloudflare Pages</div>
+                  <div className="text-[10px] text-white/30 uppercase">Static UI Assets</div>
+                </div>
+                
+                <div className="hidden md:flex text-white/30">
+                  <div className="h-0.5 w-16 bg-gradient-to-r from-blue-500/50 to-purple-500/50 relative">
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 border-y-4 border-l-4 border-y-transparent border-l-purple-500/50" />
+                  </div>
+                </div>
+
+                <div className="flex-1 text-center space-y-2 p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                  <div className="mx-auto w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/50 flex items-center justify-center mb-2">
+                    <Server className="text-purple-400" size={20}/>
+                  </div>
+                  <div className="font-semibold text-white">Media Router</div>
+                  <div className="text-xs text-purple-400/80">Oracle VPS</div>
+                  <div className="text-[10px] text-white/30 uppercase">Images, Video Chunks</div>
+                </div>
+
+                <div className="hidden md:flex text-white/30">
+                  <div className="h-0.5 w-16 bg-gradient-to-r from-purple-500/50 to-green-500/50 relative">
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 border-y-4 border-l-4 border-y-transparent border-l-green-500/50" />
+                  </div>
+                </div>
+
+                <div className="flex-1 text-center space-y-2 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                  <div className="mx-auto w-10 h-10 rounded-full bg-green-500/20 border border-green-500/50 flex items-center justify-center mb-2">
+                    <Database className="text-green-400" size={20}/>
+                  </div>
+                  <div className="font-semibold text-white">Database & Auth</div>
+                  <div className="text-xs text-green-400/80">Supabase Platform</div>
+                  <div className="text-[10px] text-white/30 uppercase">User Metadata, Access Control</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Supabase Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-6">
+                <div className="flex items-center gap-2 text-white/80 font-semibold border-b border-white/10 pb-4">
+                  <Database size={18} className="text-green-400" />
+                  Database Physical Size
+                </div>
+                {dbSize ? (
+                  <div className="space-y-4">
+                    <div className="text-center p-6 bg-black/40 rounded-xl border border-white/5">
+                      <div className="text-sm text-white/50 mb-2">Total Database Size on Disk</div>
+                      <div className="text-4xl font-mono text-green-400">{dbSize.size_pretty}</div>
+                      <div className="text-xs text-white/30 mt-2">({dbSize.size_bytes.toLocaleString()} bytes)</div>
+                    </div>
+                    <div className="text-xs text-white/40 text-center bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 text-blue-300">
+                      This represents the raw PostgreSQL database size. The media files themselves are stored on the Oracle server and are not included in this number.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-white/50 flex flex-col items-center justify-center p-8 space-y-4">
+                    <Activity className="animate-spin text-white/20" size={24} />
+                    <p>Loading database size (requires SQL RPC to be deployed)</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-6">
+                <div className="flex items-center gap-2 text-white/80 font-semibold border-b border-white/10 pb-4">
+                  <Users size={18} className="text-blue-400" />
+                  Platform Record Counts
+                </div>
+                {tableCounts ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-black/40 p-4 rounded-lg border border-white/5">
+                      <div className="text-xs text-white/50 mb-1">Users / Profiles</div>
+                      <div className="text-xl font-mono text-white">{tableCounts.users.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-lg border border-white/5">
+                      <div className="text-xs text-white/50 mb-1">Rooms</div>
+                      <div className="text-xl font-mono text-white">{tableCounts.rooms.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-lg border border-white/5">
+                      <div className="text-xs text-white/50 mb-1">Events</div>
+                      <div className="text-xl font-mono text-white">{tableCounts.events.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-lg border border-white/5">
+                      <div className="text-xs text-white/50 mb-1">Photos Indexed</div>
+                      <div className="text-xl font-mono text-white">{tableCounts.photos.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-lg border border-white/5">
+                      <div className="text-xs text-white/50 mb-1">Comments</div>
+                      <div className="text-xl font-mono text-white">{tableCounts.comments.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-lg border border-white/5">
+                      <div className="text-xs text-white/50 mb-1">Reactions</div>
+                      <div className="text-xl font-mono text-white">{tableCounts.reactions.toLocaleString()}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-white/50 flex flex-col items-center justify-center p-8 space-y-4">
+                    <Activity className="animate-spin text-white/20" size={24} />
+                    <p>Loading table counts...</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

@@ -40,6 +40,21 @@ export interface GlobalConfig {
   read_only_mode: boolean;
 }
 
+export interface SupabaseDbSize {
+  database_name: string;
+  size_bytes: number;
+  size_pretty: string;
+}
+
+export interface SupabaseTableCounts {
+  users: number;
+  rooms: number;
+  events: number;
+  photos: number;
+  comments: number;
+  reactions: number;
+}
+
 export async function getAllUsers(): Promise<AdminUser[]> {
   const { data, error } = await supabase.rpc('admin_get_all_users')
   if (error) throw error
@@ -196,16 +211,35 @@ export async function downloadBackup(): Promise<void> {
     headers: { 'Authorization': `Bearer ${token}` }
   })
   if (!res.ok) {
-    throw new Error('Failed to download backup')
+    const err = await res.json().catch(()=>({}))
+    throw new Error(err.error || 'Failed to download backup')
   }
   
   const blob = await res.blob()
   const url = window.URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'cogallery-backup.zip'
+  a.download = `cogallery-backup-${new Date().toISOString()}.zip`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   window.URL.revokeObjectURL(url)
+}
+
+export async function getSupabaseDbSize(): Promise<SupabaseDbSize | null> {
+  const { data, error } = await supabase.rpc('get_db_size')
+  if (error) {
+    console.warn('Failed to get DB size (RPC might not be installed)', error)
+    return null
+  }
+  return data?.[0] || null
+}
+
+export async function getSupabaseTableCounts(): Promise<SupabaseTableCounts | null> {
+  const { data, error } = await supabase.rpc('get_table_counts')
+  if (error) {
+    console.warn('Failed to get table counts (RPC might not be installed)', error)
+    return null
+  }
+  return data
 }
