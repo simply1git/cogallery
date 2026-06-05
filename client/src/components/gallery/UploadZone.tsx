@@ -15,7 +15,7 @@ interface UploadZoneProps {
 
 export function UploadZone({ eventId, roomId, userId }: UploadZoneProps) {
   // Use global persistent queue instead of local memory state
-  const { uploads, removeItem, retryItem, clearCompleted } = useUploadQueue()
+  const { uploads, removeItem, retryItem, clearCompleted, cancelAll } = useUploadQueue()
 
   const onDrop = useCallback(
     async (accepted: File[]) => {
@@ -103,15 +103,22 @@ export function UploadZone({ eventId, roomId, userId }: UploadZoneProps) {
                   <Loader2 size={14} className="animate-spin-slow text-blue-400" />
                 )}
               </div>
-              {/* Clear done */}
-              {completedCount > 0 && !isUploading && (
+              <div className="flex gap-3">
                 <button
-                  onClick={clearCompleted}
-                  className="text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+                  onClick={cancelAll}
+                  className="text-xs text-rose-400 hover:text-rose-300 transition-colors"
                 >
-                  Clear completed
+                  Cancel all
                 </button>
-              )}
+                {completedCount > 0 && !isUploading && (
+                  <button
+                    onClick={clearCompleted}
+                    className="text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+                  >
+                    Clear completed
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

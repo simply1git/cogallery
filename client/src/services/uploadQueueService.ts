@@ -210,5 +210,15 @@ export const uploadQueueService = {
   clearCompleted() {
     const completed = memoryItems.filter(i => i.status === 'done');
     completed.forEach(item => this.removeItem(item.id));
+  },
+
+  async cancelAll() {
+    const db = await dbPromise;
+    if (!db) return;
+    
+    // Clear everything from the db
+    await db.clear('uploads');
+    memoryItems = [];
+    this.notify();
   }
 };

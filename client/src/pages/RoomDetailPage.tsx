@@ -186,7 +186,7 @@ export function RoomDetailPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600/15 via-violet-600/8 to-transparent" />
         <div className="absolute inset-0 bg-[#0a0a0a]/50" />
 
-        <div className="relative p-6 sm:p-8 flex items-start justify-between gap-4">
+        <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
@@ -219,7 +219,7 @@ export function RoomDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
             {isOwner && (
               <>
                 <button

@@ -18,5 +18,6 @@ export function useUploadQueue() {
     retryItem: uploadQueueService.retryItem.bind(uploadQueueService),
     removeItem: uploadQueueService.removeItem.bind(uploadQueueService),
     clearCompleted: uploadQueueService.clearCompleted.bind(uploadQueueService),
+    cancelAll: uploadQueueService.cancelAll.bind(uploadQueueService),
   };
 }
