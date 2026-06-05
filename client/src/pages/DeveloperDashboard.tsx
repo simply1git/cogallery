@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2 } from 'lucide-react'
-import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, downloadBackup, getBackupUrl } from '@/services/adminService'
+import { AdminUser, TelemetryData, GlobalConfig, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, downloadBackup } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
