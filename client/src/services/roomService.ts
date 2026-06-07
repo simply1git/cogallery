@@ -14,6 +14,9 @@ function mapRoom(data: any): Room {
     thumbnailUrl: data.thumbnail_url,
     isArchived: data.is_archived ?? false,
     archivedAt: data.archived_at,
+    isVault: data.is_vault ?? false,
+    vaultSalt: data.vault_salt,
+    vaultHash: data.vault_hash,
   }
 }
 
@@ -35,12 +38,22 @@ function mapMember(data: any): RoomMember {
 export async function createRoom(
   userId: string,
   name: string,
-  description?: string
+  description?: string,
+  isVault?: boolean,
+  vaultSalt?: string,
+  vaultHash?: string
 ): Promise<{ data: Room | null; error: string | null }> {
   try {
     const { data, error } = await supabase
       .from('rooms')
-      .insert({ creator_id: userId, name, description })
+      .insert({ 
+        creator_id: userId, 
+        name, 
+        description,
+        is_vault: isVault,
+        vault_salt: vaultSalt,
+        vault_hash: vaultHash
+      })
       .select()
       .single()
 

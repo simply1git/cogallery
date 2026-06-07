@@ -5,12 +5,14 @@ import {
   ChevronUp, ChevronDown
 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { getPhotoDetails, addReaction, addComment, deleteComment, getSecureMediaUrl } from '@/services/photoService'
+import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/services/photoService'
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
 import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
+import { useRoomStore } from '@/store/roomStore'
+import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']
 
@@ -42,7 +44,9 @@ export function PhotoDetailModal({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [activeTab, setActiveTab] = useState<'reactions' | 'comments' | 'info'>('reactions')
   const [showMobilePanel, setShowMobilePanel] = useState(false)
-  const [secureUrl, setSecureUrl] = useState<string | null>(null)
+  
+  const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
+  const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey)
 
   const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
   const hasPrev = currentIndex > 0
@@ -58,22 +62,6 @@ export function PhotoDetailModal({
   useEffect(() => {
     if (photo) {
       loadDetails(photo)
-      setSecureUrl(null)
-      
-      // Robust key extraction for backward compatibility with older uploads
-      let s3Key = photo.s3Key;
-      if (!s3Key) {
-        if (photo.s3Url?.includes('.r2.dev/')) s3Key = photo.s3Url.split('.r2.dev/')[1];
-        else if (photo.s3Url?.includes('/stream/')) s3Key = photo.s3Url.split('/stream/')[1];
-        else if (photo.s3Url?.includes('/proxy/')) s3Key = photo.s3Url.split('/proxy/')[1];
-        else s3Key = photo.filename;
-      }
-      
-      if (s3Key) {
-        getSecureMediaUrl(s3Key)
-          .then(setSecureUrl)
-          .catch(() => toast.error('Failed to load secure media'))
-      }
     }
   }, [photo, loadDetails])
 
@@ -116,6 +104,10 @@ export function PhotoDetailModal({
 
   async function handleDownload() {
     if (!photo || !secureUrl) return
+    if (photo.isEncrypted && secureUrl) {
+      await downloadFile(secureUrl, photo.filename)
+      return
+    }
     await downloadFile(secureUrl, photo.filename)
   }
 
@@ -178,6 +170,8 @@ export function PhotoDetailModal({
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
                 />
+              ) : isDecrypting ? (
+                <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
               ) : (
                 <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
               )}
@@ -201,6 +195,11 @@ export function PhotoDetailModal({
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none"
                   draggable={false}
                 />
+              ) : isDecrypting ? (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                  <span className="text-sm font-medium text-blue-400">Decrypting...</span>
+                </div>
               ) : (
                 <img
                   src={photo.thumbnailBase64 || ''} // fallback to thumbnail while loading secure URL
@@ -242,13 +241,13 @@ export function PhotoDetailModal({
               {photo.filename}
             </span>
             <div className="flex items-center gap-1">
-              {onSetRoomCover && (
-                <button onClick={() => { onSetRoomCover(photo.s3Url); onClose() }} className="btn-icon" title="Set as Room Cover">
+              {onSetRoomCover && photo.s3Url && (
+                <button onClick={() => { onSetRoomCover(photo.s3Url!); onClose() }} className="btn-icon" title="Set as Room Cover">
                   <Layout size={16} />
                 </button>
               )}
-              {onSetEventCover && (
-                <button onClick={() => { onSetEventCover(photo.s3Url); onClose() }} className="btn-icon" title="Set as Event Cover">
+              {onSetEventCover && photo.s3Url && (
+                <button onClick={() => { onSetEventCover(photo.s3Url!); onClose() }} className="btn-icon" title="Set as Event Cover">
                   <ImageIcon size={16} />
                 </button>
               )}

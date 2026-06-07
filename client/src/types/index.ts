@@ -32,6 +32,9 @@ export interface Room {
   isArchived: boolean
   thumbnailUrl?: string
   archivedAt?: string
+  isVault?: boolean
+  vaultSalt?: string
+  vaultHash?: string
 }
 
 export interface RoomMember {
@@ -99,10 +102,14 @@ export interface Photo {
   contentHash?: string
   fileSizeBytes: number
   mediaType: MediaType
-  s3Key: string
-  s3Url: string
+  metadata?: Record<string, any>
+  createdAt: string
+  updatedAt: string
+  s3Key?: string
+  s3Url?: string
   thumbnailUrl?: string
   thumbnailBase64?: string
+  isEncrypted?: boolean
   
   // EXIF metadata
   takenAt?: string
@@ -116,7 +123,6 @@ export interface Photo {
   longitude?: number
   
   description?: string
-  createdAt: string
 }
 
 export interface PhotoWithReactions extends Photo {

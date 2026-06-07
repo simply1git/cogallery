@@ -4,6 +4,7 @@ import { UploadCloud, X, CheckCircle2, Film, ImageIcon, Loader2 } from 'lucide-r
 import { getMediaType, formatFileSize, ACCEPTED_MEDIA_TYPES } from '@/services/uploadService'
 import { uploadQueueService } from '@/services/uploadQueueService'
 import { useUploadQueue } from '@/hooks/useUploadQueue'
+import { useRoomStore } from '@/store/roomStore'
 import type { Photo } from '@/types'
 
 interface UploadZoneProps {
@@ -16,14 +17,20 @@ interface UploadZoneProps {
 export function UploadZone({ eventId, roomId, userId }: UploadZoneProps) {
   // Use global persistent queue instead of local memory state
   const { uploads, removeItem, retryItem, clearCompleted, cancelAll } = useUploadQueue()
+  const { currentRoom, vaultKeys } = useRoomStore()
 
   const onDrop = useCallback(
     async (accepted: File[]) => {
       if (accepted.length === 0) return
       // Instantly cache to IndexedDB and trigger background processing
-      await uploadQueueService.addFiles(accepted, { eventId, roomId, userId })
+      await uploadQueueService.addFiles(
+        accepted, 
+        { eventId, roomId, userId },
+        currentRoom?.isVault,
+        vaultKeys[roomId]
+      )
     },
-    [eventId, roomId, userId]
+    [eventId, roomId, userId, currentRoom?.isVault, vaultKeys]
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

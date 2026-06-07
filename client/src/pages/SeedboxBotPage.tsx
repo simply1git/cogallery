@@ -35,9 +35,8 @@ export function SeedboxBotPage() {
       }
     }
 
-    // Function to check and download a photo if we don't have it
     const ensurePhotoCached = async (photo: Photo) => {
-      if (!photo.s3Key.startsWith('p2p:')) return
+      if (!photo.s3Key?.startsWith('p2p:')) return
 
       seedEvent(photo.eventId) // Ensure we are seeding this event
 

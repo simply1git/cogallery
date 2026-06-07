@@ -12,6 +12,8 @@ interface RoomStore {
   addRoom: (room: Room) => void
   updateRoom: (roomId: string, updates: Partial<Room>) => void
   removeRoom: (roomId: string) => void
+  vaultKeys: Record<string, CryptoKey>
+  setVaultKey: (roomId: string, key: CryptoKey) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   reset: () => void
@@ -22,6 +24,12 @@ export const useRoomStore = create<RoomStore>((set) => ({
   currentRoom: null,
   isLoading: false,
   error: null,
+  vaultKeys: {},
+
+  setVaultKey: (roomId, key) =>
+    set((state) => ({
+      vaultKeys: { ...state.vaultKeys, [roomId]: key },
+    })),
 
   setRooms: (rooms) => set({ rooms }),
 

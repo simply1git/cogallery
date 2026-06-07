@@ -48,7 +48,9 @@ export function usePhotoSubscription({
               s3Url: raw.s3_url,
               thumbnailUrl: raw.thumbnail_url,
               createdAt: raw.created_at,
+              updatedAt: raw.updated_at || raw.created_at,
               thumbnailBase64: raw.thumbnail_base64,
+              isEncrypted: raw.is_encrypted || false,
             }
             callbacksRef.current.onNewPhoto?.(photo)
           }
@@ -75,7 +77,9 @@ export function usePhotoSubscription({
               s3Url: raw.s3_url,
               thumbnailUrl: raw.thumbnail_url,
               createdAt: raw.created_at,
+              updatedAt: raw.updated_at || raw.created_at,
               thumbnailBase64: raw.thumbnail_base64,
+              isEncrypted: raw.is_encrypted || false,
             }
             callbacksRef.current.onNewPhoto?.(photo) // Can reuse onNewPhoto to trigger a state update
           }

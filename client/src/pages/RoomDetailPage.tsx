@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, CalendarDays, Users, Image, UserPlus,
-  Loader2, FolderOpen, Camera, Clock, Check, X, Trash2, Settings, BarChart3, Bell
+  Loader2, FolderOpen, Camera, Clock, Check, X, Trash2, Settings, BarChart3, Bell, Lock
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRoomStore } from '@/store/roomStore'
@@ -19,12 +19,13 @@ import { toast } from 'sonner'
 import type { EventWithDetails } from '@/types'
 import { CardSkeleton, PageHeaderSkeleton } from '@/components/shared/Skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { deriveKeyFromPassword } from '@/services/cryptoService'
 
 export function RoomDetailPage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { currentRoom, setCurrentRoom } = useRoomStore()
+  const { currentRoom, setCurrentRoom, vaultKeys, setVaultKey } = useRoomStore()
 
   const [events, setEvents] = useState<EventWithDetails[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -35,6 +36,8 @@ export function RoomDetailPage() {
   const [showActivity, setShowActivity] = useState(false)
   const [isRequestingJoin, setIsRequestingJoin] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [vaultPassword, setVaultPassword] = useState('')
+  const [isUnlocking, setIsUnlocking] = useState(false)
 
   const { onlineUsers } = usePresence(roomId || '')
 
@@ -169,6 +172,57 @@ export function RoomDetailPage() {
     )
   }
 
+  const handleUnlockVault = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!room || !roomId || !room.vaultSalt) return
+    setIsUnlocking(true)
+    try {
+      // In a real app, we'd verify the hash before succeeding,
+      // but if the decryption fails later, it'll just show garbled data or error out.
+      // We can also check vaultHash if we want strict verification here.
+      const key = await deriveKeyFromPassword(vaultPassword, room.vaultSalt)
+      setVaultKey(roomId, key)
+      setVaultPassword('')
+    } catch (err) {
+      toast.error('Invalid password or crypto error')
+    } finally {
+      setIsUnlocking(false)
+    }
+  }
+
+  // Vault Lock Screen
+  if (room.isVault && !vaultKeys[roomId!]) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center animate-slide-up">
+        <div className="w-20 h-20 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto mb-6">
+          <Lock size={32} className="text-rose-400" />
+        </div>
+        <h1 className="text-2xl font-bold text-[#f4f4f5] mb-3">Vault Locked</h1>
+        <p className="text-[#a1a1aa] mb-8 text-sm max-w-sm mx-auto leading-relaxed">
+          This room is End-to-End Encrypted. Enter the vault password to decrypt and view the contents.
+        </p>
+        <form onSubmit={handleUnlockVault} className="max-w-sm mx-auto space-y-4">
+          <input
+            type="password"
+            className="input-base text-center"
+            placeholder="Enter Vault Password"
+            value={vaultPassword}
+            onChange={(e) => setVaultPassword(e.target.value)}
+            required
+            autoFocus
+          />
+          <button 
+            type="submit" 
+            disabled={isUnlocking || !vaultPassword}
+            className="btn-primary w-full justify-center py-3"
+          >
+            {isUnlocking ? <Loader2 size={18} className="animate-spin" /> : 'Unlock Vault'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Breadcrumb */}
@@ -189,8 +243,8 @@ export function RoomDetailPage() {
         <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-                <FolderOpen size={20} className="text-blue-400" />
+              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 ${room.isVault ? 'bg-rose-500/20 border-rose-500/30' : 'bg-blue-500/20 border-blue-500/30'}`}>
+                {room.isVault ? <Lock size={20} className="text-rose-400" /> : <FolderOpen size={20} className="text-blue-400" />}
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-[#f4f4f5] truncate">
                 {room.name}

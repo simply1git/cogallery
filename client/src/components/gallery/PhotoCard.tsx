@@ -4,6 +4,8 @@ import type { Photo } from '@/types'
 import { downloadFile } from '@/utils/download'
 import { getSecureMediaUrl } from '@/services/photoService'
 import { toast } from 'sonner'
+import { useRoomStore } from '@/store/roomStore'
+import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 
 interface PhotoCardProps {
   photo: Photo
@@ -31,6 +33,8 @@ export const PhotoCard = memo(function PhotoCard({
   const [imgError, setImgError] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const isVideo = photo.mediaType === 'video'
+  const vaultKey = useRoomStore((s) => s.vaultKeys[photo.roomId])
+  const { url: mediaUrl, isDecrypting, error: mediaError } = useDecryptedMediaUrl(photo, vaultKey)
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectable) {
@@ -44,6 +48,12 @@ export const PhotoCard = memo(function PhotoCard({
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
     try {
+      if (photo.isEncrypted && mediaUrl) {
+        // We already have the decrypted Blob URL! Just trigger download.
+        downloadFile(mediaUrl, photo.filename)
+        return
+      }
+
       let s3Key = photo.s3Key;
       if (!s3Key) {
         if (photo.s3Url?.includes('.r2.dev/')) s3Key = photo.s3Url.split('.r2.dev/')[1];
@@ -68,18 +78,23 @@ export const PhotoCard = memo(function PhotoCard({
       onClick={handleClick}
     >
       {/* Media */}
-      <div className="relative bg-[#0f0f0f]">
-        {imgError && !photo.thumbnailBase64 ? (
+      <div className="relative bg-[#0f0f0f] flex items-center justify-center min-h-[150px]">
+        {imgError || mediaError ? (
           <div className="w-full bg-[#141414] flex flex-col items-center justify-center gap-2 text-[#52525b] py-12">
             {isVideo ? <Film size={32} /> : <ImageIcon size={32} />}
             <span className="text-xs font-medium px-2 text-center break-all">{photo.filename}</span>
           </div>
+        ) : isDecrypting ? (
+          <div className="w-full flex flex-col items-center justify-center gap-2 text-blue-500/50 py-12">
+            <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <span className="text-xs font-medium">Decrypting...</span>
+          </div>
         ) : (
           <img
-            src={(photo.thumbnailBase64 && !imgError) ? photo.thumbnailBase64 : ''}
+            src={mediaUrl}
             alt={photo.filename}
             className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] ${
-              isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-60'
+              isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-0'
             }`}
             loading="lazy"
             decoding="async"

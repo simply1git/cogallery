@@ -16,6 +16,7 @@ export async function downloadFilesAsZip(photos: Photo[], zipFilename: string, o
       
       await Promise.all(batch.map(async (photo) => {
         try {
+          if (!photo.s3Url) throw new Error('Missing URL');
           const response = await fetch(photo.s3Url)
           if (!response.ok) throw new Error(`Failed to fetch ${photo.filename}`)
           

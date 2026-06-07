@@ -39,6 +39,8 @@ function mapPhoto(data: any): Photo {
     longitude: data.longitude,
     description: data.description,
     createdAt: data.created_at,
+    updatedAt: data.updated_at || data.created_at,
+    isEncrypted: data.is_encrypted ?? false,
   }
 }
 
@@ -70,13 +72,14 @@ export interface PhotoUploadOptions {
   eventId: string
   roomId: string
   userId: string
+  isEncrypted?: boolean
   onProgress?: (progress: number) => void
 }
 
 export async function uploadPhotoWithMetadata(
   opts: PhotoUploadOptions
 ): Promise<{ data: Photo | null; error: string | null }> {
-  const { file, eventId, roomId, userId, onProgress } = opts
+  const { file, eventId, roomId, userId, isEncrypted, onProgress } = opts
   let photoId: string | null = null;
 
   try {
@@ -111,6 +114,7 @@ export async function uploadPhotoWithMetadata(
         s3_key: `oracle:pending:${Date.now()}-${Math.random().toString(36).substring(7)}`,
         s3_url: 'https://pending', // will update after upload
         thumbnail_base64: thumbnailBase64,
+        is_encrypted: isEncrypted ?? false,
       })
       .select()
       .single()

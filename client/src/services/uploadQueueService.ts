@@ -2,6 +2,7 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { uploadPhotoWithMetadata } from './photoService';
 import { toast } from 'sonner';
 import { scrubExif } from '../utils/exifScrubber';
+import { encryptFile } from './cryptoService';
 
 export interface UploadItem {
   id: string; // unique internal id
@@ -13,6 +14,7 @@ export interface UploadItem {
   progress: number;
   error?: string;
   addedAt: number;
+  isEncrypted?: boolean;
 }
 
 interface CoGalleryDB extends DBSchema {
@@ -82,7 +84,12 @@ export const uploadQueueService = {
     return () => listeners.delete(listener);
   },
 
-  async addFiles(files: File[], metadata: { eventId: string; roomId: string; userId: string }) {
+  async addFiles(
+    files: File[], 
+    metadata: { eventId: string; roomId: string; userId: string },
+    isVault?: boolean,
+    vaultKey?: CryptoKey
+  ) {
     const db = await dbPromise;
     if (!db) return;
 
@@ -90,15 +97,26 @@ export const uploadQueueService = {
       // Zero-Knowledge Privacy: Scrub EXIF GPS data before it even enters the queue
       const cleanFile = await scrubExif(file);
       
+      // If Vault, encrypt the file payload immediately before putting in IndexedDB
+      let payloadToStore: File | Blob = cleanFile;
+      if (isVault) {
+        if (!vaultKey) {
+          toast.error('Vault key missing. Cannot upload.');
+          continue;
+        }
+        payloadToStore = await encryptFile(cleanFile, vaultKey);
+      }
+      
       const item: UploadItem = {
         id: crypto.randomUUID(),
-        file: cleanFile,
+        file: payloadToStore as File, // we typecast to File for interface compatibility
         eventId: metadata.eventId,
         roomId: metadata.roomId,
         userId: metadata.userId,
         status: 'queued',
         progress: 0,
         addedAt: Date.now(),
+        isEncrypted: isVault,
       };
       await db.put('uploads', item);
       memoryItems.push(item);
@@ -155,6 +173,7 @@ export const uploadQueueService = {
               eventId: item.eventId,
               roomId: item.roomId,
               userId: item.userId,
+              isEncrypted: item.isEncrypted,
               onProgress: (progress) => {
                 // Update memory instantly for UI, avoid spamming IndexedDB disk writes for every % tick
                 const memItem = memoryItems.find(i => i.id === item.id);

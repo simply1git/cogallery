@@ -161,7 +161,7 @@ export function EventDetailPage() {
   }
 
   async function handleDeletePhoto(photo: Photo) {
-    const { error } = await deletePhotoById(photo.id, photo.s3Key)
+    const { error } = await deletePhotoById(photo.id, photo.s3Key!)
     if (error) { toast.error(error); return }
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id))
     toast.success('Deleted')
@@ -227,7 +227,7 @@ export function EventDetailPage() {
     
     // Download them individually sequentially to not crash the browser
     for (const p of selectedPhotos) {
-      await downloadFile(p.s3Url, p.filename)
+      if (p.s3Url) await downloadFile(p.s3Url, p.filename)
       // Small pause between downloads to allow the browser to process
       await new Promise(res => setTimeout(res, 300))
     }
@@ -253,7 +253,7 @@ export function EventDetailPage() {
     }
 
     for (const photo of toDelete) {
-      const { error } = await deletePhotoById(photo.id, photo.s3Key)
+      const { error } = await deletePhotoById(photo.id, photo.s3Key!)
       if (error) errCount++
       else deletedCount++
     }

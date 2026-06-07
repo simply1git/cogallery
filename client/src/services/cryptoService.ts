@@ -1,0 +1,81 @@
+// Web Crypto API utility for End-to-End Encryption
+
+const ALGO = 'AES-GCM';
+const PBKDF2_ITERATIONS = 100000;
+
+export async function deriveKeyFromPassword(password: string, saltHex: string): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    'raw',
+    enc.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  const saltBuffer = new Uint8Array(saltHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+  return window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: saltBuffer,
+      iterations: PBKDF2_ITERATIONS,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: ALGO, length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function generateSaltHex(): Promise<string> {
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function encryptFile(file: File | Blob, key: CryptoKey): Promise<Blob> {
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const buffer = await file.arrayBuffer();
+  
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    {
+      name: ALGO,
+      iv: iv,
+    },
+    key,
+    buffer
+  );
+
+  // Prepend IV to the encrypted data
+  const finalBuffer = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+  finalBuffer.set(iv, 0);
+  finalBuffer.set(new Uint8Array(encryptedBuffer), iv.length);
+
+  return new Blob([finalBuffer], { type: 'application/octet-stream' });
+}
+
+export async function decryptBuffer(encryptedBuffer: ArrayBuffer, key: CryptoKey, originalType: string): Promise<Blob> {
+  const bytes = new Uint8Array(encryptedBuffer);
+  const iv = bytes.slice(0, 12);
+  const data = bytes.slice(12);
+
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    {
+      name: ALGO,
+      iv: iv,
+    },
+    key,
+    data
+  );
+
+  return new Blob([decryptedBuffer], { type: originalType });
+}
+
+// Generates a hash to verify the password later without storing the password
+export async function hashPasswordForVerification(password: string, saltHex: string): Promise<string> {
+  const key = await deriveKeyFromPassword(password, saltHex);
+  const rawKey = await window.crypto.subtle.exportKey('raw', key);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', rawKey);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
