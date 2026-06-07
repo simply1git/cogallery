@@ -1,20 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/shared/ThemeProvider'
-import { HomePage } from '@/pages/HomePage'
-import { LoginPage } from '@/pages/LoginPage'
-import { DashboardPage } from '@/pages/DashboardPage'
-import { RoomDetailPage } from '@/pages/RoomDetailPage'
-import { EventDetailPage } from '@/pages/EventDetailPage'
-import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
-import { SeedboxBotPage } from '@/pages/SeedboxBotPage'
-import { DeveloperDashboard } from '@/pages/DeveloperDashboard'
-import { MaintenancePage } from '@/pages/MaintenancePage'
 import { Layout } from '@/components/shared/Layout'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadQueueService } from '@/services/uploadQueueService'
 import { supabase } from '@/lib/supabase'
+
+// ─── Lazy-loaded pages (each becomes its own chunk) ─────────────────────────
+const HomePage = lazy(() => import('@/pages/HomePage').then(m => ({ default: m.HomePage })))
+const LoginPage = lazy(() => import('@/pages/LoginPage').then(m => ({ default: m.LoginPage })))
+const DashboardPage = lazy(() => import('@/pages/DashboardPage').then(m => ({ default: m.DashboardPage })))
+const RoomDetailPage = lazy(() => import('@/pages/RoomDetailPage').then(m => ({ default: m.RoomDetailPage })))
+const EventDetailPage = lazy(() => import('@/pages/EventDetailPage').then(m => ({ default: m.EventDetailPage })))
+const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
+const SeedboxBotPage = lazy(() => import('@/pages/SeedboxBotPage').then(m => ({ default: m.SeedboxBotPage })))
+const DeveloperDashboard = lazy(() => import('@/pages/DeveloperDashboard').then(m => ({ default: m.DeveloperDashboard })))
+const MaintenancePage = lazy(() => import('@/pages/MaintenancePage').then(m => ({ default: m.MaintenancePage })))
+
+// ─── Page loading fallback ──────────────────────────────────────────────────
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-10 h-10 border-2 border-white/10 border-t-blue-500 rounded-full animate-spin-slow" />
+    </div>
+  )
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading } = useAuth()
@@ -40,61 +51,63 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   return (
-    <Routes>
-      {/* Public */}
-      <Route path="/" element={<HomePage />} />
-      <Route path="/auth" element={<LoginPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Public */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/auth" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Protected — hierarchy routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/room/:roomId"
-        element={
-          <ProtectedRoute>
-            <RoomDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/room/:roomId/event/:eventId"
-        element={
-          <ProtectedRoute>
-            <EventDetailPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected — hierarchy routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/room/:roomId"
+          element={
+            <ProtectedRoute>
+              <RoomDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/room/:roomId/event/:eventId"
+          element={
+            <ProtectedRoute>
+              <EventDetailPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Hidden Bot Route */}
-      <Route
-        path="/bot/seedbox"
-        element={
-          <ProtectedRoute>
-            <SeedboxBotPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Hidden Bot Route */}
+        <Route
+          path="/bot/seedbox"
+          element={
+            <ProtectedRoute>
+              <SeedboxBotPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Hidden God Mode Dashboard */}
-      <Route
-        path="/developer"
-        element={
-          <ProtectedRoute>
-            <DeveloperDashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Hidden God Mode Dashboard */}
+        <Route
+          path="/developer"
+          element={
+            <ProtectedRoute>
+              <DeveloperDashboard />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 
@@ -144,7 +157,11 @@ function App() {
   }
 
   if (maintenanceMode) {
-    return <MaintenancePage />
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <MaintenancePage />
+      </Suspense>
+    )
   }
 
   return (

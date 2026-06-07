@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Upload, Image, Video, Users,
   Loader2, Camera, RefreshCw, UploadCloud,
   CheckSquare, X, Download, Trash2,
-  CalendarDays, UserPlus, Check, Settings
+  CalendarDays, UserPlus, Check, Settings, PenTool
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { getEventById, requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail, getEventUploaders } from '@/services/eventService'
@@ -29,6 +29,9 @@ import { downloadFilesAsZip } from '@/services/downloadService'
 import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
 
+// Lazy-load the heavy Canvas component (tldraw is ~400KB)
+const MoodboardCanvas = lazy(() => import('@/components/canvas/MoodboardCanvas').then(m => ({ default: m.MoodboardCanvas })))
+
 export function EventDetailPage() {
   const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
   const navigate = useNavigate()
@@ -49,7 +52,7 @@ export function EventDetailPage() {
   const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all')
   const [uploaderFilter, setUploaderFilter] = useState<string>('all')
   const [uploadersList, setUploadersList] = useState<{id: string, name: string}[]>([])
-  const [activeTab, setActiveTab] = useState<'gallery' | 'notes'>('gallery')
+  const [activeTab, setActiveTab] = useState<'gallery' | 'notes' | 'canvas'>('gallery')
 
   // Selection state
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -508,6 +511,18 @@ export function EventDetailPage() {
           )}
         </button>
         <button
+          onClick={() => setActiveTab('canvas')}
+          className={`pb-3 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${
+            activeTab === 'canvas' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <PenTool size={14} />
+          Canvas
+          {activeTab === 'canvas' && (
+            <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-blue-500 rounded-t-full" />
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('notes')}
           className={`pb-3 text-sm font-medium transition-colors relative ${
             activeTab === 'notes' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
@@ -523,6 +538,23 @@ export function EventDetailPage() {
       {activeTab === 'notes' ? (
         <div className="animate-slide-up">
           <LiveNotes eventId={event.id} initialNotes={event.notes || ''} />
+        </div>
+      ) : activeTab === 'canvas' ? (
+        <div className="animate-slide-up">
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 border-2 border-white/10 border-t-blue-500 rounded-full animate-spin-slow" />
+                <span className="text-sm text-[#71717a]">Loading Canvas...</span>
+              </div>
+            </div>
+          }>
+            <MoodboardCanvas
+              eventId={eventId!}
+              userId={user!.id}
+              photos={photos}
+            />
+          </Suspense>
         </div>
       ) : (
         <>
@@ -653,56 +685,60 @@ export function EventDetailPage() {
 
       {/* Floating Action Bar for Selection Mode */}
       {isSelectionMode && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slide-up">
-          <div className="bg-[#18181b]/95 backdrop-blur-md border border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-2 sm:gap-4 max-w-[95vw]">
-            <div className="px-2 sm:px-4 text-xs sm:text-sm font-medium text-white border-r border-white/10 whitespace-nowrap">
-              {selectedIds.size} selected
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <button
-                onClick={handleSelectAll}
-                className="btn-ghost text-sm px-3"
-              >
-                {selectedIds.size === photos.length ? 'Deselect All' : 'Select All'}
-              </button>
-              
-              <button
-                onClick={handleBatchIndividualDownload}
-                disabled={selectedIds.size === 0 || isDownloadingZip}
-                className="btn-secondary"
-                title="Download Individually"
-              >
-                <Download size={16} />
-                <span className="hidden sm:inline">Originals</span>
-              </button>
+        <div className="fixed bottom-0 left-0 right-0 z-40 animate-slide-up pb-safe">
+          <div className="mx-auto max-w-lg px-3 pb-4">
+            <div className="bg-[#18181b]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-3 flex flex-col gap-3">
+              {/* Top row: count + select all */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-white px-1">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={handleSelectAll}
+                  className="text-xs font-medium text-blue-400 hover:text-blue-300 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
+                >
+                  {selectedIds.size === photos.length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
 
-              <button
-                onClick={handleBatchDownload}
-                disabled={selectedIds.size === 0 || isDownloadingZip}
-                className="btn-primary"
-              >
-                {isDownloadingZip ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" />
-                    Zipping... {downloadProgress}%
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Download size={16} />
-                    <span className="hidden sm:inline">ZIP</span>
-                  </span>
-                )}
-              </button>
-              
-              <button
-                onClick={handleBatchDelete}
-                disabled={selectedIds.size === 0 || isDownloadingZip}
-                className="btn-danger p-2 sm:px-4 sm:py-2 flex items-center gap-2"
-                title="Delete Selected"
-              >
-                <Trash2 size={16} />
-                <span className="hidden sm:inline">Delete</span>
-              </button>
+              {/* Action buttons — always centered and accessible */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={handleBatchIndividualDownload}
+                  disabled={selectedIds.size === 0 || isDownloadingZip}
+                  className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border border-white/10 text-[#a1a1aa] hover:text-white hover:bg-white/5 transition-all disabled:opacity-40"
+                >
+                  <Download size={18} />
+                  <span className="text-[11px] font-medium">Originals</span>
+                </button>
+
+                <button
+                  onClick={handleBatchDownload}
+                  disabled={selectedIds.size === 0 || isDownloadingZip}
+                  className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-40 shadow-lg shadow-blue-900/30"
+                >
+                  {isDownloadingZip ? (
+                    <>
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" />
+                      <span className="text-[11px] font-medium">{downloadProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} />
+                      <span className="text-[11px] font-medium">ZIP</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleBatchDelete}
+                  disabled={selectedIds.size === 0 || isDownloadingZip}
+                  className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                >
+                  <Trash2 size={18} />
+                  <span className="text-[11px] font-medium">Delete</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
