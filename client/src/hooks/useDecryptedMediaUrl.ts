@@ -15,6 +15,8 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey) {
     let isActive = true;
 
     async function loadMedia() {
+      if (!photo) return;
+      
       // 1. Handle non-encrypted photos
       if (!photo.isEncrypted) {
         // If it's not a vault, we could just use the thumbnail or get a signed URL
