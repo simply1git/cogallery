@@ -110,6 +110,7 @@ export const PhotoCard = memo(function PhotoCard({
             className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] ${
               isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-0'
             }`}
+            style={{ viewTransitionName: `photo-${photo.id}` }}
             loading="lazy"
             decoding="async"
             onLoad={() => setIsLoaded(true)}
