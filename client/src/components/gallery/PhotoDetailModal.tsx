@@ -13,6 +13,8 @@ import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
+import { useColorExtractor } from '@/hooks/useColorExtractor'
+import { useHaptics } from '@/hooks/useHaptics'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']
 
@@ -47,6 +49,8 @@ export function PhotoDetailModal({
   
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
   const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
+  const { ambientStyle } = useColorExtractor(!photo?.mediaType.startsWith('video') ? secureUrl : undefined)
+  const { haptic } = useHaptics()
 
   const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
   const hasPrev = currentIndex > 0
@@ -81,6 +85,7 @@ export function PhotoDetailModal({
 
   async function handleReaction(emoji: string) {
     if (!user || !photo) { toast.error('Sign in to react'); return }
+    haptic('light')
     await addReaction(photo.id, emoji, user.id)
     loadDetails(photo)
   }
@@ -104,6 +109,7 @@ export function PhotoDetailModal({
 
   async function handleDownload() {
     if (!photo || !secureUrl) return
+    haptic('medium')
     if (photo.isEncrypted && secureUrl) {
       await downloadFile(secureUrl, photo.filename)
       return
@@ -123,7 +129,11 @@ export function PhotoDetailModal({
   ) ?? {}
 
   return (
-    <div className="lightbox-overlay animate-fade-in" onClick={onClose}>
+    <div 
+      className="lightbox-overlay animate-fade-in transition-colors duration-1000 ease-in-out" 
+      onClick={onClose}
+      style={{ backgroundColor: ambientStyle || 'rgba(0, 0, 0, 0.95)' }}
+    >
       {/* Close */}
       <button className="absolute top-3 right-3 z-30 btn-icon bg-black/60 backdrop-blur-sm border border-white/10 mt-safe" onClick={onClose}>
         <X size={20} />
@@ -132,16 +142,24 @@ export function PhotoDetailModal({
       {/* Nav arrows */}
       {hasPrev && (
         <button
-          className="absolute left-2 md:left-4 top-1/3 md:top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 border border-white/10 p-2 md:p-3"
-          onClick={(e) => { e.stopPropagation(); onNavigate(allPhotos[currentIndex - 1]) }}
+          className="absolute left-2 md:left-4 top-1/3 md:top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 backdrop-blur-md border border-white/10 p-2 md:p-3 hover:scale-105 active:scale-95 transition-transform"
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            haptic('light');
+            onNavigate(allPhotos[currentIndex - 1]) 
+          }}
         >
           <ChevronLeft size={20} />
         </button>
       )}
       {hasNext && (
         <button
-          className="absolute right-2 md:right-[340px] top-1/3 md:top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 border border-white/10 p-2 md:p-3"
-          onClick={(e) => { e.stopPropagation(); onNavigate(allPhotos[currentIndex + 1]) }}
+          className="absolute right-2 md:right-[340px] top-1/3 md:top-1/2 -translate-y-1/2 z-10 btn-icon bg-black/40 backdrop-blur-md border border-white/10 p-2 md:p-3 hover:scale-105 active:scale-95 transition-transform"
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            haptic('light');
+            onNavigate(allPhotos[currentIndex + 1]) 
+          }}
         >
           <ChevronRight size={20} />
         </button>
@@ -180,11 +198,22 @@ export function PhotoDetailModal({
             <motion.div
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              dragElastic={0.7}
+              whileDrag={{ scale: 0.95 }}
               onDragEnd={(_e, info) => {
                 const swipeThreshold = 50;
-                if (info.offset.x > swipeThreshold && hasPrev) onNavigate(allPhotos[currentIndex - 1]);
-                else if (info.offset.x < -swipeThreshold && hasNext) onNavigate(allPhotos[currentIndex + 1]);
-                else if (info.offset.y > swipeThreshold * 2) onClose();
+                if (info.offset.x > swipeThreshold && hasPrev) {
+                  haptic('light');
+                  onNavigate(allPhotos[currentIndex - 1]);
+                }
+                else if (info.offset.x < -swipeThreshold && hasNext) {
+                  haptic('light');
+                  onNavigate(allPhotos[currentIndex + 1]);
+                }
+                else if (info.offset.y > swipeThreshold * 2) {
+                  haptic('medium');
+                  onClose();
+                }
               }}
               className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
             >

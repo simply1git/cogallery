@@ -3,14 +3,12 @@ import { LogOut, LayoutDashboard, Menu, X, Settings, Download } from 'lucide-rea
 import { useAuth } from '@/hooks/useAuth'
 import { signOut } from '@/services/authService'
 import { useState } from 'react'
-import { ProfileSettingsModal } from '@/components/modals/ProfileSettingsModal'
 import { usePWAInstall } from '@/hooks/usePWAInstall'
 
-export function Header() {
+export function Header({ onOpenProfile }: { onOpenProfile?: () => void }) {
   const navigate = useNavigate()
   const { user, isAuthenticated, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const { isInstallable, promptInstall } = usePWAInstall()
 
   const handleLogout = async () => {
@@ -100,7 +98,7 @@ export function Header() {
                         Dashboard
                       </Link>
                       <button
-                        onClick={() => setIsProfileOpen(true)}
+                        onClick={() => onOpenProfile?.()}
                         className="w-full flex items-center gap-2 text-sm text-[#a1a1aa] hover:text-white hover:bg-white/5 px-3 py-2 rounded-lg transition-colors"
                       >
                         <Settings size={15} />
@@ -159,7 +157,7 @@ export function Header() {
                   <button
                     onClick={() => {
                       setIsMenuOpen(false)
-                      setIsProfileOpen(true)
+                      onOpenProfile?.()
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#a1a1aa] hover:text-white hover:bg-white/5 rounded-lg"
                   >
@@ -189,11 +187,6 @@ export function Header() {
         </div>
       </header>
 
-      {/* Modals */}
-      <ProfileSettingsModal 
-        isOpen={isProfileOpen} 
-        onClose={() => setIsProfileOpen(false)} 
-      />
     </>
   )
 }

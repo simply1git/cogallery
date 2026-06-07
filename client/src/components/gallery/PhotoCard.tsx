@@ -6,6 +6,8 @@ import { getSecureMediaUrl } from '@/services/photoService'
 import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
+import { motion } from 'framer-motion'
+import { useHaptics } from '@/hooks/useHaptics'
 
 interface PhotoCardProps {
   photo: Photo
@@ -35,18 +37,22 @@ export const PhotoCard = memo(function PhotoCard({
   const isVideo = photo.mediaType === 'video'
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo.roomId])
   const { url: mediaUrl, isDecrypting, error: mediaError } = useDecryptedMediaUrl(photo, vaultKey)
+  const { haptic } = useHaptics()
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectable) {
       e.stopPropagation()
+      haptic('light')
       onSelect?.()
     } else {
+      haptic('light')
       onClick?.()
     }
   }
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
+    haptic('medium')
     try {
       if (photo.isEncrypted && mediaUrl) {
         // We already have the decrypted Blob URL! Just trigger download.
@@ -70,12 +76,20 @@ export const PhotoCard = memo(function PhotoCard({
   }
 
   return (
-    <div
-      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-all duration-200 ${
+    <motion.div
+      layout
+      whileTap={{ scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-colors duration-200 ${
         selected ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)]' : 'border-white/[0.06] hover:border-white/[0.15]'
       }`}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}
       onClick={handleClick}
+      // Add context menu action on mobile
+      onContextMenu={() => {
+        // We could block context menu or open our own
+      }}
     >
       {/* Media */}
       <div className="relative bg-[#0f0f0f] flex items-center justify-center min-h-[150px]">
@@ -178,6 +192,6 @@ export const PhotoCard = memo(function PhotoCard({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 })

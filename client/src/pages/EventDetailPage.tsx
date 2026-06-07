@@ -675,7 +675,13 @@ export function EventDetailPage() {
         <PhotoGrid
           photos={photos}
           isLoading={isLoadingPhotos}
-          onPhotoClick={(photo) => setSelectedPhoto(photo)}
+          onPhotoClick={(photo) => {
+            if (document.startViewTransition) {
+              document.startViewTransition(() => setSelectedPhoto(photo))
+            } else {
+              setSelectedPhoto(photo)
+            }
+          }}
           onPhotoDelete={handleDeletePhoto}
           canDelete={(photo) => photo.uploaderId === user?.id}
           selectedIds={isSelectionMode ? selectedIds : undefined}
@@ -747,7 +753,13 @@ export function EventDetailPage() {
           <PhotoDetailModal
             photo={selectedPhoto}
             allPhotos={photos}
-            onClose={() => setSelectedPhoto(null)}
+            onClose={() => {
+              if (document.startViewTransition) {
+                document.startViewTransition(() => setSelectedPhoto(null))
+              } else {
+                setSelectedPhoto(null)
+              }
+            }}
             onNavigate={(photo) => setSelectedPhoto(photo)}
             onDelete={(photoId) => {
               const p = photos.find((x) => x.id === photoId)
