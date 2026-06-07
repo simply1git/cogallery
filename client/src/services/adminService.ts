@@ -98,7 +98,6 @@ export async function nukeUser(userId: string): Promise<{ deletedFiles: number }
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
       'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({ 
@@ -134,7 +133,7 @@ export async function getTelemetry(): Promise<TelemetryData> {
 
   const res = await fetch(`${backendUrl}/developer/telemetry`, {
     headers: {
-      'ngrok-skip-browser-warning': 'true',
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     }
   });

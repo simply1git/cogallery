@@ -12,7 +12,6 @@ export async function downloadFile(url: string | null, filename: string) {
   try {
     const res = await fetch(url, {
       headers: {
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     if (!res.ok) throw new Error('Network response was not ok')

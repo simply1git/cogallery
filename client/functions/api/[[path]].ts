@@ -3,18 +3,15 @@ export async function onRequest(context: any) {
   const url = new URL(request.url);
 
   // The frontend passes the backend URL via env variables in Cloudflare dashboard
-  // But since we are hardcoding the ngrok proxy for this specific user's backend, we can fallback to it
-  const backendUrl = env.VITE_NGROK_URL || 'https://daytime-savings-rippling.ngrok-free.dev';
+  // Use the new Cloudflare Tunnel domain for the backend
+  const backendUrl = env.VITE_BACKEND_URL || 'https://api.25012004.xyz';
 
   // Strip the /api prefix, keep the rest of the path and query params
   const targetPath = url.pathname.replace(/^\/api/, '');
   const targetUrl = `${backendUrl}${targetPath}${url.search}`;
 
   // Clone the original request to preserve body and methods
-  const proxyRequest = new Request(targetUrl, request);
-
-  // INJECT THE MAGIC NGROK BYPASS HEADER
-  proxyRequest.headers.set('ngrok-skip-browser-warning', 'true');
+  const proxyRequest = new Request(targetUrl, request); // Cloudflare Tunnels don't require warning bypass headers like Ngrok did.  
   
   // Forward the request to the Oracle Backend
   const response = await fetch(proxyRequest);

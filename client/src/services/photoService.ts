@@ -156,7 +156,6 @@ export async function uploadPhotoWithMetadata(
         xhr.setRequestHeader('x-mime-type', file.type || 'application/octet-stream');
         xhr.setRequestHeader('Content-Type', 'application/octet-stream');
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -241,7 +240,6 @@ export async function getSecureMediaUrl(s3Key: string): Promise<string> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
       'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({ key: s3Key })
