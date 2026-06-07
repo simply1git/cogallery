@@ -46,7 +46,7 @@ export function PhotoDetailModal({
   const [showMobilePanel, setShowMobilePanel] = useState(false)
   
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
-  const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey)
+  const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
 
   const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
   const hasPrev = currentIndex > 0

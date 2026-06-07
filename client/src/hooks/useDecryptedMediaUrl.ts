@@ -6,7 +6,7 @@ import { decryptBuffer } from '@/services/cryptoService';
 // Module-level cache to prevent re-decrypting the same photo if unmounted/remounted in the virtual grid
 const urlCache = new Map<string, string>();
 
-export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey) {
+export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferFullRes: boolean = false) {
   const [url, setUrl] = useState<string>('');
   const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey) {
       // 1. Handle non-encrypted photos
       if (!photo.isEncrypted) {
         // If it's not a vault, we could just use the thumbnail or get a signed URL
-        if (photo.thumbnailBase64) {
+        if (photo.thumbnailBase64 && !preferFullRes) {
           setUrl(photo.thumbnailBase64);
         } else {
           try {
