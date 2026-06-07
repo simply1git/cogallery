@@ -39,8 +39,8 @@ export function UploadZone({ eventId, roomId, userId }: UploadZoneProps) {
     // No file size limit
   })
 
-  // Filter uploads specific to this room (in case user switches rooms while uploading)
-  const roomUploads = uploads.filter(u => u.roomId === roomId)
+  // Filter uploads specific to this event (in case user switches events while uploading)
+  const roomUploads = uploads.filter(u => u.eventId === eventId)
   const completedCount = roomUploads.filter(u => u.status === 'done').length
   const errorCount = roomUploads.filter(u => u.status === 'error').length
   const totalCount = roomUploads.length
