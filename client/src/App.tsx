@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/shared/ThemeProvider'
 import { Layout } from '@/components/shared/Layout'
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadQueueService } from '@/services/uploadQueueService'
 import { supabase } from '@/lib/supabase'
@@ -168,7 +169,9 @@ function App() {
     <ThemeProvider>
       <Router>
         <Layout>
-          <AppRoutes />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
         </Layout>
       </Router>
       <Toaster
