@@ -98,6 +98,17 @@ export function PhotoGrid({
     }
   }, [colWidth, haptic])
 
+  const windowSize = useWindowSize()
+  const positioner = usePositioner(
+    { 
+      width: containerRef.current?.offsetWidth ?? windowSize[0], 
+      columnWidth: colWidth, 
+      columnGutter: 16 
+    },
+    [photos.length, colWidth, windowSize[0]]
+  )
+  const resizeObserver = useResizeObserver(positioner)
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -115,17 +126,6 @@ export function PhotoGrid({
   if (photos.length === 0) {
     return null
   }
-
-  const windowSize = useWindowSize()
-  const positioner = usePositioner(
-    { 
-      width: containerRef.current?.offsetWidth ?? windowSize[0], 
-      columnWidth: colWidth, 
-      columnGutter: 16 
-    },
-    [photos.length, colWidth, windowSize[0]]
-  )
-  const resizeObserver = useResizeObserver(positioner)
 
   return (
     <div ref={containerRef} className="w-full touch-pan-y">
