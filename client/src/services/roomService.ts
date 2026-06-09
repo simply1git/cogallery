@@ -59,13 +59,17 @@ export async function createRoom(
 
     if (error) throw error
 
-    // Auto-add creator as owner member
-    await supabase.from('room_members').insert({
+    // Auto-add creator as owner member (ignore 23505 Conflict if a DB trigger already did this)
+    const { error: memberError } = await supabase.from('room_members').insert({
       room_id: data.id,
       user_id: userId,
       role: 'owner',
       status: 'approved',
     })
+    
+    if (memberError && memberError.code !== '23505') {
+      console.warn('Failed to auto-add creator to room:', memberError)
+    }
 
     return { data: mapRoom(data), error: null }
   } catch (err: any) {
@@ -271,7 +275,7 @@ export async function addMemberByEmail(
       invited_by_id: invitedById,
     })
 
-    if (error) throw error
+    if (error && error.code !== '23505') throw error
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
@@ -346,7 +350,7 @@ export async function requestToJoinRoom(
       status: 'pending',
     })
 
-    if (error) throw error
+    if (error && error.code !== '23505') throw error
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
