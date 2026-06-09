@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react'
-import { Tldraw, Editor, createShapeId, AssetRecordType } from 'tldraw'
+import { useState, useCallback, useEffect } from 'react'
+import { Tldraw, Editor, createShapeId } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { useCanvasSync } from '@/hooks/useCanvasSync'
-import { getSecureMediaUrl } from '@/services/photoService'
 import type { Photo } from '@/types'
-import { ImagePlus, Save, Loader2 } from 'lucide-react'
+import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
-import { saveCanvasState } from '@/services/canvasService'
+import { GalleryPhotoShapeUtil } from './GalleryPhotoShape'
+import { useCanvasStore } from '@/store/canvasStore'
 
 interface MoodboardCanvasProps {
   eventId: string
@@ -14,10 +14,18 @@ interface MoodboardCanvasProps {
   photos: Photo[]
 }
 
+const customShapeUtils = [GalleryPhotoShapeUtil]
+
 export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProps) {
   const [editor, setEditor] = useState<Editor | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
   const [showPhotoDrawer, setShowPhotoDrawer] = useState(false)
+  
+  const setStorePhotos = useCanvasStore((s) => s.setPhotos)
+
+  // Sync photos to store so shapes can render them
+  useEffect(() => {
+    setStorePhotos(photos)
+  }, [photos, setStorePhotos])
 
   // Sync canvas state across users
   useCanvasSync({ eventId, userId, editor })
@@ -26,60 +34,31 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
     setEditor(editorInstance)
   }, [])
 
-  // Add a photo from the gallery onto the canvas
-  const addPhotoToCanvas = useCallback(async (photo: Photo) => {
+  // Add a photo from the gallery onto the canvas using our custom shape
+  const addPhotoToCanvas = useCallback((photo: Photo) => {
     if (!editor) return
 
     try {
-      // Get a URL for the image
-      let imageUrl = photo.thumbnailBase64
-      if (!imageUrl && photo.s3Key) {
-        imageUrl = await getSecureMediaUrl(photo.s3Key)
-      }
-      if (!imageUrl) {
-        toast.error('Could not load image')
-        return
-      }
-
-      // Create an asset for the image
-      const assetId = AssetRecordType.createId()
-      editor.createAssets([
-        {
-          id: assetId,
-          type: 'image',
-          typeName: 'asset',
-          props: {
-            name: photo.filename,
-            src: imageUrl,
-            w: 400,
-            h: 300,
-            mimeType: photo.mediaType === 'video' ? 'image/jpeg' : 'image/jpeg',
-            isAnimated: false,
-          },
-          meta: { photoId: photo.id },
-        },
-      ])
-
-      // Create the image shape on the canvas
       const shapeId = createShapeId()
       const camera = editor.getCamera()
       const viewportCenter = editor.getViewportScreenCenter()
 
       // Place the image near the center of the current viewport
-      const x = (viewportCenter.x - camera.x) / camera.z - 200
+      const x = (viewportCenter.x - camera.x) / camera.z - 150
       const y = (viewportCenter.y - camera.y) / camera.z - 150
 
+      // Create the custom gallery photo shape (zero base64 footprint!)
       editor.createShape({
         id: shapeId,
-        type: 'image',
+        type: 'gallery-photo',
         x,
         y,
         props: {
-          assetId,
-          w: 400,
+          photoId: photo.id,
+          w: 300,
           h: 300,
         },
-      })
+      } as any)
 
       toast.success(`Added "${photo.filename}" to canvas`)
       setShowPhotoDrawer(false)
@@ -89,29 +68,13 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
     }
   }, [editor])
 
-  // Manual save
-  const handleManualSave = useCallback(async () => {
-    if (!editor) return
-    setIsSaving(true)
-    const allRecords = editor.store.allRecords()
-    const persistable = allRecords.filter(
-      (r: any) => r.typeName === 'shape' || r.typeName === 'page' || r.typeName === 'asset'
-    )
-    const { error } = await saveCanvasState(eventId, { records: persistable }, userId)
-    if (error) {
-      toast.error('Failed to save canvas')
-    } else {
-      toast.success('Canvas saved')
-    }
-    setIsSaving(false)
-  }, [editor, eventId, userId])
-
   return (
     <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
       {/* tldraw Canvas */}
       <Tldraw
         onMount={handleMount}
         forceMobile={false}
+        shapeUtils={customShapeUtils}
       />
 
       {/* Floating toolbar */}
@@ -122,14 +85,6 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
         >
           <ImagePlus size={16} className="text-blue-400" />
           Add Photo
-        </button>
-        <button
-          onClick={handleManualSave}
-          disabled={isSaving}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b]/90 backdrop-blur-xl border border-white/10 text-sm font-medium text-white hover:bg-[#27272a] transition-all shadow-xl disabled:opacity-50"
-        >
-          {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} className="text-emerald-400" />}
-          Save
         </button>
       </div>
 

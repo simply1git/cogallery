@@ -11,6 +11,8 @@
     "@aws-sdk/client-s3": "^3.1058.0",
     "@aws-sdk/s3-request-presigner": "^3.1058.0",
     "@supabase/supabase-js": "^2.43.4",
+    "@tus/file-store": "^2.1.0",
+    "@tus/server": "^2.4.1",
     "archiver": "^7.0.1",
     "cors": "^2.8.6",
     "dotenv": "^16.4.5",

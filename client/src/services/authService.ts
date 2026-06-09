@@ -14,6 +14,19 @@ export async function signUpWithEmail(email: string, password: string, displayNa
     })
 
     if (error) throw error
+
+    // Manually create the profile if the trigger failed or was dropped
+    if (data?.user) {
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        email: data.user.email,
+        display_name: displayName,
+      })
+      if (profileError) {
+        console.warn('Failed to create profile row manually:', profileError)
+      }
+    }
+
     return { data, error: null }
   } catch (error: any) {
     return { data: null, error: error.message }

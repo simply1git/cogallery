@@ -17,6 +17,8 @@ const archiver = require('archiver');
 import https from 'https';
 import dotenv from 'dotenv';
 import jwksClient from 'jwks-rsa';
+import { Server, EVENTS } from '@tus/server';
+import { FileStore } from '@tus/file-store';
 
 dotenv.config();
 
@@ -47,6 +49,7 @@ app.use(express.json({ limit: '50mb' }));
 // Ensure directories exist
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 await fs.mkdir(TEMP_DIR, { recursive: true }).catch(() => {});
+await fs.mkdir(path.join(TEMP_DIR, 'tus'), { recursive: true }).catch(() => {});
 
 // --- DISK JANITOR ---
 // Clean up temp chunks older than 24 hours every day
@@ -352,76 +355,44 @@ app.get('/upload/status/:photoId', async (req, res) => {
   }
 });
 
-// In-memory locks to prevent race conditions when chunks finish concurrently
-const assemblyLocks = new Set();
+const tusServer = new Server({
+  path: '/upload/tus',
+  datastore: new FileStore({ directory: path.join(TEMP_DIR, 'tus') }),
+  respectForwardedHeaders: true,
+});
 
-// Upload chunk
-app.post('/upload/chunk', authenticateJWT, express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
-  const photoId = req.headers['x-photo-id'];
-  const chunkIndex = parseInt(req.headers['x-chunk-index'], 10);
-  const totalChunks = parseInt(req.headers['x-total-chunks'], 10);
-  const filename = decodeURIComponent(req.headers['x-filename'] || 'file');
-  const mimeType = req.headers['x-mime-type'] || 'application/octet-stream';
-  
-  if (!photoId || isNaN(chunkIndex) || isNaN(totalChunks)) {
-    return res.status(400).json({ error: 'Missing headers' });
-  }
-  
-  const chunkData = req.body;
-  if (!chunkData || chunkData.length === 0) {
-    return res.status(400).json({ error: 'Empty body' });
-  }
-
-  const chunkDir = path.join(TEMP_DIR, photoId);
-  await fs.mkdir(chunkDir, { recursive: true }).catch(() => {});
-  
-  const partPath = path.join(chunkDir, `${chunkIndex}.part`);
-  await fs.writeFile(partPath, chunkData);
-  
-  // Check if we have all chunks
-  const files = await fs.readdir(chunkDir);
-  const partFiles = files.filter(f => f.endsWith('.part'));
-  
-  if (partFiles.length === totalChunks) {
-    if (assemblyLocks.has(photoId)) {
-      return res.json({ success: true, message: 'Chunk received, assembly already in progress' });
-    }
+tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
+  try {
+    const photoId = upload.metadata?.photoId;
+    const filename = upload.metadata?.filename || 'file';
+    const mimeType = upload.metadata?.filetype || 'application/octet-stream';
     
-    assemblyLocks.add(photoId);
-    
-    try {
+    if (photoId) {
       const finalPath = path.join(CACHE_DIR, `${photoId}.data`);
       const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
+      const tusFilePath = path.join(TEMP_DIR, 'tus', upload.id);
       
-      let totalSize = 0;
-      const writeStream = fsSync.createWriteStream(finalPath);
+      // Move file to final location
+      await fs.rename(tusFilePath, finalPath);
+      // Write meta.json
+      await fs.writeFile(metaPath, JSON.stringify({ filename, mimeType, size: upload.size }));
       
-      // Must append in correct order!
-      for (let i = 0; i < totalChunks; i++) {
-        const pPath = path.join(chunkDir, `${i}.part`);
-        const data = await fs.readFile(pPath);
-        writeStream.write(data);
-        totalSize += data.length;
-      }
+      // Clean up the .info file
+      await fs.unlink(`${tusFilePath}.info`).catch(() => {});
       
-      writeStream.end();
-      
-      await new Promise((resolve) => writeStream.on('finish', resolve));
-      await fs.writeFile(metaPath, JSON.stringify({ filename, mimeType, size: totalSize }));
-      
-      // Cleanup temp chunks
-      await fs.rm(chunkDir, { recursive: true, force: true }).catch(() => {});
-      assemblyLocks.delete(photoId);
-      
-      console.log(`[Upload] Merged ${photoId} successfully (${totalSize} bytes)`);
-      return res.json({ status: 'completed' });
-    } catch (err) {
-      console.error(`[Upload] Error merging ${photoId}:`, err);
-      return res.status(500).json({ error: 'Merge failed' });
+      console.log(`[Upload] TUS upload completed and moved for photoId: ${photoId}`);
     }
+  } catch (error) {
+    console.error(`[Upload] Error in TUS finish handler:`, error);
   }
-  
-  res.json({ status: 'chunk_received', received: partFiles.length, total: totalChunks });
+});
+
+// Intercept TUS routes
+app.all('/upload/tus/*', authenticateJWT, (req, res) => {
+  tusServer.handle(req, res);
+});
+app.all('/upload/tus', authenticateJWT, (req, res) => {
+  tusServer.handle(req, res);
 });
 
 // Stream Media (Video/Image) with HTTP 206 Partial Content support

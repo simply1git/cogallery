@@ -12,8 +12,15 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",
     "@aws-sdk/lib-storage": "^3.1055.0",
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@supabase/realtime-js": "^2.10.2",
     "@supabase/supabase-js": "^2.43.0",
+    "@uppy/core": "^5.2.0",
+    "@uppy/dashboard": "^5.1.1",
+    "@uppy/react": "^5.2.0",
+    "@uppy/tus": "^5.1.1",
     "axios": "^1.7.7",
     "client-zip": "^2.5.0",
     "clsx": "^2.1.0",
@@ -24,6 +31,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.408.0",
     "masonic": "^4.1.0",
+    "pg": "^8.21.0",
     "photoswipe": "^5.4.1",
     "qrcode": "^1.5.3",
     "qrcode.react": "^4.2.0",
@@ -35,6 +43,8 @@
     "tailwind-merge": "^2.3.0",
     "tailwindcss": "^3.4.1",
     "tldraw": "^5.1.0",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.31",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

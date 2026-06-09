@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { saveCanvasState, loadCanvasState } from '@/services/canvasService'
-import type { Editor } from 'tldraw'
+import type { Editor, TLRecord } from 'tldraw'
+import * as Y from 'yjs'
 
 interface UseCanvasSyncOptions {
   eventId: string
@@ -10,159 +11,198 @@ interface UseCanvasSyncOptions {
 }
 
 /**
- * Syncs tldraw canvas state across multiple users via Supabase Realtime.
+ * Syncs tldraw canvas state across multiple users via Supabase Realtime and Yjs.
  * 
  * Architecture:
- * - Each user broadcasts their local changes to a Supabase Realtime channel
- * - Other users receive the broadcast and apply changes to their local editor
- * - The full canvas snapshot is auto-saved to the DB every 10 seconds (debounced)
- * - On mount, the canvas loads the last saved snapshot from the DB
+ * - tldraw records are bound to a Yjs Y.Map via two-way sync.
+ * - Yjs binary updates are broadcasted via Supabase Realtime.
+ * - This provides mathematical CRDT conflict resolution (zero race conditions).
  */
 export function useCanvasSync({ eventId, userId, editor }: UseCanvasSyncOptions) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isRemoteUpdateRef = useRef(false)
-  const hasLoadedRef = useRef(false)
+  
+  // Yjs document references
+  const yDocRef = useRef<Y.Doc | null>(null)
+  const yMapRef = useRef<Y.Map<TLRecord> | null>(null)
 
-  // Load initial canvas state from database
+  // Initialize Yjs and load initial state
   useEffect(() => {
-    if (!editor || hasLoadedRef.current) return
+    if (!editor) return
+
+    let isMounted = true
+    const yDoc = new Y.Doc()
+    const yMap = yDoc.getMap<TLRecord>('records')
+    yDocRef.current = yDoc
+    yMapRef.current = yMap
 
     async function loadInitial() {
       const state = await loadCanvasState(eventId)
-      if (state?.canvasData && editor) {
+      
+      if (state?.canvasData?.yjsUpdate) {
+        // Decode base64 to Uint8Array and apply
         try {
-          isRemoteUpdateRef.current = true
-          const snapshot = state.canvasData
-          if (snapshot.records && Array.isArray(snapshot.records)) {
-            // Load shapes from the saved snapshot
-            editor.store.mergeRemoteChanges(() => {
-              for (const record of snapshot.records) {
-                if (editor.store.has(record.id as any)) {
-                  editor.store.update(record.id as any, () => record)
-                } else {
-                  editor.store.put([record])
-                }
-              }
-            })
+          const binaryString = atob(state.canvasData.yjsUpdate)
+          const len = binaryString.length
+          const bytes = new Uint8Array(len)
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
           }
+          Y.applyUpdate(yDoc, bytes)
         } catch (err) {
-          console.warn('Failed to restore canvas state:', err)
-        } finally {
-          isRemoteUpdateRef.current = false
+          console.error('Failed to load Yjs binary state', err)
         }
       }
-      hasLoadedRef.current = true
+
+      // Sync initial Yjs state to tldraw
+      if (!isMounted) return
+      
+      editor!.store.mergeRemoteChanges(() => {
+        const initialRecords: TLRecord[] = Array.from(yMap.values())
+        if (initialRecords.length > 0) {
+          editor!.store.put(initialRecords)
+        }
+      })
     }
 
     loadInitial()
+
+    return () => {
+      isMounted = false
+      yDoc.destroy()
+    }
   }, [editor, eventId])
 
-  // Debounced save to database
+  // Debounced save of Yjs binary state
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      if (!editor) return
-      const allRecords = editor.store.allRecords()
-      // Only save shape/page records, not ephemeral stuff like cursors
-      const persistable = allRecords.filter(
-        (r: any) => r.typeName === 'shape' || r.typeName === 'page' || r.typeName === 'asset'
-      )
-      saveCanvasState(eventId, { records: persistable }, userId)
+      const yDoc = yDocRef.current
+      if (!yDoc) return
+      
+      const stateUpdate = Y.encodeStateAsUpdate(yDoc)
+      
+      // Convert Uint8Array to base64 string for JSONB storage
+      let binaryString = ''
+      for (let i = 0; i < stateUpdate.length; i++) {
+        binaryString += String.fromCharCode(stateUpdate[i])
+      }
+      const base64Update = btoa(binaryString)
+      
+      saveCanvasState(eventId, { yjsUpdate: base64Update }, userId)
     }, 5000)
-  }, [editor, eventId, userId])
+  }, [eventId, userId])
 
-  // Set up Supabase Realtime channel for live sync
+  // Set up Tldraw <-> Yjs bindings and Supabase Realtime transport
   useEffect(() => {
     if (!editor) return
+    const yDoc = yDocRef.current
+    const yMap = yMapRef.current
+    if (!yDoc || !yMap) return
 
     const channelName = `canvas:${eventId}`
     const channel = supabase.channel(channelName)
 
+    // 1. Receive binary updates from other users via Supabase
     channel
-      .on('broadcast', { event: 'canvas-change' }, ({ payload }) => {
-        if (payload.senderId === userId) return // Ignore own changes
-        if (!editor) return
-
+      .on('broadcast', { event: 'yjs-update' }, ({ payload }) => {
+        if (payload.senderId === userId) return // Ignore own broadcast
+        
         try {
-          isRemoteUpdateRef.current = true
-          editor.store.mergeRemoteChanges(() => {
-            if (payload.added) {
-              editor.store.put(payload.added)
-            }
-            if (payload.updated) {
-              for (const record of payload.updated) {
-                if (editor.store.has(record.id as any)) {
-                  editor.store.update(record.id as any, () => record)
-                } else {
-                  editor.store.put([record])
-                }
-              }
-            }
-            if (payload.removed) {
-              const ids = payload.removed
-                .map((r: any) => r.id)
-                .filter((id: any) => editor.store.has(id as any))
-              if (ids.length > 0) {
-                editor.store.remove(ids as any[])
-              }
-            }
-          })
+          const binaryString = atob(payload.update)
+          const len = binaryString.length
+          const bytes = new Uint8Array(len)
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          // Apply to Yjs, which will trigger the yMap observer
+          Y.applyUpdate(yDoc, bytes, 'supabase')
         } catch (err) {
-          console.warn('Failed to apply remote canvas change:', err)
-        } finally {
-          isRemoteUpdateRef.current = false
+          console.warn('Failed to apply remote Yjs update:', err)
         }
-      })
-      .on('presence', { event: 'sync' }, () => {
-        // Presence sync for multiplayer cursors is handled by tldraw's built-in system
       })
       .subscribe()
 
     channelRef.current = channel
 
-    // Listen to local store changes and broadcast them
-    const unsub = editor.store.listen(
-      ({ changes }) => {
-        if (isRemoteUpdateRef.current) return // Don't re-broadcast remote changes
+    // 2. Broadcast local Yjs binary updates to other users
+    const handleYjsUpdate = (update: Uint8Array, origin: any) => {
+      // Don't broadcast updates that we just received from supabase!
+      if (origin === 'supabase') return
+      
+      let binaryString = ''
+      for (let i = 0; i < update.length; i++) {
+        binaryString += String.fromCharCode(update[i])
+      }
+      const base64Update = btoa(binaryString)
 
-        const added = Object.values(changes.added).filter(
-          (r: any) => r.typeName === 'shape' || r.typeName === 'asset'
-        )
-        const updated = Object.values(changes.updated).map(([, to]: any) => to).filter(
-          (r: any) => r.typeName === 'shape' || r.typeName === 'asset'
-        )
-        const removed = Object.values(changes.removed).filter(
-          (r: any) => r.typeName === 'shape' || r.typeName === 'asset'
-        )
+      channel.send({
+        type: 'broadcast',
+        event: 'yjs-update',
+        payload: {
+          senderId: userId,
+          update: base64Update,
+        },
+      })
 
-        if (added.length === 0 && updated.length === 0 && removed.length === 0) return
+      scheduleSave()
+    }
+    yDoc.on('update', handleYjsUpdate)
 
-        channel.send({
-          type: 'broadcast',
-          event: 'canvas-change',
-          payload: {
-            senderId: userId,
-            added: added.length > 0 ? added : undefined,
-            updated: updated.length > 0 ? updated : undefined,
-            removed: removed.length > 0 ? removed : undefined,
-          },
+    // 3. Bind Yjs Map changes -> Tldraw Store
+    const handleYMapObserve = (event: Y.YMapEvent<TLRecord>, transaction: Y.Transaction) => {
+      if (transaction.origin === 'tldraw') return // Avoid infinite loop
+      
+      const toUpdate: TLRecord[] = []
+      const toRemove: string[] = []
+
+      event.changes.keys.forEach((change, key) => {
+        if (change.action === 'add' || change.action === 'update') {
+          const record = yMap.get(key)
+          if (record) toUpdate.push(record)
+        } else if (change.action === 'delete') {
+          toRemove.push(key)
+        }
+      })
+
+      if (toUpdate.length > 0 || toRemove.length > 0) {
+        editor.store.mergeRemoteChanges(() => {
+          if (toUpdate.length > 0) editor.store.put(toUpdate)
+          if (toRemove.length > 0) editor.store.remove(toRemove as any)
         })
+      }
+    }
+    yMap.observe(handleYMapObserve)
 
-        // Schedule a debounced save
-        scheduleSave()
+    // 4. Bind Tldraw Store changes -> Yjs Map
+    const unsubTldraw = editor.store.listen(
+      ({ changes }) => {
+        yDoc.transact(() => {
+          Object.values(changes.added).forEach((r) => {
+            if (r.typeName === 'shape' || r.typeName === 'page' || r.typeName === 'asset') {
+              yMap.set(r.id, r as TLRecord)
+            }
+          })
+          Object.values(changes.updated).forEach(([, r]) => {
+            if (r.typeName === 'shape' || r.typeName === 'page' || r.typeName === 'asset') {
+              yMap.set(r.id, r as TLRecord)
+            }
+          })
+          Object.values(changes.removed).forEach((r) => {
+            yMap.delete(r.id)
+          })
+        }, 'tldraw')
       },
       { source: 'user', scope: 'document' }
     )
 
     return () => {
-      unsub()
+      unsubTldraw()
+      yMap.unobserve(handleYMapObserve)
+      yDoc.off('update', handleYjsUpdate)
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
-      }
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current)
       }
     }
   }, [editor, eventId, userId, scheduleSave])
