@@ -37,7 +37,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
     async function loadMedia() {
       const s3Key = photo.s3Key || photo.filename;
 
-      if (s3Key.startsWith('pending')) {
+      if (s3Key?.startsWith('pending')) {
         if (isActive) setUrl('');
         return;
       }
@@ -45,7 +45,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       // 1. Grid Mode: Use Thumbnail (No Network Required)
       if (!preferFullRes && photo.thumbnailBase64) {
         // If it's a plain data URL (unencrypted or legacy), use it instantly
-        if (photo.thumbnailBase64.startsWith('data:image/')) {
+        if (photo.thumbnailBase64?.startsWith('data:image/')) {
           urlCache.set(cacheKey, photo.thumbnailBase64);
           if (isActive) setUrl(photo.thumbnailBase64);
           return;

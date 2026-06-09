@@ -50,7 +50,7 @@ export function PhotoDetailModal({
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
   const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
   const { url: thumbUrl } = useDecryptedMediaUrl(photo!, vaultKey, false)
-  const { ambientStyle } = useColorExtractor(!photo?.mediaType.startsWith('video') ? secureUrl : undefined)
+  const { ambientStyle } = useColorExtractor(!photo?.mediaType?.startsWith('video') ? secureUrl : undefined)
   const { haptic } = useHaptics()
 
   const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
