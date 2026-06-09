@@ -41,8 +41,9 @@ const app = express();
 // Allow all origins (since frontend is on Cloudflare Pages)
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['*']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Upload-Length', 'Upload-Metadata', 'Upload-Offset', 'Tus-Resumable', 'Upload-Name', 'Upload-Concat', 'X-Requested-With', 'Range'],
+  exposedHeaders: ['Upload-Offset', 'Location', 'Upload-Length', 'Tus-Version', 'Tus-Resumable', 'Tus-Max-Size', 'Tus-Extension', 'Upload-Metadata', 'Upload-Concat', 'Content-Disposition']
 }));
 app.use(express.json({ limit: '50mb' }));
 
