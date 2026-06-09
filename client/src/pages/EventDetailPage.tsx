@@ -678,7 +678,8 @@ export function EventDetailPage() {
           activePhotoId={selectedPhoto?.id}
           onPhotoClick={(photo) => {
             if (document.startViewTransition) {
-              document.startViewTransition(() => setSelectedPhoto(photo))
+              const transition = document.startViewTransition(() => setSelectedPhoto(photo))
+              transition.finished.catch(() => {})
             } else {
               setSelectedPhoto(photo)
             }
@@ -756,7 +757,8 @@ export function EventDetailPage() {
             allPhotos={photos}
             onClose={() => {
               if (document.startViewTransition) {
-                document.startViewTransition(() => setSelectedPhoto(null))
+                const transition = document.startViewTransition(() => setSelectedPhoto(null))
+                transition.finished.catch(() => {})
               } else {
                 setSelectedPhoto(null)
               }
