@@ -388,7 +388,7 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
 });
 
 // Intercept TUS routes
-app.all('/upload/tus(.*)', authenticateJWT, (req, res) => {
+app.use('/upload/tus', authenticateJWT, (req, res) => {
   tusServer.handle(req, res);
 });
 
