@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Photo } from '@/types';
 import { getSecureMediaUrl } from '@/services/photoService';
-import { decryptBuffer } from '@/services/cryptoService';
+import { decryptBuffer, decryptString } from '@/services/cryptoService';
 
 // Module-level cache to prevent re-decrypting the same photo if unmounted/remounted in the virtual grid
 const urlCache = new Map<string, string>();
@@ -35,25 +35,41 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
     let isActive = true;
 
     async function loadMedia() {
-      // 1. Handle non-encrypted photos
+      const s3Key = photo.s3Key || photo.filename;
+
+      if (s3Key.startsWith('pending')) {
+        if (isActive) setUrl('');
+        return;
+      }
+
+      // 1. Grid Mode: Use Thumbnail (No Network Required)
+      if (!preferFullRes && photo.thumbnailBase64) {
+        // If it's a plain data URL (unencrypted or legacy), use it instantly
+        if (photo.thumbnailBase64.startsWith('data:image/')) {
+          urlCache.set(cacheKey, photo.thumbnailBase64);
+          if (isActive) setUrl(photo.thumbnailBase64);
+          return;
+        }
+
+        // If it's encrypted, decrypt the string
+        if (photo.isEncrypted && vaultKey) {
+          if (isActive) setIsDecrypting(true);
+          try {
+            const decThumb = await decryptString(photo.thumbnailBase64, vaultKey);
+            urlCache.set(cacheKey, decThumb);
+            if (isActive && photoIdRef.current === photo.id) setUrl(decThumb);
+          } catch (e) {
+            console.error('Failed to decrypt thumbnail', e);
+            if (isActive) setError('Decryption failed');
+          } finally {
+            if (isActive) setIsDecrypting(false);
+          }
+          return;
+        }
+      }
+
+      // 2. Full-Res Mode: Fetch and potentially decrypt the full media file
       if (!photo.isEncrypted) {
-        // For grid cards: use the inline thumbnail for instant rendering
-        if (photo.thumbnailBase64 && !preferFullRes) {
-          const thumbUrl = photo.thumbnailBase64;
-          urlCache.set(cacheKey, thumbUrl);
-          if (isActive) setUrl(thumbUrl);
-          return;
-        }
-
-        // For full-res (detail modal) or photos without thumbnails: fetch signed URL
-        const s3Key = photo.s3Key || photo.filename;
-
-        if (s3Key.startsWith('pending')) {
-          if (isActive) setUrl('');
-          return;
-        }
-
-        // Deduplicate inflight requests
         let fetchPromise = inflightRequests.get(cacheKey);
         if (!fetchPromise) {
           fetchPromise = getSecureMediaUrl(s3Key);
@@ -74,7 +90,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
         return;
       }
 
-      // 2. Handle encrypted photos
+      // 3. Encrypted Full-Res Mode
       if (!vaultKey) {
         if (isActive) setError('Vault locked');
         return;
@@ -85,7 +101,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       let fetchPromise = inflightRequests.get(cacheKey);
       if (!fetchPromise) {
         fetchPromise = (async () => {
-          const secureUrl = await getSecureMediaUrl(photo.s3Key || photo.filename);
+          const secureUrl = await getSecureMediaUrl(s3Key);
           const response = await fetch(secureUrl);
           if (!response.ok) throw new Error('Failed to fetch encrypted media');
 

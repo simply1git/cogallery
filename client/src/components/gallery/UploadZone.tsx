@@ -6,7 +6,8 @@ import '@uppy/core/css/style.min.css'
 import '@uppy/dashboard/css/style.min.css'
 import { supabase } from '@/lib/supabase'
 import { getMediaType } from '@/services/uploadService'
-import { encryptStream } from '@/services/cryptoService'
+import { encryptStream, encryptString } from '@/services/cryptoService'
+import { generateThumbnail } from '@/services/thumbnailService'
 import { useRoomStore } from '@/store/roomStore'
 import type { Photo } from '@/types'
 
@@ -84,8 +85,22 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
              });
           }
 
-          // Generate a fake tiny thumbnail or extract real one (for now we skip to save time)
-          const fakeThumb = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+          // Generate a real thumbnail via Web Worker
+          let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+          try {
+            const generatedThumb = await generateThumbnail(file.data as File);
+            if (generatedThumb) thumbBase64 = generatedThumb;
+          } catch (err) {
+            console.error('Thumbnail generation failed:', err);
+          }
+          
+          if (isVault && vaultKey && thumbBase64.length > 50) {
+             try {
+               thumbBase64 = await encryptString(thumbBase64, vaultKey);
+             } catch (e) {
+               console.error('Thumbnail encryption failed:', e);
+             }
+          }
           
           // Insert row to get ID
           const tempKey = 'pending_' + crypto.randomUUID()
@@ -95,7 +110,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             uploader_id: userId,
             filename: file.name,
             media_type: mediaType,
-            thumbnail_base64: fakeThumb,
+            thumbnail_base64: thumbBase64,
             s3_url: 'https://pending',
             s3_key: tempKey,
             is_encrypted: isVault || false,

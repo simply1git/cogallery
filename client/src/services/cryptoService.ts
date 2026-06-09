@@ -92,3 +92,42 @@ export async function hashPasswordForVerification(password: string, saltHex: str
   const hashBuffer = await window.crypto.subtle.digest('SHA-256', rawKey);
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
+
+export async function encryptString(text: string, key: CryptoKey): Promise<string> {
+  const enc = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const buffer = enc.encode(text);
+  
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: ALGO, iv: iv },
+    key,
+    buffer
+  );
+
+  const finalBuffer = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+  finalBuffer.set(iv, 0);
+  finalBuffer.set(new Uint8Array(encryptedBuffer), iv.length);
+
+  return btoa(String.fromCharCode(...finalBuffer));
+}
+
+export async function decryptString(encryptedBase64: string, key: CryptoKey): Promise<string> {
+  const binaryString = atob(encryptedBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  const iv = bytes.slice(0, 12);
+  const data = bytes.slice(12);
+
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    { name: ALGO, iv: iv },
+    key,
+    data
+  );
+
+  const dec = new TextDecoder();
+  return dec.decode(decryptedBuffer);
+}
+
