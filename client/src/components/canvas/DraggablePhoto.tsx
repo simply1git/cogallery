@@ -11,9 +11,10 @@ interface DraggablePhotoProps {
   onChange: (item: CanvasItem) => void
   onDelete: (id: string) => void
   onBringToFront: () => void
+  onDoubleClick?: (photoId: string) => void
 }
 
-export function DraggablePhoto({ item, onChange, onDelete, onBringToFront }: DraggablePhotoProps) {
+export function DraggablePhoto({ item, onChange, onDelete, onBringToFront, onDoubleClick }: DraggablePhotoProps) {
   const photos = useCanvasStore((s) => s.photos)
   const photo = photos.find((p) => p.id === item.photoId)
   const vaultKey = useRoomStore((s) => photo ? s.vaultKeys[photo.roomId] : undefined)
@@ -41,11 +42,17 @@ export function DraggablePhoto({ item, onChange, onDelete, onBringToFront }: Dra
       dragControls={controls}
       dragMomentum={false}
       onDragStart={onBringToFront}
+      onDoubleClick={() => onDoubleClick?.(photo.id)}
       onDragEnd={(_, info) => {
+        // Magnetic Grid Snapping (20px)
+        const snap = 20
+        const newX = Math.round((item.x + info.offset.x) / snap) * snap
+        const newY = Math.round((item.y + info.offset.y) / snap) * snap
+        
         onChange({
           ...item,
-          x: item.x + info.offset.x,
-          y: item.y + info.offset.y
+          x: newX,
+          y: newY
         })
       }}
       initial={{ x: item.x, y: item.y, scale: 0.8, opacity: 0 }}

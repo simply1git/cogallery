@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState } from 'react'
 import { motion, useMotionValue, useSpring } from 'framer-motion'
 import { DraggablePhoto } from './DraggablePhoto'
+import { StickyNote } from './StickyNote'
+import { DraggableEmoji } from './DraggableEmoji'
 import { CanvasItem, CanvasCursor } from '@/hooks/useMoodboardSync'
 import { MousePointer2 } from 'lucide-react'
 
@@ -11,9 +13,10 @@ interface InfiniteCanvasProps {
   deleteItem: (id: string) => void
   updateCursor: (x: number, y: number) => void
   isLoading: boolean
+  onPhotoDoubleClick?: (photoId: string) => void
 }
 
-export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateCursor, isLoading }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateCursor, isLoading, onPhotoDoubleClick }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   
   // Custom pan state
@@ -99,18 +102,51 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
         className="relative"
       >
         {/* Render items */}
-        {Object.values(items).map(item => (
-          <DraggablePhoto
-            key={item.id}
-            item={item}
-            onChange={updateItem}
-            onDelete={deleteItem}
-            onBringToFront={() => {
-              setTopZIndex(z => z + 1)
-              updateItem({ ...item, zIndex: topZIndex + 1 })
-            }}
-          />
-        ))}
+        {Object.values(items).map(item => {
+          if (item.type === 'sticky') {
+            return (
+              <StickyNote
+                key={item.id}
+                item={item}
+                onChange={updateItem}
+                onDelete={deleteItem}
+                onBringToFront={() => {
+                  setTopZIndex(z => z + 1)
+                  updateItem({ ...item, zIndex: topZIndex + 1 })
+                }}
+              />
+            )
+          }
+
+          if (item.type === 'emoji') {
+            return (
+              <DraggableEmoji
+                key={item.id}
+                item={item}
+                onChange={updateItem}
+                onDelete={deleteItem}
+                onBringToFront={() => {
+                  setTopZIndex(z => z + 1)
+                  updateItem({ ...item, zIndex: topZIndex + 1 })
+                }}
+              />
+            )
+          }
+
+          return (
+            <DraggablePhoto
+              key={item.id}
+              item={item}
+              onChange={updateItem}
+              onDelete={deleteItem}
+              onBringToFront={() => {
+                setTopZIndex(z => z + 1)
+                updateItem({ ...item, zIndex: topZIndex + 1 })
+              }}
+              onDoubleClick={onPhotoDoubleClick}
+            />
+          )
+        })}
 
         {/* Render multiplayer cursors */}
         {Object.values(cursors).map(cursor => (
@@ -133,7 +169,7 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
               className="ml-2 px-2 py-0.5 rounded text-[10px] font-medium text-white shadow-sm whitespace-nowrap"
               style={{ backgroundColor: cursor.color }}
             >
-              Anon
+              {cursor.userName || 'Anon'}
             </div>
           </motion.div>
         ))}

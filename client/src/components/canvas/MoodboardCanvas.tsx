@@ -11,10 +11,12 @@ import { useMoodboardSync } from '@/hooks/useMoodboardSync'
 interface MoodboardCanvasProps {
   eventId: string
   userId: string
+  userName: string
   photos: Photo[]
+  onPhotoDoubleClick?: (photo: Photo) => void
 }
 
-export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProps) {
+export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoubleClick }: MoodboardCanvasProps) {
   const [showPhotoDrawer, setShowPhotoDrawer] = useState(false)
   
   const setStorePhotos = useCanvasStore((s) => s.setPhotos)
@@ -24,7 +26,7 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
     setStorePhotos(photos)
   }, [photos, setStorePhotos])
 
-  const { items, cursors, updateItem, deleteItem, updateCursor, isLoading } = useMoodboardSync(eventId, userId)
+  const { items, cursors, updateItem, deleteItem, updateCursor, isLoading } = useMoodboardSync(eventId, userId, userName)
 
   // Add a photo from the gallery onto the canvas
   const addPhotoToCanvas = useCallback((photo: Photo) => {
@@ -61,10 +63,57 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
         deleteItem={deleteItem}
         updateCursor={updateCursor}
         isLoading={isLoading}
+        onPhotoDoubleClick={(photoId) => {
+          const photo = photos.find(p => p.id === photoId)
+          if (photo && onPhotoDoubleClick) {
+            onPhotoDoubleClick(photo)
+          }
+        }}
       />
 
       {/* Floating toolbar */}
       <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">
+        <div className="flex bg-[#18181b]/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-xl mr-2">
+          {['🔥', '❤️', '💯', '✨'].map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => {
+                updateItem({
+                  id: `emoji-${Date.now()}`,
+                  type: 'emoji',
+                  text: emoji,
+                  x: 150 + Math.random() * 200,
+                  y: 150 + Math.random() * 200,
+                  w: 100,
+                  h: 100,
+                  zIndex: Object.keys(items).length + 1
+                })
+              }}
+              className="px-3 py-2 text-xl hover:bg-white/10 transition-colors"
+              title={`Drop ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => {
+            updateItem({
+              id: `sticky-${Date.now()}`,
+              type: 'sticky',
+              color: ['yellow', 'blue', 'pink', 'green'][Math.floor(Math.random() * 4)],
+              text: '',
+              x: 100 + Math.random() * 100,
+              y: 100 + Math.random() * 100,
+              w: 200,
+              h: 200,
+              zIndex: Object.keys(items).length + 1
+            })
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b]/90 backdrop-blur-xl border border-white/10 text-sm font-medium text-white hover:bg-[#27272a] transition-all shadow-xl"
+        >
+          📝 Add Note
+        </button>
         <button
           onClick={() => setShowPhotoDrawer(!showPhotoDrawer)}
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b]/90 backdrop-blur-xl border border-white/10 text-sm font-medium text-white hover:bg-[#27272a] transition-all shadow-xl"

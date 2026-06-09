@@ -4,7 +4,10 @@ import { saveCanvasState, loadCanvasState } from '@/services/canvasService'
 
 export interface CanvasItem {
   id: string
-  photoId: string
+  type?: 'photo' | 'sticky' | 'emoji'
+  photoId?: string
+  text?: string
+  color?: string
   x: number
   y: number
   w: number
@@ -14,12 +17,13 @@ export interface CanvasItem {
 
 export interface CanvasCursor {
   userId: string
+  userName: string
   x: number
   y: number
   color: string
 }
 
-export function useMoodboardSync(eventId: string, userId: string) {
+export function useMoodboardSync(eventId: string, userId: string, userName: string) {
   const [items, setItems] = useState<Record<string, CanvasItem>>({})
   const [cursors, setCursors] = useState<Record<string, CanvasCursor>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -116,9 +120,9 @@ export function useMoodboardSync(eventId: string, userId: string) {
     channelRef.current?.send({
       type: 'broadcast',
       event: 'cursor',
-      payload: { userId, cursor: { userId, x, y, color: userColor } }
+      payload: { userId, cursor: { userId, userName, x, y, color: userColor } }
     })
-  }, [userId, userColor])
+  }, [userId, userName, userColor])
 
   return {
     items,
