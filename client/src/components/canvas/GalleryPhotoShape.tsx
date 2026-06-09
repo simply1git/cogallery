@@ -1,5 +1,6 @@
 import { ShapeUtil, HTMLContainer, RecordProps, T, TLBaseShape } from 'tldraw'
 import { useCanvasStore } from '@/store/canvasStore'
+import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { Loader2, ImageOff } from 'lucide-react'
 
@@ -18,8 +19,10 @@ function GalleryPhotoComponent({ shape }: { shape: IGalleryPhotoShape }) {
   const photos = useCanvasStore((s) => s.photos)
   const photo = photos.find((p) => p.id === shape.props.photoId)
 
+  const vaultKey = useRoomStore((s) => photo ? s.vaultKeys[photo.roomId] : undefined)
+
   // Use the existing secure decryption hook
-  const { url, isDecrypting, error } = useDecryptedMediaUrl(photo as any, undefined, false)
+  const { url, isDecrypting, error } = useDecryptedMediaUrl(photo as any, vaultKey, false)
 
   if (!photo) {
     return (

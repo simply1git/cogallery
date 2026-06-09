@@ -7,6 +7,8 @@ import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { GalleryPhotoShapeUtil } from './GalleryPhotoShape'
 import { useCanvasStore } from '@/store/canvasStore'
+import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
+import { useRoomStore } from '@/store/roomStore'
 
 interface MoodboardCanvasProps {
   eventId: string
@@ -97,31 +99,43 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {photos.map((photo) => (
-                <button
-                  key={photo.id}
-                  onClick={() => addPhotoToCanvas(photo)}
-                  className="relative aspect-square rounded-lg overflow-hidden bg-[#0f0f0f] border border-white/[0.06] hover:border-blue-500/40 transition-all group cursor-pointer"
-                >
-                  {photo.thumbnailBase64 ? (
-                    <img
-                      src={photo.thumbnailBase64}
-                      alt={photo.filename}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#52525b]">
-                      <ImagePlus size={16} />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center">
-                    <ImagePlus size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </button>
+                <CanvasDrawerItem 
+                  key={photo.id} 
+                  photo={photo} 
+                  onClick={() => addPhotoToCanvas(photo)} 
+                />
               ))}
             </div>
           )}
         </div>
       )}
     </div>
+  )
+}
+
+function CanvasDrawerItem({ photo, onClick }: { photo: Photo, onClick: () => void }) {
+  const vaultKey = useRoomStore((s) => s.vaultKeys[photo.roomId])
+  const { url: thumbUrl } = useDecryptedMediaUrl(photo, vaultKey, false)
+
+  return (
+    <button
+      onClick={onClick}
+      className="relative aspect-square rounded-lg overflow-hidden bg-[#0f0f0f] border border-white/[0.06] hover:border-blue-500/40 transition-all group cursor-pointer"
+    >
+      {thumbUrl ? (
+        <img
+          src={thumbUrl}
+          alt={photo.filename}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-[#52525b]">
+          <ImagePlus size={16} />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center">
+        <ImagePlus size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+    </button>
   )
 }

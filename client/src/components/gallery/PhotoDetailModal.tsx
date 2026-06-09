@@ -49,6 +49,7 @@ export function PhotoDetailModal({
   
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
   const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
+  const { url: thumbUrl } = useDecryptedMediaUrl(photo!, vaultKey, false)
   const { ambientStyle } = useColorExtractor(!photo?.mediaType.startsWith('video') ? secureUrl : undefined)
   const { haptic } = useHaptics()
 
@@ -186,13 +187,26 @@ export function PhotoDetailModal({
                   controls
                   playsInline
                   autoPlay
+                  poster={thumbUrl || ''}
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : isDecrypting ? (
-                <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                  <span className="text-sm font-medium text-blue-400">Decrypting...</span>
+                </div>
               ) : (
-                <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                <div className="relative flex items-center justify-center">
+                  {thumbUrl && (
+                    <img 
+                      src={thumbUrl} 
+                      className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl blur-md opacity-50" 
+                      alt="loading" 
+                    />
+                  )}
+                  <div className="absolute w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                </div>
               )}
             </motion.div>
           ) : (
@@ -235,7 +249,7 @@ export function PhotoDetailModal({
               ) : (
                 <img
                   key={`fallback-${photo.id}`}
-                  src={photo.thumbnailBase64 || ''} // fallback to thumbnail while loading secure URL
+                  src={thumbUrl || ''} // use decrypted thumbnail while loading secure URL
                   alt={photo.filename}
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none blur-sm transition-all"
                   style={{ viewTransitionName: `photo-${photo.id}` }}
