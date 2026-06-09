@@ -181,6 +181,7 @@ export function PhotoDetailModal({
             >
               {secureUrl ? (
                 <video
+                  key={photo.id}
                   src={secureUrl}
                   controls
                   playsInline
@@ -219,6 +220,7 @@ export function PhotoDetailModal({
             >
               {secureUrl ? (
                 <img
+                  key={`secure-${photo.id}`}
                   src={secureUrl}
                   alt={photo.filename}
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none"
@@ -232,6 +234,7 @@ export function PhotoDetailModal({
                 </div>
               ) : (
                 <img
+                  key={`fallback-${photo.id}`}
                   src={photo.thumbnailBase64 || ''} // fallback to thumbnail while loading secure URL
                   alt={photo.filename}
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none blur-sm transition-all"

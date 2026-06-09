@@ -48,6 +48,11 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
         // For full-res (detail modal) or photos without thumbnails: fetch signed URL
         const s3Key = photo.s3Key || photo.filename;
 
+        if (s3Key.startsWith('pending')) {
+          if (isActive) setUrl('');
+          return;
+        }
+
         // Deduplicate inflight requests
         let fetchPromise = inflightRequests.get(cacheKey);
         if (!fetchPromise) {
