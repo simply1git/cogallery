@@ -30,7 +30,17 @@ import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
 
 // Lazy-load the heavy Canvas component (tldraw is ~400KB)
-const MoodboardCanvas = lazy(() => import('@/components/canvas/MoodboardCanvas').then(m => ({ default: m.MoodboardCanvas })))
+const MoodboardCanvas = lazy(() => 
+  import('@/components/canvas/MoodboardCanvas')
+    .then(m => ({ default: m.MoodboardCanvas }))
+    .catch((error) => {
+      // If the chunk fails to load (e.g. after a new deployment deleted the old hash),
+      // force a hard refresh to get the latest index.html from the server.
+      console.warn('Failed to load Canvas chunk. A new version may have been deployed. Refreshing page...', error)
+      window.location.reload()
+      return { default: () => <div className="text-center py-10 text-zinc-500">Loading new version...</div> }
+    })
+)
 
 export function EventDetailPage() {
   const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
