@@ -193,15 +193,17 @@ export function EventDetailPage() {
     }
   }
 
+  const canDeletePhoto = useCallback((photo: Photo) => photo.uploaderId === user?.id, [user?.id])
+
   // Selection mode handlers
-  const handleToggleSelect = (photoId: string) => {
+  const handleToggleSelect = useCallback((photoId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(photoId)) next.delete(photoId)
       else next.add(photoId)
       return next
     })
-  }
+  }, [])
 
   const handleSelectAll = () => {
     if (selectedIds.size === photos.length) {
@@ -697,9 +699,10 @@ export function EventDetailPage() {
             }
           }}
           onPhotoDelete={handleDeletePhoto}
-          canDelete={(photo) => photo.uploaderId === user?.id}
+          canDelete={canDeletePhoto}
           selectedIds={isSelectionMode ? selectedIds : undefined}
           onToggleSelect={handleToggleSelect}
+          activePhotoId={selectedPhoto?.id}
         />
       )}
 

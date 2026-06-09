@@ -3,6 +3,32 @@ import { PhotoCard } from './PhotoCard'
 import type { Photo } from '@/types'
 import { MasonryScroller, usePositioner, useResizeObserver } from 'masonic'
 import { useHaptics } from '@/hooks/useHaptics'
+import { createContext, useContext, useCallback } from 'react'
+
+const PhotoGridContext = createContext<{
+  onPhotoClick?: (photo: Photo, index: number) => void
+  onPhotoDelete?: (photo: Photo) => void
+  canDelete?: (photo: Photo) => boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (photoId: string) => void
+  activePhotoId?: string
+}>({})
+
+const MasonicCard = memo(function MasonicCard({ data, index }: { data: Photo; index: number }) {
+  const ctx = useContext(PhotoGridContext)
+  return (
+    <PhotoCard
+      photo={data}
+      isActiveTransition={ctx.activePhotoId === data.id}
+      onClick={() => ctx.onPhotoClick?.(data, index)}
+      onDelete={() => ctx.onPhotoDelete?.(data)}
+      canDelete={ctx.canDelete?.(data) ?? false}
+      selectable={ctx.selectedIds !== undefined}
+      selected={ctx.selectedIds?.has(data.id)}
+      onSelect={() => ctx.onToggleSelect?.(data.id)}
+    />
+  )
+})
 
 function useWindowSize() {
   const [size, setSize] = useState([
@@ -128,29 +154,20 @@ export function PhotoGrid({
   }
 
   return (
-    <div ref={containerRef} className="w-full touch-pan-y">
-      <MasonryScroller
-        positioner={positioner}
-        resizeObserver={resizeObserver}
-        containerRef={containerRef}
-        items={photos}
-        height={windowSize[1]}
-        offset={containerRef.current?.offsetTop ?? 0}
-        overscanBy={2}
-        itemKey={(data) => data.id}
-        render={({ data, index }) => (
-          <PhotoCard
-            photo={data}
-            isActiveTransition={activePhotoId === data.id}
-            onClick={() => onPhotoClick?.(data, index)}
-            onDelete={() => onPhotoDelete?.(data)}
-            canDelete={canDelete?.(data) ?? false}
-            selectable={selectedIds !== undefined}
-            selected={selectedIds?.has(data.id)}
-            onSelect={() => onToggleSelect?.(data.id)}
-          />
-        )}
-      />
-    </div>
+    <PhotoGridContext.Provider value={{ onPhotoClick, onPhotoDelete, canDelete, selectedIds, onToggleSelect, activePhotoId }}>
+      <div ref={containerRef} className="w-full touch-pan-y">
+        <MasonryScroller
+          positioner={positioner}
+          resizeObserver={resizeObserver}
+          containerRef={containerRef}
+          items={photos}
+          height={windowSize[1]}
+          offset={containerRef.current?.offsetTop ?? 0}
+          overscanBy={2}
+          itemKey={(data) => data.id}
+          render={MasonicCard}
+        />
+      </div>
+    </PhotoGridContext.Provider>
   )
 }

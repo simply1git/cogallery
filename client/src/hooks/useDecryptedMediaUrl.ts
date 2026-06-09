@@ -54,14 +54,22 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
         // If it's encrypted, decrypt the string
         if (photo.isEncrypted && vaultKey) {
           if (isActive) setIsDecrypting(true);
+          
+          let thumbPromise = inflightRequests.get(cacheKey);
+          if (!thumbPromise) {
+            thumbPromise = decryptString(photo.thumbnailBase64, vaultKey);
+            inflightRequests.set(cacheKey, thumbPromise);
+          }
+
           try {
-            const decThumb = await decryptString(photo.thumbnailBase64, vaultKey);
+            const decThumb = await thumbPromise;
             urlCache.set(cacheKey, decThumb);
             if (isActive && photoIdRef.current === photo.id) setUrl(decThumb);
           } catch (e) {
             console.error('Failed to decrypt thumbnail', e);
             if (isActive) setError('Decryption failed');
           } finally {
+            inflightRequests.delete(cacheKey);
             if (isActive) setIsDecrypting(false);
           }
           return;
