@@ -12,6 +12,7 @@ interface PhotoGridProps {
   isLoading?: boolean
   selectedIds?: Set<string>
   onToggleSelect?: (photoId: string) => void
+  activePhotoId?: string
 }
 
 export function PhotoGrid({
@@ -22,6 +23,7 @@ export function PhotoGrid({
   isLoading,
   selectedIds,
   onToggleSelect,
+  activePhotoId,
 }: PhotoGridProps) {
   const [colWidth, setColWidth] = useState(200)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -111,6 +113,7 @@ export function PhotoGrid({
         render={({ data, index }) => (
           <PhotoCard
             photo={data}
+            isActiveTransition={activePhotoId === data.id}
             onClick={() => onPhotoClick?.(data, index)}
             onDelete={() => onPhotoDelete?.(data)}
             canDelete={canDelete?.(data) ?? false}

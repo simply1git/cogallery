@@ -675,6 +675,7 @@ export function EventDetailPage() {
         <PhotoGrid
           photos={photos}
           isLoading={isLoadingPhotos}
+          activePhotoId={selectedPhoto?.id}
           onPhotoClick={(photo) => {
             if (document.startViewTransition) {
               document.startViewTransition(() => setSelectedPhoto(photo))
