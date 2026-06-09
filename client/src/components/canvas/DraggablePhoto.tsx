@@ -1,4 +1,5 @@
 // React imports removed
+import { useState } from 'react'
 import { motion, useDragControls } from 'framer-motion'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useRoomStore } from '@/store/roomStore'
@@ -36,14 +37,60 @@ export function DraggablePhoto({ item, onChange, onDelete, onBringToFront, onDou
     )
   }
 
+  const [isResizing, setIsResizing] = useState(false)
+
+  // Natural aspect ratio state (width / height)
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null)
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget
+    if (img.naturalWidth && img.naturalHeight) {
+      setAspectRatio(img.naturalWidth / img.naturalHeight)
+    }
+  }
+
+  const startResize = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    setIsResizing(true)
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const startW = item.w
+    const startH = item.h
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX
+      // If we have an aspect ratio, derive deltaY from deltaX so it scales proportionally
+      const newW = Math.max(100, startW + deltaX)
+      const newH = aspectRatio ? newW / aspectRatio : Math.max(100, startH + (moveEvent.clientY - startY))
+
+      onChange({
+        ...item,
+        w: newW,
+        h: newH
+      })
+    }
+
+    const onPointerUp = () => {
+      setIsResizing(false)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+  }
+
   return (
     <motion.div
-      drag
+      drag={!isResizing}
       dragControls={controls}
       dragMomentum={false}
+      onPointerDown={onBringToFront}
       onDragStart={onBringToFront}
       onDoubleClick={() => onDoubleClick?.(photo.id)}
       onDragEnd={(_, info) => {
+        if (isResizing) return
         // Magnetic Grid Snapping (20px)
         const snap = 20
         const newX = Math.round((item.x + info.offset.x) / snap) * snap
@@ -64,7 +111,7 @@ export function DraggablePhoto({ item, onChange, onDelete, onBringToFront, onDou
         position: 'absolute',
         zIndex: item.zIndex,
       }}
-      className="group rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-black cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-500/50 transition-shadow"
+      className="group rounded-xl shadow-2xl border border-white/10 bg-black cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-500/50 transition-shadow"
     >
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <button
@@ -79,21 +126,30 @@ export function DraggablePhoto({ item, onChange, onDelete, onBringToFront, onDou
       </div>
 
       {isDecrypting && !url ? (
-        <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+        <div className="w-full h-full flex items-center justify-center bg-zinc-900 rounded-xl">
           <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
         </div>
       ) : error ? (
-        <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+        <div className="w-full h-full flex items-center justify-center bg-zinc-900 rounded-xl">
           <span className="text-xs text-red-400">Failed</span>
         </div>
       ) : url ? (
         <img
           src={url}
           alt={photo.filename}
-          className="w-full h-full object-cover pointer-events-none"
+          onLoad={handleImageLoad}
+          className="w-full h-full object-contain pointer-events-none rounded-xl"
           draggable={false}
         />
       ) : null}
+
+      {/* Resize Handle */}
+      <div
+        onPointerDown={startResize}
+        className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-end justify-end p-1"
+      >
+        <div className="w-3 h-3 bg-blue-500 rounded-tl-sm rounded-br-lg shadow-sm" />
+      </div>
     </motion.div>
   )
 }

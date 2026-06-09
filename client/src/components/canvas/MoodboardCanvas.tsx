@@ -1,12 +1,14 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Photo } from '@/types'
-import { ImagePlus } from 'lucide-react'
+import { ImagePlus, Download, Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useRoomStore } from '@/store/roomStore'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { useMoodboardSync } from '@/hooks/useMoodboardSync'
+import * as htmlToImage from 'html-to-image'
+import download from 'downloadjs'
 
 interface MoodboardCanvasProps {
   eventId: string
@@ -18,6 +20,9 @@ interface MoodboardCanvasProps {
 
 export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoubleClick }: MoodboardCanvasProps) {
   const [showPhotoDrawer, setShowPhotoDrawer] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isDrawingMode, setIsDrawingMode] = useState(false)
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
   
   const setStorePhotos = useCanvasStore((s) => s.setPhotos)
 
@@ -27,6 +32,29 @@ export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoub
   }, [photos, setStorePhotos])
 
   const { items, cursors, updateItem, deleteItem, updateCursor, isLoading } = useMoodboardSync(eventId, userId, userName)
+
+  const handleExport = useCallback(async () => {
+    if (!canvasContainerRef.current) return
+    try {
+      setIsExporting(true)
+      const dataUrl = await htmlToImage.toPng(canvasContainerRef.current, {
+        quality: 1,
+        pixelRatio: 2,
+        backgroundColor: '#000000',
+        filter: (node) => {
+          // Filter out the UI toolbars and cursor elements
+          if ((node as HTMLElement).classList?.contains('export-exclude')) return false
+          return true
+        }
+      })
+      download(dataUrl, 'moodboard-export.png')
+    } catch (err) {
+      console.error('Failed to export canvas', err)
+      toast.error('Failed to export canvas')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [])
 
   // Add a photo from the gallery onto the canvas
   const addPhotoToCanvas = useCallback((photo: Photo) => {
@@ -54,7 +82,7 @@ export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoub
   }, [updateItem, items])
 
   return (
-    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+    <div ref={canvasContainerRef} className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
       
       <InfiniteCanvas
         items={items}
@@ -69,10 +97,29 @@ export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoub
             onPhotoDoubleClick(photo)
           }
         }}
+        isDrawingMode={isDrawingMode}
       />
 
       {/* Floating toolbar */}
-      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">
+      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2 export-exclude">
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-medium hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-xl disabled:opacity-50"
+        >
+          {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          Export PNG
+        </button>
+        <div className="flex bg-[#18181b]/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-xl mr-2">
+          <button
+            onClick={() => setIsDrawingMode(!isDrawingMode)}
+            className={`px-3 py-2 flex items-center justify-center transition-colors ${isDrawingMode ? 'bg-blue-500 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
+            title="Toggle Draw Mode"
+          >
+            <Pencil size={18} />
+          </button>
+        </div>
+        
         <div className="flex bg-[#18181b]/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-xl mr-2">
           {['🔥', '❤️', '💯', '✨'].map((emoji) => (
             <button

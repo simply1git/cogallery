@@ -34,13 +34,47 @@ export function StickyNote({ item, onChange, onDelete, onBringToFront }: StickyN
   
   const colorClass = bgColors[(item.color as keyof typeof bgColors)] || bgColors.yellow
 
+  const [isResizing, setIsResizing] = useState(false)
+
+  const startResize = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    setIsResizing(true)
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const startW = item.w
+    const startH = item.h
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const newW = Math.max(100, startW + (moveEvent.clientX - startX))
+      const newH = Math.max(100, startH + (moveEvent.clientY - startY))
+
+      onChange({
+        ...item,
+        w: newW,
+        h: newH
+      })
+    }
+
+    const onPointerUp = () => {
+      setIsResizing(false)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+  }
+
   return (
     <motion.div
-      drag
+      drag={!isResizing}
       dragControls={controls}
       dragMomentum={false}
+      onPointerDown={onBringToFront}
       onDragStart={onBringToFront}
       onDragEnd={(_, info) => {
+        if (isResizing) return
         const snap = 20
         const newX = Math.round((item.x + info.offset.x) / snap) * snap
         const newY = Math.round((item.y + info.offset.y) / snap) * snap
@@ -81,6 +115,14 @@ export function StickyNote({ item, onChange, onDelete, onBringToFront }: StickyN
         placeholder="Type a note..."
         className="w-full h-full bg-transparent resize-none outline-none font-medium text-sm leading-relaxed placeholder:text-black/30"
       />
+
+      {/* Resize Handle */}
+      <div
+        onPointerDown={startResize}
+        className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-end justify-end p-1"
+      >
+        <div className="w-3 h-3 bg-black/20 rounded-tl-sm rounded-br-lg shadow-sm" />
+      </div>
     </motion.div>
   )
 }

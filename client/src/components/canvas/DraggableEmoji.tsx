@@ -17,6 +17,7 @@ export function DraggableEmoji({ item, onChange, onDelete, onBringToFront }: Dra
       drag
       dragControls={controls}
       dragMomentum={false}
+      onPointerDown={onBringToFront}
       onDragStart={onBringToFront}
       onDragEnd={(_, info) => {
         const snap = 20

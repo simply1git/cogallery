@@ -14,22 +14,81 @@ interface InfiniteCanvasProps {
   updateCursor: (x: number, y: number) => void
   isLoading: boolean
   onPhotoDoubleClick?: (photoId: string) => void
+  isDrawingMode?: boolean
 }
 
-export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateCursor, isLoading, onPhotoDoubleClick }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateCursor, isLoading, onPhotoDoubleClick, isDrawingMode }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   
   // Custom pan state
   const x = useMotionValue(0)
   const y = useMotionValue(0)
-  const scale = useMotionValue(1)
-  
-  const springConfig = { stiffness: 400, damping: 40 }
-  const animatedX = useSpring(x, springConfig)
-  const animatedY = useSpring(y, springConfig)
-  const animatedScale = useSpring(scale, springConfig)
+  const scale = useSpring(1, { stiffness: 300, damping: 30 })
 
-  const [topZIndex, setTopZIndex] = useState(1)
+  const [topZIndex, setTopZIndex] = useState(0)
+  const [currentPath, setCurrentPath] = useState<number[][]>([])
+  
+  useEffect(() => {
+    let maxZ = 0
+    Object.values(items).forEach(item => {
+      if (item.zIndex > maxZ) maxZ = item.zIndex
+    })
+    setTopZIndex(maxZ)
+  }, [items])
+
+  // Get pointer position relative to the scaled/panned canvas
+  const getCanvasPoint = (clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
+    
+    // Reverse the pan and zoom
+    const normalizedX = (clientX - rect.left - x.get()) / scale.get()
+    const normalizedY = (clientY - rect.top - y.get()) / scale.get()
+    return { x: normalizedX, y: normalizedY }
+  }
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (isDrawingMode) {
+      e.stopPropagation()
+      const pt = getCanvasPoint(e.clientX, e.clientY)
+      setCurrentPath([[pt.x, pt.y]])
+      return
+    }
+
+    // Normal pan interaction (middle click or spacebar equivalent)
+    if (e.button === 1 || e.button === 2) {
+      // Middle or right click
+      e.preventDefault()
+    }
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const pt = getCanvasPoint(e.clientX, e.clientY)
+    updateCursor(pt.x, pt.y)
+
+    if (isDrawingMode && e.buttons === 1) {
+      setCurrentPath(prev => [...prev, [pt.x, pt.y]])
+    }
+  }
+
+  const handlePointerUp = () => {
+    if (isDrawingMode && currentPath.length > 0) {
+      const pathString = `M ${currentPath.map(p => `${p[0]} ${p[1]}`).join(' L ')}`
+      updateItem({
+        id: `path-${Date.now()}`,
+        type: 'path',
+        pathData: pathString,
+        strokeColor: '#3b82f6', // default blue
+        strokeWidth: 4,
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        zIndex: topZIndex + 1
+      })
+      setCurrentPath([])
+    }
+  }
 
   // Wheel zoom
   useEffect(() => {
@@ -54,17 +113,7 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
     return () => el.removeEventListener('wheel', handleWheel)
   }, [])
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    // Calculate cursor position relative to the canvas origin (0,0), taking scale and pan into account
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    
-    // Reverse the pan and scale to get true board coordinates
-    const boardX = (e.clientX - rect.left - x.get()) / scale.get()
-    const boardY = (e.clientY - rect.top - y.get()) / scale.get()
-    
-    updateCursor(boardX, boardY)
-  }
+
 
   if (isLoading) {
     return (
@@ -78,7 +127,10 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
     <div 
       ref={containerRef}
       className="w-full h-full bg-[#0a0a0a] overflow-hidden relative cursor-crosshair"
+      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
     >
       {/* Background grid */}
       <div 
@@ -92,9 +144,9 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
       {/* The actual canvas plane */}
       <motion.div
         style={{
-          x: animatedX,
-          y: animatedY,
-          scale: animatedScale,
+          x,
+          y,
+          scale,
           transformOrigin: '0 0',
           width: 0,
           height: 0
@@ -103,6 +155,24 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
       >
         {/* Render items */}
         {Object.values(items).map(item => {
+          if (item.type === 'path' && item.pathData) {
+            return (
+              <svg 
+                key={item.id} 
+                className="absolute overflow-visible pointer-events-none"
+                style={{ zIndex: item.zIndex, left: 0, top: 0 }}
+              >
+                <path
+                  d={item.pathData}
+                  stroke={item.strokeColor || '#3b82f6'}
+                  strokeWidth={item.strokeWidth || 4}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )
+          }
           if (item.type === 'sticky') {
             return (
               <StickyNote
@@ -147,6 +217,20 @@ export function InfiniteCanvas({ items, cursors, updateItem, deleteItem, updateC
             />
           )
         })}
+
+        {/* Render current drawing path */}
+        {currentPath.length > 0 && (
+          <svg className="absolute overflow-visible pointer-events-none" style={{ zIndex: topZIndex + 2, left: 0, top: 0 }}>
+            <path
+              d={`M ${currentPath.map(p => `${p[0]} ${p[1]}`).join(' L ')}`}
+              stroke="#3b82f6"
+              strokeWidth={4}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
 
         {/* Render multiplayer cursors */}
         {Object.values(cursors).map(cursor => (

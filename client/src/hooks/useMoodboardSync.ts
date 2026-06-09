@@ -4,10 +4,13 @@ import { saveCanvasState, loadCanvasState } from '@/services/canvasService'
 
 export interface CanvasItem {
   id: string
-  type?: 'photo' | 'sticky' | 'emoji'
+  type?: 'photo' | 'sticky' | 'emoji' | 'path'
   photoId?: string
   text?: string
   color?: string
+  pathData?: string
+  strokeColor?: string
+  strokeWidth?: number
   x: number
   y: number
   w: number
