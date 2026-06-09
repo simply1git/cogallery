@@ -1,8 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { PhotoCard } from './PhotoCard'
 import type { Photo } from '@/types'
-import { Masonry } from 'masonic'
+import { MasonryScroller, usePositioner, useResizeObserver } from 'masonic'
 import { useHaptics } from '@/hooks/useHaptics'
+
+function useWindowSize() {
+  const [size, setSize] = useState([
+    typeof window !== 'undefined' ? window.innerWidth : 1200,
+    typeof window !== 'undefined' ? window.innerHeight : 800
+  ])
+  useEffect(() => {
+    const onResize = () => setSize([window.innerWidth, window.innerHeight])
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return size
+}
 
 interface PhotoGridProps {
   photos: Photo[]
@@ -103,13 +116,28 @@ export function PhotoGrid({
     return null
   }
 
+  const windowSize = useWindowSize()
+  const positioner = usePositioner(
+    { 
+      width: containerRef.current?.offsetWidth ?? windowSize[0], 
+      columnWidth: colWidth, 
+      columnGutter: 16 
+    },
+    [photos.length, colWidth, windowSize[0]]
+  )
+  const resizeObserver = useResizeObserver(positioner)
+
   return (
     <div ref={containerRef} className="w-full touch-pan-y">
-      <Masonry
+      <MasonryScroller
+        positioner={positioner}
+        resizeObserver={resizeObserver}
+        containerRef={containerRef}
         items={photos}
-        columnGutter={16}
-        columnWidth={colWidth}
+        height={windowSize[1]}
+        offset={containerRef.current?.offsetTop ?? 0}
         overscanBy={2}
+        itemKey={(data) => data.id}
         render={({ data, index }) => (
           <PhotoCard
             photo={data}
