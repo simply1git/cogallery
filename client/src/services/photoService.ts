@@ -183,19 +183,15 @@ export async function uploadPhotoWithMetadata(
     };
     
     // Upload with concurrency of 2
-    try {
-      const concurrency = 2;
-      let currentIndex = 0;
-      const workers = Array(concurrency).fill(null).map(async () => {
-        while (currentIndex < totalChunks) {
-          const index = currentIndex++;
-          await uploadChunk(index);
-        }
-      });
-      await Promise.all(workers);
-    } catch (err) {
-      throw err;
-    }
+    const concurrency = 2;
+    let currentIndex = 0;
+    const workers = Array(concurrency).fill(null).map(async () => {
+      while (currentIndex < totalChunks) {
+        const index = currentIndex++;
+        await uploadChunk(index);
+      }
+    });
+    await Promise.all(workers);
 
     // Finalize URL in database
     // Note: Since we are using zero-trust streams, the s3_url stored here is just a placeholder.

@@ -3,7 +3,7 @@ import { webcrypto } from 'node:crypto'
 import { deriveKeyFromPassword, generateSaltHex, encryptFile, decryptBuffer } from './cryptoService'
 
 beforeAll(() => {
-  ;(globalThis as typeof globalThis & { window: { crypto: Crypto } }).window = {
+  (globalThis as typeof globalThis & { window: { crypto: Crypto } }).window = {
     crypto: webcrypto as unknown as Crypto,
   } as any
 })

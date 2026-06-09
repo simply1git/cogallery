@@ -143,7 +143,6 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       isActive = false;
     };
   // Stable primitive dependencies — no object reference churn
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photo?.id, photo?.s3Key, photo?.isEncrypted, photo?.thumbnailBase64, preferFullRes, vaultKey]);
 
   return { url, isDecrypting, error };
