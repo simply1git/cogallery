@@ -1,15 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Tldraw, Editor, createShapeId } from 'tldraw'
-import 'tldraw/tldraw.css'
-import { useYjsStore } from '@/hooks/useYjsStore'
 import type { Photo } from '@/types'
 import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
-import { GalleryPhotoShapeUtil } from './GalleryPhotoShape'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
-import { Loader2 } from 'lucide-react'
 import { useRoomStore } from '@/store/roomStore'
+import { InfiniteCanvas } from './InfiniteCanvas'
+import { useMoodboardSync } from '@/hooks/useMoodboardSync'
 
 interface MoodboardCanvasProps {
   eventId: string
@@ -17,10 +14,7 @@ interface MoodboardCanvasProps {
   photos: Photo[]
 }
 
-const customShapeUtils = [GalleryPhotoShapeUtil]
-
 export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProps) {
-  const [editor, setEditor] = useState<Editor | null>(null)
   const [showPhotoDrawer, setShowPhotoDrawer] = useState(false)
   
   const setStorePhotos = useCanvasStore((s) => s.setPhotos)
@@ -30,38 +24,24 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
     setStorePhotos(photos)
   }, [photos, setStorePhotos])
 
-  // Sync canvas state and presence across users
-  const storeWithStatus = useYjsStore({ eventId, userId, shapeUtils: customShapeUtils })
+  const { items, cursors, updateItem, deleteItem, updateCursor, isLoading } = useMoodboardSync(eventId, userId)
 
-  const handleMount = useCallback((editorInstance: Editor) => {
-    setEditor(editorInstance)
-  }, [])
-
-  // Add a photo from the gallery onto the canvas using our custom shape
+  // Add a photo from the gallery onto the canvas
   const addPhotoToCanvas = useCallback((photo: Photo) => {
-    if (!editor) return
-
     try {
-      const shapeId = createShapeId()
-      const camera = editor.getCamera()
-      const viewportCenter = editor.getViewportScreenCenter()
-
-      // Place the image near the center of the current viewport
-      const x = (viewportCenter.x - camera.x) / camera.z - 150
-      const y = (viewportCenter.y - camera.y) / camera.z - 150
-
-      // Create the custom gallery photo shape (zero base64 footprint!)
-      editor.createShape({
-        id: shapeId,
-        type: 'gallery-photo',
-        x,
-        y,
-        props: {
-          photoId: photo.id,
-          w: 300,
-          h: 300,
-        },
-      } as any)
+      const id = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      
+      // Place it in the center-ish area 
+      // (a robust solution would project screen center using InfiniteCanvas state, but (0,0) is fine for now)
+      updateItem({
+        id,
+        photoId: photo.id,
+        x: Math.random() * 200,
+        y: Math.random() * 200,
+        w: 300,
+        h: 300,
+        zIndex: Object.keys(items).length + 1
+      })
 
       toast.success(`Added "${photo.filename}" to canvas`)
       setShowPhotoDrawer(false)
@@ -69,27 +49,19 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
       console.error('Failed to add photo to canvas:', err)
       toast.error('Failed to add photo')
     }
-  }, [editor])
+  }, [updateItem, items])
 
   return (
     <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
-      {/* tldraw Canvas */}
-      {storeWithStatus.status === 'loading' ? (
-        <div className="w-full h-full flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-zinc-600" />
-        </div>
-      ) : storeWithStatus.status === 'error' ? (
-        <div className="w-full h-full flex items-center justify-center text-red-500">
-          <p className="text-sm">Failed to load canvas data</p>
-        </div>
-      ) : (
-        <Tldraw
-          store={storeWithStatus.store}
-          onMount={handleMount}
-          forceMobile={false}
-          shapeUtils={customShapeUtils}
-        />
-      )}
+      
+      <InfiniteCanvas
+        items={items}
+        cursors={cursors}
+        updateItem={updateItem}
+        deleteItem={deleteItem}
+        updateCursor={updateCursor}
+        isLoading={isLoading}
+      />
 
       {/* Floating toolbar */}
       <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">
