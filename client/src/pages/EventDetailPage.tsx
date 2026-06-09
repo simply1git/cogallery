@@ -679,7 +679,9 @@ export function EventDetailPage() {
           onPhotoClick={(photo) => {
             if (document.startViewTransition) {
               const transition = document.startViewTransition(() => setSelectedPhoto(photo))
+              transition.ready.catch(() => {})
               transition.finished.catch(() => {})
+              transition.updateCallbackDone.catch(() => {})
             } else {
               setSelectedPhoto(photo)
             }
@@ -758,7 +760,9 @@ export function EventDetailPage() {
             onClose={() => {
               if (document.startViewTransition) {
                 const transition = document.startViewTransition(() => setSelectedPhoto(null))
+                transition.ready.catch(() => {})
                 transition.finished.catch(() => {})
+                transition.updateCallbackDone.catch(() => {})
               } else {
                 setSelectedPhoto(null)
               }
