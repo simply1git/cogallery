@@ -88,6 +88,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
           const fakeThumb = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
           
           // Insert row to get ID
+          const tempKey = 'pending_' + crypto.randomUUID()
           const { data: row, error } = await supabase.from('photos').insert({
             event_id: eventId,
             room_id: roomId,
@@ -96,7 +97,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             media_type: mediaType,
             thumbnail_base64: fakeThumb,
             s3_url: 'https://pending',
-            s3_key: 'pending',
+            s3_key: tempKey,
             is_encrypted: isVault || false,
           }).select('*').single()
           
