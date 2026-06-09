@@ -103,6 +103,12 @@ export class GalleryPhotoShapeUtil extends ShapeUtil<IGalleryPhotoShape> {
     }
   }
 
+  getIndicatorPath(shape: IGalleryPhotoShape) {
+    const path = new Path2D()
+    path.rect(0, 0, shape.props.w, shape.props.h)
+    return path
+  }
+
   component(shape: IGalleryPhotoShape) {
     return <GalleryPhotoComponent shape={shape} />
   }
