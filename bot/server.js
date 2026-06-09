@@ -325,7 +325,7 @@ app.post('/media/presign-get', authenticateJWT, async (req, res) => {
     if (!key) return res.status(400).json({ error: 'Missing key' });
     
     // Generate a short-lived JWT token that grants read access to this specific file
-    const streamToken = jwt.sign({ key }, JWT_SECRET, { expiresIn: '60s' });
+    const streamToken = jwt.sign({ key }, JWT_SECRET, { expiresIn: '12h' });
     const url = `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
     
     res.json({ url });

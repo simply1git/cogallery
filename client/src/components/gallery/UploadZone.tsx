@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import Uppy from '@uppy/core'
 import Tus from '@uppy/tus'
-// @ts-expect-error Uppy types might not match the exported React components in some configs
-import { Dashboard } from '@uppy/react'
-import '@uppy/core/dist/style.min.css'
-import '@uppy/dashboard/dist/style.min.css'
+import Dashboard from '@uppy/react/dashboard'
+import '@uppy/core/css/style.min.css'
+import '@uppy/dashboard/css/style.min.css'
 import { supabase } from '@/lib/supabase'
 import { getMediaType } from '@/services/uploadService'
 import { encryptStream } from '@/services/cryptoService'
