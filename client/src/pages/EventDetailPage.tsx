@@ -702,7 +702,6 @@ export function EventDetailPage() {
           canDelete={canDeletePhoto}
           selectedIds={isSelectionMode ? selectedIds : undefined}
           onToggleSelect={handleToggleSelect}
-          activePhotoId={selectedPhoto?.id}
         />
       )}
 

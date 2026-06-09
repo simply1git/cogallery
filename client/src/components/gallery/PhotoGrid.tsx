@@ -3,7 +3,7 @@ import { PhotoCard } from './PhotoCard'
 import type { Photo } from '@/types'
 import { MasonryScroller, usePositioner, useResizeObserver } from 'masonic'
 import { useHaptics } from '@/hooks/useHaptics'
-import { createContext, useContext, useCallback } from 'react'
+import { createContext, useContext, memo } from 'react'
 
 const PhotoGridContext = createContext<{
   onPhotoClick?: (photo: Photo, index: number) => void
