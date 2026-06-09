@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Tldraw, Editor, createShapeId } from 'tldraw'
 import 'tldraw/tldraw.css'
-import { useCanvasSync } from '@/hooks/useCanvasSync'
+import { useYjsStore } from '@/hooks/useYjsStore'
 import type { Photo } from '@/types'
 import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { GalleryPhotoShapeUtil } from './GalleryPhotoShape'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
+import { Loader2 } from 'lucide-react'
 import { useRoomStore } from '@/store/roomStore'
 
 interface MoodboardCanvasProps {
@@ -29,8 +30,8 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
     setStorePhotos(photos)
   }, [photos, setStorePhotos])
 
-  // Sync canvas state across users
-  useCanvasSync({ eventId, userId, editor })
+  // Sync canvas state and presence across users
+  const storeWithStatus = useYjsStore({ eventId, userId, shapeUtils: customShapeUtils })
 
   const handleMount = useCallback((editorInstance: Editor) => {
     setEditor(editorInstance)
@@ -73,11 +74,22 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
   return (
     <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
       {/* tldraw Canvas */}
-      <Tldraw
-        onMount={handleMount}
-        forceMobile={false}
-        shapeUtils={customShapeUtils}
-      />
+      {storeWithStatus.status === 'loading' ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-zinc-600" />
+        </div>
+      ) : storeWithStatus.status === 'error' ? (
+        <div className="w-full h-full flex items-center justify-center text-red-500">
+          <p className="text-sm">Failed to load canvas data</p>
+        </div>
+      ) : (
+        <Tldraw
+          store={storeWithStatus.store}
+          onMount={handleMount}
+          forceMobile={false}
+          shapeUtils={customShapeUtils}
+        />
+      )}
 
       {/* Floating toolbar */}
       <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">

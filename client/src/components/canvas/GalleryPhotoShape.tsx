@@ -94,8 +94,13 @@ export class GalleryPhotoShapeUtil extends ShapeUtil<IGalleryPhotoShape> {
     })
   }
 
-  getIndicatorPath(shape: any): any {
-    return `M0,0 L${shape.props.w},0 L${shape.props.w},${shape.props.h} L0,${shape.props.h} Z`
+  onResize(_shape: IGalleryPhotoShape, info: any) {
+    return {
+      props: {
+        w: Math.max(50, info.initialBounds.w * info.scaleX),
+        h: Math.max(50, info.initialBounds.h * info.scaleY),
+      },
+    }
   }
 
   component(shape: IGalleryPhotoShape) {
