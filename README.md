@@ -1,303 +1,140 @@
 # CoGallery
 
-**Permanent Photo Sharing Platform for Trips, Events & Memories**
+**Collaborative photo platform for trips, events, and memories — with permanent GitHub archival.**
 
-![Status](https://img.shields.io/badge/status-in%20development-yellow)
-![Version](https://img.shields.io/badge/version-1.0--planning-blue)
+![Status](https://img.shields.io/badge/status-production--ready-green)
+![Version](https://img.shields.io/badge/version-1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
-## 🎯 What is CoGallery?
+## What is CoGallery?
 
-CoGallery is a modern photo sharing platform designed for group trips, events, and occasions where you want to **permanently preserve original-quality photos** with real-time collaboration.
-
-**Unlike traditional alternatives:**
-- ❌ Not temporary (photos don't disappear)
-- ❌ Not compressed (original quality preserved)
-- ❌ Not enterprise-complex (built for casual users)
-- ✅ Real-time uploads during events
-- ✅ Permanent archival with GitHub Pages
-- ✅ Free at small scale, predictable costs at scale
-
----
-
-## ✨ Key Features
-
-### 🚀 Phase 1: MVP (Core)
-- **Real-Time Photo Upload** - Direct upload to AWS S3
-- **Gallery View** - Responsive thumbnail grid with pagination
-- **Guest Mode** - No account needed to share
-- **QR Code Sharing** - Easy event discovery
-- **Instant Sync** - Photos appear live across all devices
-
-### 📸 Phase 2: Enhancement
-- **Metadata Extraction** - EXIF data, location, camera info
-- **Search & Filter** - Find photos by date, uploader, location
-- **Comments & Reactions** - Interact with photos
-- **Slideshow Mode** - Auto-play gallery
-- **ZIP Download** - Download entire event
-
-### 📦 Phase 3: Archive
-- **GitHub Auto-Archive** - Permanent backup with GitHub Pages
-- **Static HTML Gallery** - Searchable offline archive
-- **Version History** - Access any past moment
-- **Forever Accessible** - $0 permanent storage
-
-### 🎨 Phase 4: Polish
-- **Mobile App** - React Native version
-- **Offline Support** - Browse cached photos
-- **Analytics** - See popular photos
-- **Admin Controls** - Manage photos & members
-
----
-
-## 🏗️ Technology Stack
+CoGallery is a real-time photo sharing platform for group trips and events. It preserves original-quality media with collaborative tools: moodboards, E2E vault rooms, P2P seeding, and free permanent archives on GitHub Pages.
 
 ```
-Frontend:  React 18 + TypeScript + Vite + Tailwind CSS
-Database:  PostgreSQL (Supabase)
-Storage:   AWS S3 + CloudFront CDN
-Real-time: Supabase Realtime WebSocket
-Archive:   GitHub Pages + Actions
-Deploy:    Vercel (frontend), Supabase (backend)
+Room (trip) → Event (day/theme) → Photos & Videos
 ```
 
 ---
 
-## 📊 Architecture Overview
+## Features
 
-```
-┌────────────────────────────────────────┐
-│  Browser (React App)                   │
-│  Real-time gallery + photo upload      │
-└────────┬─────────────────────────────┬─┘
-         │                             │
-    [Upload]                     [View]
-         │                             │
-    ┌────▼───┐                   ┌────▼───┐
-    │ AWS S3 │                   │Supabase│
-    │ Photos │                   │ DB     │
-    └────────┘                   └────────┘
-         │                             │
-    [CDN]                         [RLS]
-         │                             │
-    CloudFront              Row-Level Security
-         │
-    ┌────▼────────────────┐
-    │ GitHub Pages        │
-    │ (Archive + Backup)  │
-    └─────────────────────┘
-```
+| Feature | Status |
+|---------|--------|
+| Real-time gallery with masonry grid | ✅ |
+| Offline upload queue (IndexedDB) | ✅ |
+| Chunked + TUS resumable uploads | ✅ |
+| Guest access via invite links | ✅ |
+| E2E encrypted vault rooms | ✅ |
+| Collaborative moodboard (tldraw + Yjs) | ✅ |
+| WebRTC P2P file seeding | ✅ |
+| GitHub Pages permanent archive | ✅ |
+| Admin developer dashboard | ✅ |
+| PWA installable | ✅ |
 
 ---
 
-## 🚀 Quick Start
+## Tech Stack
 
-### 1. Prerequisites
-```bash
-Node.js 18+, npm, Git, AWS account, Supabase account
-```
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Vite, Tailwind, Zustand |
+| Deploy | Cloudflare Pages |
+| Database & Auth | Supabase (PostgreSQL + Realtime) |
+| Storage | Cloudflare R2 + Oracle streaming backend |
+| Canvas | tldraw v5 + Yjs CRDT |
+| Archive | GitHub API + GitHub Pages |
+| P2P | WebRTC + Supabase signaling |
 
-### 2. Clone & Install
+---
+
+## Quick Start
+
+### 1. Clone & install
+
 ```bash
 git clone https://github.com/yourusername/cogallery.git
 cd cogallery/client
 npm install
-```
-
-### 3. Setup Environment
-```bash
-cp .env.example .env.local
-# Edit with your Supabase and AWS credentials
-```
-
-### 4. Run Locally
-```bash
+cp .env.example .env
+# Fill in VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_BACKEND_URL
 npm run dev
-# Open http://localhost:5173
 ```
 
-### 5. Deploy
-```bash
-vercel deploy
-```
-
-**[🔗 Full Setup Guide →](./SETUP_GUIDE.md)**
-
----
-
-## 📚 Documentation
-
-- **[PROJECT_SPEC.md](./PROJECT_SPEC.md)** - Complete project specification, features, roadmap
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Technical architecture, system design, scalability
-- **[API_DOCS.md](./API_DOCS.md)** - REST API reference, endpoints, examples
-- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - Installation, configuration, deployment
-
----
-
-## 💰 Pricing
-
-### Free Forever (For Casual Users)
-- Up to 1 event per month
-- Up to 500 photos per event
-- Access for 1 year
-- **Cost: $0**
-
-### Creator Plan ($4.99/month)
-- Unlimited events
-- Unlimited photos
-- Access forever
-- GitHub auto-archive
-- Priority support
-
-### Team Plan ($9.99/month)
-- Everything in Creator
-- 10+ collaborators per event
-- Advanced analytics
-- Admin controls
-- Team management
-
-**[Check full pricing →](#pricing)**
-
----
-
-## 📈 Roadmap
-
-### ✅ Completed
-- Project specification
-- Architecture design
-- Database schema
-- API documentation
-
-### 🚧 In Progress (Weeks 1-12)
-- [ ] Week 1-2: Foundation (Supabase + React setup)
-- [ ] Week 3-4: Core features (Upload + Gallery)
-- [ ] Week 5-6: Metadata (EXIF + Search)
-- [ ] Week 7-8: Downloads (ZIP + Slideshow)
-- [ ] Week 9-10: Archive (GitHub integration)
-- [ ] Week 11-12: Polish (Mobile + Analytics)
-
-### 📅 Future (Post-Launch)
-- Mobile app (React Native)
-- AI photo tagging
-- Face recognition
-- Live streaming events
-- Social features
-
-**[Full Roadmap →](./PROJECT_SPEC.md#-implementation-roadmap)**
-
----
-
-## 🎯 Use Cases
-
-### 🏖️ Trip Memory Sharing
-Create event → Friends upload during trip → Photos archived forever → Access anytime
-
-### 🎉 Event Coverage
-Wedding, graduation, conference → Real-time uploads → Guest gallery → Permanent archive
-
-### 👨‍👩‍👧‍👦 Family Memories
-Family reunion → Collective album → Searchable archive → Share with relatives
-
-### 📸 Professional Events
-Photography assignment → Client gallery → Deliverables → Backup archive
-
----
-
-## 🔐 Security & Privacy
-
-- **Encryption:** TLS 1.3 in transit, AES-256 at rest
-- **Row-Level Security:** Supabase PostgreSQL policies
-- **Data Control:** You own your photos
-- **Private Events:** Invitation-only by default
-- **GDPR Compliant:** Full data export & deletion
-
----
-
-## 📊 Performance Specs
-
-- **Real-time Latency:** < 500ms photo updates
-- **Upload Speed:** Direct S3 (no bottleneck)
-- **Gallery Load:** < 2s for 50 photos
-- **Concurrent Users:** 10,000+
-- **Storage Capacity:** Unlimited (scales infinitely)
-- **Uptime:** 99.9%
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! 
+### 2. Oracle backend (uploads + archive)
 
 ```bash
-# Fork the repo
-git clone https://github.com/yourusername/cogallery.git
-git checkout -b feature/your-feature
-
-# Make changes & commit
-git add .
-git commit -m "Add your feature"
-
-# Push & create PR
-git push origin feature/your-feature
+cd ../bot
+npm install
+cp .env.example .env
+# Fill in SUPABASE_SERVICE_ROLE_KEY, GITHUB_TOKEN, GITHUB_USERNAME
+npm start
 ```
 
-**[Contributing Guide →](./CONTRIBUTING.md)**
+### 3. Database migrations
+
+Run in Supabase SQL Editor (in order):
+
+1. `SCHEMA_MIGRATION_HIERARCHICAL.sql`
+2. `FIX_EVENT_ACCESS_AND_PROFILES.sql`
+3. `CANVAS_STATES_MIGRATION.sql`
+4. `FIX_CANVAS_RLS.sql` — **required** for canvas security
+5. `ADD_EVENT_ARCHIVE_COLUMNS.sql`
+
+Enable **Anonymous sign-ins** in Supabase Auth for guest mode.
 
 ---
 
-## 📝 License
+## Architecture
 
-MIT License - feel free to use, modify, and distribute
-
----
-
-## 🆘 Support
-
-- **Documentation:** [/docs](./PROJECT_SPEC.md)
-- **Issues:** [GitHub Issues](https://github.com/yourusername/cogallery/issues)
-- **Email:** support@cogallery.app
-- **Discord:** [Join Community](https://discord.gg/cogallery)
+```
+Browser (React PWA)
+    ├── Supabase (auth, DB, realtime)
+    ├── Oracle Bot (upload, stream, archive, telemetry)
+    ├── Cloudflare R2 (object storage)
+    └── WebRTC P2P (file seeding between peers)
+```
 
 ---
 
-## 👥 Authors
+## GitHub Archive
 
-- **Founder:** You
-- **Contributors:** [See CONTRIBUTORS.md](./CONTRIBUTORS.md)
+Event owners can archive any event to GitHub Pages from **Event Settings → Archive to GitHub**.
 
----
+The archive includes:
+- Static HTML gallery (searchable, mobile-friendly)
+- `manifest.json` with photo metadata
+- Links to original full-resolution photos on your storage backend
 
-## 🙏 Acknowledgments
-
-- Supabase for PostgreSQL + Real-time
-- AWS for S3 + CloudFront
-- Vercel for hosting
-- GitHub for archival
-- React ecosystem for tooling
+Requires `GITHUB_TOKEN` and `GITHUB_USERNAME` on the Oracle bot.
 
 ---
 
-## 📞 Contact
+## Development
 
-- **Website:** cogallery.app (coming soon)
-- **Email:** hello@cogallery.app
-- **Twitter:** [@cogallery](https://twitter.com/cogallery)
-- **GitHub:** [@cogallery](https://github.com/cogallery)
+```bash
+cd client
+npm run dev          # Start Vite dev server
+npm run type-check   # TypeScript
+npm run lint         # ESLint
+npm test             # Vitest unit tests
+npm run build        # Production build
+```
 
----
-
-## 🌟 Show Your Support
-
-If you like this project, please ⭐ star it on GitHub!
-
----
-
-**CoGallery** - *Preserve your memories. Forever.*
+CI runs on every push via `.github/workflows/ci.yml`.
 
 ---
 
-**Status:** 🚀 Ready for Development  
-**Last Updated:** May 27, 2026  
-**Version:** 1.0 (Planning Phase)
+## Security
+
+- JWT-gated media streaming (zero-trust)
+- Event-scoped canvas RLS (`FIX_CANVAS_RLS.sql`)
+- Client-side E2E encryption for vault rooms
+- EXIF scrubbing on upload
+
+---
+
+## License
+
+MIT

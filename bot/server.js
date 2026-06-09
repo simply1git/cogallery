@@ -19,8 +19,15 @@ import dotenv from 'dotenv';
 import jwksClient from 'jwks-rsa';
 import { Server, EVENTS } from '@tus/server';
 import { FileStore } from '@tus/file-store';
+import { archiveEventToGitHub } from './lib/githubArchive.js';
 
 dotenv.config();
+
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  : null;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'uploads');
@@ -506,6 +513,121 @@ app.post('/api/download-zip', authenticateJWT, [express.json({ limit: '10mb' }),
   }
 
   archive.finalize();
+});
+
+// --- CLIENT ERROR TELEMETRY ---
+app.post('/telemetry/error', express.json({ limit: '100kb' }), (req, res) => {
+  console.error('[Client Error]', JSON.stringify(req.body));
+  res.json({ ok: true });
+});
+
+// --- GITHUB ARCHIVE ---
+async function userCanArchiveEvent(userId, eventId) {
+  if (!supabaseAdmin) return false;
+  const { data: event } = await supabaseAdmin.from('events').select('creator_id').eq('id', eventId).single();
+  if (!event) return false;
+  if (event.creator_id === userId) return true;
+  const { data: member } = await supabaseAdmin
+    .from('event_members')
+    .select('role')
+    .eq('event_id', eventId)
+    .eq('user_id', userId)
+    .eq('status', 'approved')
+    .maybeSingle();
+  return member?.role === 'owner';
+}
+
+app.post('/events/:eventId/archive-to-github', authenticateJWT, async (req, res) => {
+  const { eventId } = req.params;
+  const userId = req.user?.sub;
+  const { isPublic = true } = req.body || {};
+
+  const githubToken = process.env.GITHUB_TOKEN;
+  const githubUsername = process.env.GITHUB_USERNAME;
+
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Archive service not configured (missing SUPABASE_SERVICE_ROLE_KEY)' });
+  }
+  if (!githubToken || !githubUsername) {
+    return res.status(503).json({ error: 'GitHub archive not configured (GITHUB_TOKEN, GITHUB_USERNAME)' });
+  }
+
+  const allowed = await userCanArchiveEvent(userId, eventId);
+  if (!allowed) {
+    return res.status(403).json({ error: 'Only event owners can archive' });
+  }
+
+  try {
+    await supabaseAdmin.from('events').update({ archive_status: 'processing' }).eq('id', eventId);
+
+    const { data: event, error: eventErr } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
+    if (eventErr || !event) throw new Error('Event not found');
+
+    const { data: photos, error: photosErr } = await supabaseAdmin
+      .from('photos')
+      .select('id, filename, s3_url, thumbnail_url, thumbnail_base64, taken_at, created_at')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true });
+
+    if (photosErr) throw photosErr;
+
+    const result = await archiveEventToGitHub({
+      event,
+      photos: photos || [],
+      githubToken,
+      githubUsername,
+      isPublic,
+    });
+
+    await supabaseAdmin.from('events').update({
+      archive_status: 'completed',
+      github_repo_url: result.repoUrl,
+      github_pages_url: result.pagesUrl,
+      archived_at: new Date().toISOString(),
+    }).eq('id', eventId);
+
+    res.json({
+      status: 'completed',
+      repoUrl: result.repoUrl,
+      pagesUrl: result.pagesUrl,
+      photoCount: result.photoCount,
+      message: 'Archive published to GitHub Pages',
+    });
+  } catch (err) {
+    console.error('[Archive]', err);
+    await supabaseAdmin.from('events').update({ archive_status: 'failed' }).eq('id', eventId);
+    res.status(500).json({ error: err.message || 'Archive failed' });
+  }
+});
+
+app.get('/events/:eventId/archive-status', authenticateJWT, async (req, res) => {
+  const { eventId } = req.params;
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Archive service not configured' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('events')
+    .select('archive_status, github_repo_url, github_pages_url, archived_at')
+    .eq('id', eventId)
+    .single();
+
+  if (error || !data) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+
+  const { count } = await supabaseAdmin
+    .from('photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+
+  res.json({
+    status: data.archive_status || 'none',
+    repoUrl: data.github_repo_url,
+    pagesUrl: data.github_pages_url,
+    archivedAt: data.archived_at,
+    photoCount: count ?? 0,
+  });
 });
 
 const PORT = process.env.PORT || 3000;

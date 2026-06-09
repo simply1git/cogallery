@@ -4,6 +4,7 @@ import * as Y from 'yjs'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import { supabase } from '@/lib/supabase'
 import { saveCanvasState, loadCanvasState } from '@/services/canvasService'
+import { uint8ToBase64, base64ToUint8 } from '@/utils/binary'
 
 interface UseYjsStoreOptions {
   eventId: string
@@ -11,8 +12,9 @@ interface UseYjsStoreOptions {
   shapeUtils?: TLAnyShapeUtilConstructor[]
   assets?: any // TLAssetStore
 }
+const DEFAULT_SHAPE_UTILS: TLAnyShapeUtilConstructor[] = []
 
-export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjsStoreOptions) {
+export function useYjsStore({ eventId, userId, shapeUtils = DEFAULT_SHAPE_UTILS, assets }: UseYjsStoreOptions) {
   const [storeWithStatus, setStoreWithStatus] = useState<TLStoreWithStatus>({
     status: 'loading'
   })
@@ -40,12 +42,7 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         const stateUpdate = Y.encodeStateAsUpdate(yDoc)
-        let binaryString = ''
-        for (let i = 0; i < stateUpdate.length; i++) {
-          binaryString += String.fromCharCode(stateUpdate[i])
-        }
-        const base64Update = btoa(binaryString)
-        saveCanvasState(eventId, { yjsUpdate: base64Update }, userId)
+        saveCanvasState(eventId, { yjsUpdate: uint8ToBase64(stateUpdate) }, userId)
       }, 5000)
     }
 
@@ -54,13 +51,7 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
       try {
         const state = await loadCanvasState(eventId)
         if (state?.canvasData?.yjsUpdate) {
-          const binaryString = atob(state.canvasData.yjsUpdate)
-          const len = binaryString.length
-          const bytes = new Uint8Array(len)
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
-          }
-          Y.applyUpdate(yDoc, bytes)
+          Y.applyUpdate(yDoc, base64ToUint8(state.canvasData.yjsUpdate))
         }
 
         if (!isMounted) return
@@ -68,8 +59,32 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
         // Sync loaded Yjs data to Tldraw Store
         store.mergeRemoteChanges(() => {
           const initialRecords: TLRecord[] = Array.from(yMap.values())
-          if (initialRecords.length > 0) {
-            store.put(initialRecords)
+          
+          // Sanitize records to prevent crashes from legacy or unknown shapes
+          const validRecords = initialRecords.filter((record) => {
+            if (record.typeName === 'shape') {
+              const anyRecord = record as any
+              // The legacy 'gallery-photo' shape crashes Tldraw v5 because the util is missing
+              if (anyRecord.type === 'gallery-photo') {
+                yMap.delete(record.id) // Clean it up from Yjs
+                return false
+              }
+              // Also drop anything with missing typeName
+              if (!anyRecord.type) {
+                yMap.delete(record.id)
+                return false
+              }
+            }
+            return true
+          })
+
+          if (validRecords.length > 0) {
+            try {
+              store.put(validRecords)
+            } catch (putErr) {
+              console.error('Failed to parse Tldraw records from Yjs map. Resetting to prevent blank canvas:', putErr)
+              yMap.clear() // Clear corrupt data so we can start fresh
+            }
           }
         })
 
@@ -87,12 +102,7 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
       .on('broadcast', { event: 'yjs-update' }, ({ payload }) => {
         if (payload.senderId === userId) return
         try {
-          const binaryString = atob(payload.update)
-          const bytes = new Uint8Array(binaryString.length)
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
-          }
-          Y.applyUpdate(yDoc, bytes, 'supabase')
+          Y.applyUpdate(yDoc, base64ToUint8(payload.update), 'supabase')
         } catch (err) {
           console.warn('Failed to apply remote Yjs update:', err)
         }
@@ -100,12 +110,7 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
       .on('broadcast', { event: 'yjs-awareness' }, ({ payload }) => {
         if (payload.senderId === userId) return
         try {
-          const binaryString = atob(payload.update)
-          const bytes = new Uint8Array(binaryString.length)
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
-          }
-          awarenessProtocol.applyAwarenessUpdate(awareness, bytes, 'supabase')
+          awarenessProtocol.applyAwarenessUpdate(awareness, base64ToUint8(payload.update), 'supabase')
         } catch (err) {
           console.warn('Failed to apply remote awareness update:', err)
         }
@@ -120,15 +125,10 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
     const handleYjsUpdate = (update: Uint8Array, origin: any) => {
       if (origin === 'supabase') return
       
-      let binaryString = ''
-      for (let i = 0; i < update.length; i++) {
-        binaryString += String.fromCharCode(update[i])
-      }
-      
       channel.send({
         type: 'broadcast',
         event: 'yjs-update',
-        payload: { senderId: userId, update: btoa(binaryString) },
+        payload: { senderId: userId, update: uint8ToBase64(update) },
       })
       scheduleSave()
     }
@@ -141,15 +141,10 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
       const changedClients = added.concat(updated, removed)
       const update = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients)
       
-      let binaryString = ''
-      for (let i = 0; i < update.length; i++) {
-        binaryString += String.fromCharCode(update[i])
-      }
-
       channel.send({
         type: 'broadcast',
         event: 'yjs-awareness',
-        payload: { senderId: userId, update: btoa(binaryString) },
+        payload: { senderId: userId, update: uint8ToBase64(update) },
       })
     }
     awareness.on('update', handleAwarenessUpdate)
@@ -208,7 +203,24 @@ export function useYjsStore({ eventId, userId, shapeUtils = [], assets }: UseYjs
 
       if (toUpdate.length > 0 || toRemove.length > 0) {
         store.mergeRemoteChanges(() => {
-          if (toUpdate.length > 0) store.put(toUpdate)
+          // Sanitize remote updates to prevent crashes
+          const validUpdate = toUpdate.filter((record) => {
+            if (record.typeName === 'shape') {
+              const anyRecord = record as any
+              if (anyRecord.type === 'gallery-photo' || !anyRecord.type) {
+                return false // ignore it
+              }
+            }
+            return true
+          })
+
+          if (validUpdate.length > 0) {
+            try {
+              store.put(validUpdate)
+            } catch (putErr) {
+              console.warn('Failed to apply remote Yjs records to Tldraw store:', putErr)
+            }
+          }
           if (toRemove.length > 0) store.remove(toRemove as any)
         })
       }

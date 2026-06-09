@@ -17,11 +17,29 @@ import { getCachedFile } from './photoCache'
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-]
+function buildIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ]
+
+  const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined
+  const turnUser = import.meta.env.VITE_TURN_USERNAME as string | undefined
+  const turnCred = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined
+
+  if (turnUrl && turnUser && turnCred) {
+    servers.push({
+      urls: turnUrl,
+      username: turnUser,
+      credential: turnCred,
+    })
+  }
+
+  return servers
+}
+
+const ICE_SERVERS = buildIceServers()
 
 type TransferCallback = (progress: number) => void
 type FileReceivedCallback = (photoId: string, blob: Blob, filename: string, mimeType: string) => void

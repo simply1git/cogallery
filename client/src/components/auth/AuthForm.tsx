@@ -118,6 +118,8 @@ export function AuthForm({ initialMode = 'login' }: AuthFormProps) {
     }
   }
 
+
+
   const handleSubmit = (e: React.FormEvent) => {
     if (mode === 'login') {
       handleSignIn(e)
@@ -306,6 +308,8 @@ export function AuthForm({ initialMode = 'login' }: AuthFormProps) {
             Don't have an account? <span className="font-semibold text-white">Sign up</span>
           </button>
         )}
+
+
       </div>
     </form>
   )

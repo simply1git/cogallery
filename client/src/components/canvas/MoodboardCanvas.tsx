@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Tldraw, Editor, createShapeId, AssetRecordType, TLAssetStore } from 'tldraw'
+import { Tldraw, Editor, AssetRecordType, TLAssetStore } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { useYjsStore } from '@/hooks/useYjsStore'
 import type { Photo } from '@/types'
@@ -71,7 +71,7 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
   }, [photos, setStorePhotos])
 
   // Sync canvas state and presence across users
-  const storeWithStatus = useYjsStore({ eventId, userId, shapeUtils: [], assets: customAssetStore })
+  const storeWithStatus = useYjsStore({ eventId, userId, assets: customAssetStore })
 
   const handleMount = useCallback((editorInstance: Editor) => {
     setEditor(editorInstance)
@@ -82,50 +82,41 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
     if (!editor) return
 
     try {
-      const shapeId = createShapeId()
-      const camera = editor.getCamera()
-      const viewportCenter = editor.getViewportScreenCenter()
-
-      // Place the image near the center of the current viewport
-      const x = (viewportCenter.x - camera.x) / camera.z - 150
-      const y = (viewportCenter.y - camera.y) / camera.z - 150
-
       const assetId = AssetRecordType.createId()
-      
-      // 1. Create native asset with encrypted reference
-      editor.createAssets([{
-        id: assetId,
-        type: 'image',
-        typeName: 'asset',
-        props: {
-          w: 300,
-          h: 300,
-          name: photo.filename,
-          isAnimated: false,
-          mimeType: photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-          src: `encrypted-photo://${photo.id}`
-        },
-        meta: {}
-      }])
 
-      // 2. Create standard image shape
+      // 1. Create the asset in the store first
+      editor.createAssets([
+        {
+          id: assetId,
+          type: 'image',
+          typeName: 'asset',
+          props: {
+            w: 300,
+            h: 300,
+            name: photo.filename,
+            isAnimated: false,
+            mimeType: 'image/jpeg',
+            src: `encrypted-photo://${photo.id}`
+          },
+          meta: {}
+        }
+      ])
+
+      // 2. Create the shape referencing the asset
       editor.createShape({
-        id: shapeId,
         type: 'image',
-        x,
-        y,
+        x: editor.getViewportPageBounds().center.x - 150,
+        y: editor.getViewportPageBounds().center.y - 150,
         props: {
           w: 300,
           h: 300,
-          assetId
+          assetId,
         },
       })
-
-      toast.success(`Added "${photo.filename}" to canvas`)
-      setShowPhotoDrawer(false)
-    } catch (err) {
-      console.error('Failed to add photo to canvas:', err)
+      toast.success('Photo added to canvas')
+    } catch (error) {
       toast.error('Failed to add photo')
+      console.error(error)
     }
   }, [editor])
 

@@ -33,6 +33,8 @@ export async function signUpWithEmail(email: string, password: string, displayNa
   }
 }
 
+
+
 export async function signInWithEmail(email: string, password: string) {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -69,7 +71,7 @@ export async function getCurrentUser(): Promise<User | null> {
       email: user.email,
       displayName: user.user_metadata?.displayName || user.email?.split('@')[0] || 'User',
       avatarUrl: user.user_metadata?.avatarUrl,
-      isGuest: user.user_metadata?.isGuest || false,
+      isGuest: false,
       createdAt: user.created_at,
     }
   } catch (error) {
