@@ -18,6 +18,8 @@ interface MoodboardCanvasProps {
   photos: Photo[]
 }
 
+const assetUrlCache = new Map<string, string>()
+
 const customAssetStore: TLAssetStore = {
   async upload(_asset: any, _file: File) {
     toast.error('Please upload photos using the Gallery interface first.')
@@ -38,11 +40,21 @@ const customAssetStore: TLAssetStore = {
     try {
       // 1. Unencrypted handling
       if (!photo.isEncrypted) {
-        return await getSecureMediaUrl(photo.s3Key || photo.filename)
+        if (assetUrlCache.has(photoId)) {
+          return assetUrlCache.get(photoId)
+        }
+        const url = await getSecureMediaUrl(photo.s3Key || photo.filename)
+        assetUrlCache.set(photoId, url)
+        return url
       }
 
       // 2. Encrypted handling
       if (!vaultKey) return null
+
+      // Check cache first to prevent blinking/re-fetching
+      if (assetUrlCache.has(photoId)) {
+        return assetUrlCache.get(photoId)
+      }
 
       const secureUrl = await getSecureMediaUrl(photo.s3Key || photo.filename)
       const response = await fetch(secureUrl)
@@ -52,7 +64,9 @@ const customAssetStore: TLAssetStore = {
       const mimeType = photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
       const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType)
       
-      return URL.createObjectURL(decryptedBlob)
+      const blobUrl = URL.createObjectURL(decryptedBlob)
+      assetUrlCache.set(photoId, blobUrl)
+      return blobUrl
     } catch (e) {
       console.error('Asset resolve error:', e)
       return null
