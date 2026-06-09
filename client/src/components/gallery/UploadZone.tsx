@@ -55,9 +55,16 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
           let payloadToUpload: File | Blob = file.data as File;
           const mediaType = getMediaType(payloadToUpload as File) || 'image'
           
+          // Generate a real thumbnail via Web Worker BEFORE encryption
+          let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+          try {
+            const generatedThumb = await generateThumbnail(payloadToUpload as File);
+            if (generatedThumb) thumbBase64 = generatedThumb;
+          } catch (err) {
+            console.error('Thumbnail generation failed:', err);
+          }
+          
           // PHASE 3: Streaming Encryption
-          // We fetch the current room vault status dynamically (React state may not update the closure, 
-          // so it's safer to fetch from the store or pass it via refs, but we'll use useRoomStore.getState())
           const { currentRoom, vaultKeys } = useRoomStore.getState()
           const isVault = currentRoom?.isVault
           const vaultKey = vaultKeys[roomId]
@@ -66,9 +73,6 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
              if (!vaultKey) throw new Error('Vault key missing. Cannot encrypt.');
              const { stream } = await encryptStream(payloadToUpload, vaultKey);
              
-             // Uppy TUS plugin accepts Blob. We wait for the stream to resolve to a Blob for now.
-             // True TransformStream support in TUS JS client requires advanced custom FileReader,
-             // which we will implement if performance demands it.
              const reader = stream.getReader();
              const chunks: Uint8Array[] = [];
              while (true) {
@@ -83,22 +87,14 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                data: payloadToUpload,
                size: payloadToUpload.size,
              });
-          }
-
-          // Generate a real thumbnail via Web Worker
-          let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-          try {
-            const generatedThumb = await generateThumbnail(file.data as File);
-            if (generatedThumb) thumbBase64 = generatedThumb;
-          } catch (err) {
-            console.error('Thumbnail generation failed:', err);
-          }
-          
-          if (isVault && vaultKey && thumbBase64.length > 50) {
-             try {
-               thumbBase64 = await encryptString(thumbBase64, vaultKey);
-             } catch (e) {
-               console.error('Thumbnail encryption failed:', e);
+             
+             // Encrypt the thumbnail using the Vault Key
+             if (thumbBase64.length > 50) {
+               try {
+                 thumbBase64 = await encryptString(thumbBase64, vaultKey);
+               } catch (e) {
+                 console.error('Thumbnail encryption failed:', e);
+               }
              }
           }
           
@@ -133,6 +129,11 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
       // Finish hook to update the final URL in the database
       uppyInstance.on('upload-success', async (file) => {
         if (!file) return;
+        
+        // Wait 1.5 seconds to allow the backend TUS server POST_FINISH 
+        // handler to complete the fs.rename of the uploaded file.
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
         const photoId = file.meta.photoId as string;
         
         // The backend moved the file to cache directory.
