@@ -1,28 +1,67 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { Tldraw, Editor, createShapeId, AssetRecordType, TLAssetStore } from 'tldraw'
+import 'tldraw/tldraw.css'
+import { useYjsStore } from '@/hooks/useYjsStore'
 import type { Photo } from '@/types'
-import { ImagePlus, Download, Loader2, Pencil } from 'lucide-react'
+import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
+import { Loader2 } from 'lucide-react'
 import { useRoomStore } from '@/store/roomStore'
-import { InfiniteCanvas } from './InfiniteCanvas'
-import { useMoodboardSync } from '@/hooks/useMoodboardSync'
-import * as htmlToImage from 'html-to-image'
-import download from 'downloadjs'
+import { getSecureMediaUrl } from '@/services/photoService'
+import { decryptBuffer } from '@/services/cryptoService'
 
 interface MoodboardCanvasProps {
   eventId: string
   userId: string
-  userName: string
   photos: Photo[]
-  onPhotoDoubleClick?: (photo: Photo) => void
 }
 
-export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoubleClick }: MoodboardCanvasProps) {
+const customAssetStore: TLAssetStore = {
+  async upload(_asset: any, _file: File) {
+    toast.error('Please upload photos using the Gallery interface first.')
+    throw new Error('Direct upload to canvas is disabled.')
+  },
+  async resolve(asset: any, _ctx: any) {
+    const src = asset.props.src
+    if (!src || !src.startsWith('encrypted-photo://')) {
+      return src
+    }
+    
+    const photoId = src.replace('encrypted-photo://', '')
+    const photo = useCanvasStore.getState().photos.find((p) => p.id === photoId)
+    if (!photo) return null
+    
+    const vaultKey = useRoomStore.getState().vaultKeys[photo.roomId]
+    
+    try {
+      // 1. Unencrypted handling
+      if (!photo.isEncrypted) {
+        return await getSecureMediaUrl(photo.s3Key || photo.filename)
+      }
+
+      // 2. Encrypted handling
+      if (!vaultKey) return null
+
+      const secureUrl = await getSecureMediaUrl(photo.s3Key || photo.filename)
+      const response = await fetch(secureUrl)
+      if (!response.ok) throw new Error('Failed to fetch')
+      
+      const encryptedBuffer = await response.arrayBuffer()
+      const mimeType = photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
+      const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType)
+      
+      return URL.createObjectURL(decryptedBlob)
+    } catch (e) {
+      console.error('Asset resolve error:', e)
+      return null
+    }
+  }
+}
+export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProps) {
+  const [editor, setEditor] = useState<Editor | null>(null)
   const [showPhotoDrawer, setShowPhotoDrawer] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
-  const [isDrawingMode, setIsDrawingMode] = useState(false)
-  const canvasContainerRef = useRef<HTMLDivElement>(null)
   
   const setStorePhotos = useCanvasStore((s) => s.setPhotos)
 
@@ -31,46 +70,55 @@ export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoub
     setStorePhotos(photos)
   }, [photos, setStorePhotos])
 
-  const { items, cursors, updateItem, deleteItem, updateCursor, isLoading } = useMoodboardSync(eventId, userId, userName)
+  // Sync canvas state and presence across users
+  const storeWithStatus = useYjsStore({ eventId, userId, shapeUtils: [], assets: customAssetStore })
 
-  const handleExport = useCallback(async () => {
-    if (!canvasContainerRef.current) return
-    try {
-      setIsExporting(true)
-      const dataUrl = await htmlToImage.toPng(canvasContainerRef.current, {
-        quality: 1,
-        pixelRatio: 2,
-        backgroundColor: '#000000',
-        filter: (node) => {
-          // Filter out the UI toolbars and cursor elements
-          if ((node as HTMLElement).classList?.contains('export-exclude')) return false
-          return true
-        }
-      })
-      download(dataUrl, 'moodboard-export.png')
-    } catch (err) {
-      console.error('Failed to export canvas', err)
-      toast.error('Failed to export canvas')
-    } finally {
-      setIsExporting(false)
-    }
+  const handleMount = useCallback((editorInstance: Editor) => {
+    setEditor(editorInstance)
   }, [])
 
-  // Add a photo from the gallery onto the canvas
+  // Add a photo from the gallery onto the canvas using our custom shape
   const addPhotoToCanvas = useCallback((photo: Photo) => {
+    if (!editor) return
+
     try {
-      const id = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const shapeId = createShapeId()
+      const camera = editor.getCamera()
+      const viewportCenter = editor.getViewportScreenCenter()
+
+      // Place the image near the center of the current viewport
+      const x = (viewportCenter.x - camera.x) / camera.z - 150
+      const y = (viewportCenter.y - camera.y) / camera.z - 150
+
+      const assetId = AssetRecordType.createId()
       
-      // Place it in the center-ish area 
-      // (a robust solution would project screen center using InfiniteCanvas state, but (0,0) is fine for now)
-      updateItem({
-        id,
-        photoId: photo.id,
-        x: Math.random() * 200,
-        y: Math.random() * 200,
-        w: 300,
-        h: 300,
-        zIndex: Object.keys(items).length + 1
+      // 1. Create native asset with encrypted reference
+      editor.createAssets([{
+        id: assetId,
+        type: 'image',
+        typeName: 'asset',
+        props: {
+          w: 300,
+          h: 300,
+          name: photo.filename,
+          isAnimated: false,
+          mimeType: photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+          src: `encrypted-photo://${photo.id}`
+        },
+        meta: {}
+      }])
+
+      // 2. Create standard image shape
+      editor.createShape({
+        id: shapeId,
+        type: 'image',
+        x,
+        y,
+        props: {
+          w: 300,
+          h: 300,
+          assetId
+        },
       })
 
       toast.success(`Added "${photo.filename}" to canvas`)
@@ -79,88 +127,29 @@ export function MoodboardCanvas({ eventId, userId, userName, photos, onPhotoDoub
       console.error('Failed to add photo to canvas:', err)
       toast.error('Failed to add photo')
     }
-  }, [updateItem, items])
+  }, [editor])
 
   return (
-    <div ref={canvasContainerRef} className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
-      
-      <InfiniteCanvas
-        items={items}
-        cursors={cursors}
-        updateItem={updateItem}
-        deleteItem={deleteItem}
-        updateCursor={updateCursor}
-        isLoading={isLoading}
-        onPhotoDoubleClick={(photoId) => {
-          const photo = photos.find(p => p.id === photoId)
-          if (photo && onPhotoDoubleClick) {
-            onPhotoDoubleClick(photo)
-          }
-        }}
-        isDrawingMode={isDrawingMode}
-      />
+    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.08] bg-[#0a0a0a]" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+      {/* tldraw Canvas */}
+      {storeWithStatus.status === 'loading' ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-zinc-600" />
+        </div>
+      ) : storeWithStatus.status === 'error' ? (
+        <div className="w-full h-full flex items-center justify-center text-red-500">
+          <p className="text-sm">Failed to load canvas data</p>
+        </div>
+      ) : (
+        <Tldraw
+          store={storeWithStatus.store}
+          onMount={handleMount}
+          forceMobile={false}
+        />
+      )}
 
       {/* Floating toolbar */}
-      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2 export-exclude">
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-medium hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-xl disabled:opacity-50"
-        >
-          {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-          Export PNG
-        </button>
-        <div className="flex bg-[#18181b]/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-xl mr-2">
-          <button
-            onClick={() => setIsDrawingMode(!isDrawingMode)}
-            className={`px-3 py-2 flex items-center justify-center transition-colors ${isDrawingMode ? 'bg-blue-500 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-            title="Toggle Draw Mode"
-          >
-            <Pencil size={18} />
-          </button>
-        </div>
-        
-        <div className="flex bg-[#18181b]/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-xl mr-2">
-          {['🔥', '❤️', '💯', '✨'].map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => {
-                updateItem({
-                  id: `emoji-${Date.now()}`,
-                  type: 'emoji',
-                  text: emoji,
-                  x: 150 + Math.random() * 200,
-                  y: 150 + Math.random() * 200,
-                  w: 100,
-                  h: 100,
-                  zIndex: Object.keys(items).length + 1
-                })
-              }}
-              className="px-3 py-2 text-xl hover:bg-white/10 transition-colors"
-              title={`Drop ${emoji}`}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => {
-            updateItem({
-              id: `sticky-${Date.now()}`,
-              type: 'sticky',
-              color: ['yellow', 'blue', 'pink', 'green'][Math.floor(Math.random() * 4)],
-              text: '',
-              x: 100 + Math.random() * 100,
-              y: 100 + Math.random() * 100,
-              w: 200,
-              h: 200,
-              zIndex: Object.keys(items).length + 1
-            })
-          }}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b]/90 backdrop-blur-xl border border-white/10 text-sm font-medium text-white hover:bg-[#27272a] transition-all shadow-xl"
-        >
-          📝 Add Note
-        </button>
+      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">
         <button
           onClick={() => setShowPhotoDrawer(!showPhotoDrawer)}
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#18181b]/90 backdrop-blur-xl border border-white/10 text-sm font-medium text-white hover:bg-[#27272a] transition-all shadow-xl"

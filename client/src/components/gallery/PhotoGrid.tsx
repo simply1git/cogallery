@@ -137,22 +137,19 @@ export function PhotoGrid({
         height={windowSize[1]}
         offset={containerRef.current?.offsetTop ?? 0}
         overscanBy={2}
-        itemKey={(data, index) => data?.id ?? `fallback-${index}`}
-        render={({ data, index }) => {
-          if (!data) return null
-          return (
-            <PhotoCard
-              photo={data}
-              isActiveTransition={activePhotoId === data.id}
-              onClick={() => onPhotoClick?.(data, index)}
-              onDelete={() => onPhotoDelete?.(data)}
-              canDelete={canDelete?.(data) ?? false}
-              selectable={selectedIds !== undefined}
-              selected={selectedIds?.has(data.id)}
-              onSelect={() => onToggleSelect?.(data.id)}
-            />
-          )
-        }}
+        itemKey={(data) => data.id}
+        render={({ data, index }) => (
+          <PhotoCard
+            photo={data}
+            isActiveTransition={activePhotoId === data.id}
+            onClick={() => onPhotoClick?.(data, index)}
+            onDelete={() => onPhotoDelete?.(data)}
+            canDelete={canDelete?.(data) ?? false}
+            selectable={selectedIds !== undefined}
+            selected={selectedIds?.has(data.id)}
+            onSelect={() => onToggleSelect?.(data.id)}
+          />
+        )}
       />
     </div>
   )

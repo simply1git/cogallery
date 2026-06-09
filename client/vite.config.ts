@@ -63,7 +63,8 @@ export default defineConfig({
           'vendor': ['react', 'react-dom', 'react-router-dom'],
           'supabase': ['@supabase/supabase-js'],
           'ui': ['framer-motion', 'sonner', 'lucide-react'],
-          'gallery': ['masonic', 'photoswipe']
+          'gallery': ['masonic', 'photoswipe'],
+          'canvas': ['tldraw'],
         }
       }
     }

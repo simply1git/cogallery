@@ -562,9 +562,7 @@ export function EventDetailPage() {
             <MoodboardCanvas
               eventId={eventId!}
               userId={user!.id}
-              userName={(user as any)!.user_metadata?.display_name || user!.email?.split('@')[0] || 'Anon'}
               photos={photos}
-              onPhotoDoubleClick={(photo) => setSelectedPhoto(photo)}
             />
           </Suspense>
         </div>
