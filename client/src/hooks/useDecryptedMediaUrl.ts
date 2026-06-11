@@ -6,6 +6,21 @@ import { decryptBuffer, decryptString } from '@/services/cryptoService';
 // Module-level cache to prevent re-decrypting the same photo if unmounted/remounted in the virtual grid
 const urlCache = new Map<string, string>();
 
+function setCachedUrl(key: string, url: string) {
+  urlCache.set(key, url);
+  // Prevent infinite memory leak of Blob ObjectURLs
+  if (urlCache.size > 100) {
+    const oldestKey = urlCache.keys().next().value;
+    if (oldestKey) {
+      const oldestUrl = urlCache.get(oldestKey);
+      if (oldestUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(oldestUrl);
+      }
+      urlCache.delete(oldestKey);
+    }
+  }
+}
+
 // Inflight request deduplication — prevents the same photo from being fetched N times
 // when Masonic unmounts/remounts cards rapidly during scroll
 const inflightRequests = new Map<string, Promise<string>>();
@@ -56,7 +71,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       if (!preferFullRes && photo.thumbnailBase64) {
         // If it's a plain data URL (unencrypted or legacy), use it instantly
         if (photo.thumbnailBase64?.startsWith('data:image/')) {
-          urlCache.set(cacheKey, photo.thumbnailBase64);
+          setCachedUrl(cacheKey, photo.thumbnailBase64);
           if (isActive) setUrl(photo.thumbnailBase64);
           return;
         }
@@ -73,7 +88,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
 
           try {
             const decThumb = await thumbPromise;
-            urlCache.set(cacheKey, decThumb);
+            setCachedUrl(cacheKey, decThumb);
             if (isActive && photoIdRef.current === photo.id) setUrl(decThumb);
           } catch (e) {
             console.error('Failed to decrypt thumbnail', e);
@@ -96,7 +111,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
 
         try {
           const secureUrl = await fetchPromise;
-          urlCache.set(cacheKey, secureUrl);
+          setCachedUrl(cacheKey, secureUrl);
           if (isActive && photoIdRef.current === photo.id) {
             setUrl(secureUrl);
           }
@@ -134,7 +149,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
 
       try {
         const blobUrl = await fetchPromise;
-        urlCache.set(cacheKey, blobUrl);
+        setCachedUrl(cacheKey, blobUrl);
         if (isActive && photoIdRef.current === photo.id) {
           setUrl(blobUrl);
         }
