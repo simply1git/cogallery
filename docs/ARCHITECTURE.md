@@ -34,14 +34,6 @@ USER DEVICES (Web/Mobile)
 │  - Automatic backups                    │
 │  - Global distribution                  │
 └─────────────────────────────────────────┘
-        ↓
-┌─────────────────────────────────────────┐
-│      ARCHIVE LAYER                      │
-│  GitHub Pages + Actions                 │
-│  - Permanent backup                     │
-│  - Static galleries                     │
-│  - Public/private hosting               │
-└─────────────────────────────────────────┘
 ```
 
 ---
@@ -68,8 +60,7 @@ App.tsx
 │   └── SettingsPage
 └── AuthLayout
     ├── LoginForm
-    ├── SignupForm
-    └── GuestEntry
+    └── SignupForm
 ```
 
 ### State Management (Zustand)
@@ -269,21 +260,6 @@ useEffect(() => {
 
 ### User Flow
 
-**Guest Mode (No Auth):**
-```
-User opens app
-    ↓
-Click "Join as Guest"
-    ↓
-Anonymous user created in Supabase
-    ↓
-JWT token stored in localStorage
-    ↓
-Can upload photos (until 1hr inactivity)
-    ↓
-Can't access archived events later
-```
-
 **Email Registration:**
 ```
 User clicks "Sign Up"
@@ -310,68 +286,11 @@ GitHub Authorization Code
 Exchange for Supabase JWT
     ↓
 Create/link user
-    ↓
-Access GitHub for auto-archive
 ```
 
 ---
 
-## Archive Architecture (GitHub)
 
-### Workflow: Event → GitHub Pages
-
-**Trigger:** User clicks "Archive to GitHub"
-
-```
-1. Frontend calls API: POST /api/events/{id}/archive-to-github
-   ↓
-2. Backend (serverless function):
-   - Validates event ownership
-   - Generates unique repo name: trip-{eventId}-{date}
-   - Creates GitHub repo via API
-   - Downloads all photos from S3
-   - Generates static HTML gallery
-   - Uploads to GitHub repo
-   - Enables GitHub Pages
-   ↓
-3. GitHub Actions workflow:
-   - Triggered on upload
-   - Runs image optimization (optional)
-   - Generates analytics
-   - Creates index.html
-   ↓
-4. Result: https://{username}.github.io/trip-2026-05-bali/
-   ↓
-5. Link shared with group
-   ↓
-6. Everyone can access forever ($0 cost)
-```
-
-**GitHub Actions Workflow (YAML):**
-```yaml
-name: Generate Gallery
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: npm install
-      - name: Generate static gallery
-        run: npm run generate-gallery
-      - name: Deploy to Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-```
-
----
 
 ## Scalability Considerations
 
@@ -509,7 +428,6 @@ USING (user_id = auth.uid());
 - Supabase: Automatic request logging
 - Frontend: Sentry for error tracking
 - CloudFront: Access logs to S3
-- GitHub: Action logs for archive failures
 
 ---
 

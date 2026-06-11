@@ -69,28 +69,7 @@ Content-Type: application/json
 
 ---
 
-### Guest Login
 
-```http
-POST /auth/guest
-Content-Type: application/json
-
-{
-  "displayName": "Anonymous User"
-}
-```
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "access_token": "eyJhbGc...",
-  "displayName": "Anonymous User",
-  "isGuest": true
-}
-```
-
----
 
 ### Get Current User
 
@@ -540,53 +519,7 @@ Authorization: Bearer {access_token}
 
 ---
 
-## Archive Endpoints
 
-### Trigger GitHub Archive
-
-```http
-POST /events/:eventId/archive-to-github
-Authorization: Bearer {access_token}
-Content-Type: application/json
-
-{
-  "isPublic": true
-}
-```
-
-**Response:**
-```json
-{
-  "status": "processing",
-  "jobId": "archive-job-uuid",
-  "estimatedTime": "30 seconds",
-  "message": "Archive started. You'll receive email when complete."
-}
-```
-
----
-
-### Get Archive Status
-
-```http
-GET /events/:eventId/archive-status
-Authorization: Bearer {access_token}
-```
-
-**Response:**
-```json
-{
-  "status": "completed",
-  "jobId": "archive-job-uuid",
-  "completedAt": "2026-05-27T10:35:00Z",
-  "repoUrl": "https://github.com/username/trip-abc123-2026-05-27",
-  "pagesUrl": "https://username.github.io/trip-abc123-2026-05-27",
-  "photoCount": 342,
-  "totalSize": "2.1 GB"
-}
-```
-
----
 
 ## Error Responses
 
@@ -642,7 +575,6 @@ Authorization: Bearer {access_token}
 
 ## Rate Limiting
 
-- **Guest users:** 10 requests/minute
 - **Authenticated users:** 100 requests/minute
 - **Upload:** 10 files/minute per user
 
@@ -661,7 +593,6 @@ Events:
 - event.deleted
 - photo.uploaded
 - photo.deleted
-- event.archived
 ```
 
 ---

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import {
-  ArrowRight, Zap, Lock, Share2, Archive, Image, Video,
+  ArrowRight, Zap, Lock, Share2, Image, Video,
   Users, Star, ChevronDown, Infinity
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -26,13 +26,6 @@ const FEATURES = [
     bg: 'bg-blue-500/10 border-blue-500/20',
     title: 'Instant Sharing',
     desc: 'Share with a link or QR code. No signup needed for guests to upload.',
-  },
-  {
-    icon: Archive,
-    color: 'from-violet-400 to-purple-400',
-    bg: 'bg-violet-500/10 border-violet-500/20',
-    title: 'Permanent Archive',
-    desc: 'Automatic GitHub backup. Your memories preserved at zero cost, forever.',
   },
   {
     icon: Infinity,

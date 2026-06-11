@@ -1,6 +1,6 @@
 # CoGallery
 
-**Collaborative photo platform for trips, events, and memories — with permanent GitHub archival.**
+**Collaborative photo platform for trips, events, and memories.**
 
 ![Status](https://img.shields.io/badge/status-production--ready-green)
 ![Version](https://img.shields.io/badge/version-1.0-blue)
@@ -10,7 +10,7 @@
 
 ## What is CoGallery?
 
-CoGallery is a real-time photo sharing platform for group trips and events. It preserves original-quality media with collaborative tools: moodboards, E2E vault rooms, P2P seeding, and free permanent archives on GitHub Pages.
+CoGallery is a real-time photo sharing platform for group trips and events. It preserves original-quality media with collaborative tools: moodboards, E2E vault rooms, and P2P seeding.
 
 ```
 Room (trip) → Event (day/theme) → Photos & Videos
@@ -25,11 +25,9 @@ Room (trip) → Event (day/theme) → Photos & Videos
 | Real-time gallery with masonry grid | ✅ |
 | Offline upload queue (IndexedDB) | ✅ |
 | Chunked + TUS resumable uploads | ✅ |
-| Guest access via invite links | ✅ |
 | E2E encrypted vault rooms | ✅ |
 | Collaborative moodboard (tldraw + Yjs) | ✅ |
 | WebRTC P2P file seeding | ✅ |
-| GitHub Pages permanent archive | ✅ |
 | Admin developer dashboard | ✅ |
 | PWA installable | ✅ |
 
@@ -44,7 +42,6 @@ Room (trip) → Event (day/theme) → Photos & Videos
 | Database & Auth | Supabase (PostgreSQL + Realtime) |
 | Storage | Cloudflare R2 + Oracle streaming backend |
 | Canvas | tldraw v5 + Yjs CRDT |
-| Archive | GitHub API + GitHub Pages |
 | P2P | WebRTC + Supabase signaling |
 
 ---
@@ -62,13 +59,13 @@ cp .env.example .env
 npm run dev
 ```
 
-### 2. Oracle backend (uploads + archive)
+### 2. Oracle backend (uploads)
 
 ```bash
 cd ../bot
 npm install
 cp .env.example .env
-# Fill in SUPABASE_SERVICE_ROLE_KEY, GITHUB_TOKEN, GITHUB_USERNAME
+# Fill in SUPABASE_SERVICE_ROLE_KEY
 npm start
 ```
 
@@ -80,9 +77,6 @@ Run in Supabase SQL Editor (in order):
 2. `FIX_EVENT_ACCESS_AND_PROFILES.sql`
 3. `CANVAS_STATES_MIGRATION.sql`
 4. `FIX_CANVAS_RLS.sql` — **required** for canvas security
-5. `ADD_EVENT_ARCHIVE_COLUMNS.sql`
-
-Enable **Anonymous sign-ins** in Supabase Auth for guest mode.
 
 ---
 
@@ -91,25 +85,14 @@ Enable **Anonymous sign-ins** in Supabase Auth for guest mode.
 ```
 Browser (React PWA)
     ├── Supabase (auth, DB, realtime)
-    ├── Oracle Bot (upload, stream, archive, telemetry)
+    ├── Oracle Bot (upload, stream, telemetry)
     ├── Cloudflare R2 (object storage)
     └── WebRTC P2P (file seeding between peers)
 ```
 
 ---
 
-## GitHub Archive
 
-Event owners can archive any event to GitHub Pages from **Event Settings → Archive to GitHub**.
-
-The archive includes:
-- Static HTML gallery (searchable, mobile-friendly)
-- `manifest.json` with photo metadata
-- Links to original full-resolution photos on your storage backend
-
-Requires `GITHUB_TOKEN` and `GITHUB_USERNAME` on the Oracle bot.
-
----
 
 ## Development
 
