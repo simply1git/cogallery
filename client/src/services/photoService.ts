@@ -234,14 +234,22 @@ export async function uploadPhotoWithMetadata(
   }
 }
 
-export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'>): Promise<string> {
+export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & Partial<Pick<Photo, 'filename'>>): Promise<string> {
   let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   
-  if (photo.s3Url && photo.s3Url.startsWith('http')) {
+  if (photo.s3Url && photo.s3Url.startsWith('http') && !photo.s3Url.includes('pending')) {
     try {
       const urlObj = new URL(photo.s3Url);
       targetNodeUrl = urlObj.origin;
     } catch {}
+  }
+
+  let s3Key = photo.s3Key;
+  if (!s3Key || s3Key.includes('pending')) {
+    if (photo.s3Url?.includes('.r2.dev/')) s3Key = photo.s3Url.split('.r2.dev/')[1];
+    else if (photo.s3Url?.includes('/stream/')) s3Key = photo.s3Url.split('/stream/')[1];
+    else if (photo.s3Url?.includes('/proxy/')) s3Key = photo.s3Url.split('/proxy/')[1];
+    else s3Key = photo.filename || '';
   }
 
   const { data: sessionData } = await supabase.auth.getSession()

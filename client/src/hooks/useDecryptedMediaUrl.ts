@@ -62,7 +62,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
     async function loadMedia() {
       const s3Key = photo.s3Key || photo.filename;
 
-      if (s3Key?.startsWith('pending')) {
+      if (s3Key?.includes('pending') || photo.s3Url?.includes('pending')) {
         if (isActive) setUrl('');
         return;
       }
