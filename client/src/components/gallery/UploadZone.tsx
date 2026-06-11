@@ -46,84 +46,89 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
           Authorization: `Bearer ${token}`
         },
         chunkSize: 5 * 1024 * 1024,
+        limit: 3,
       })
       
       // Pre-processor to handle WebAssembly compression and Stream Encryption BEFORE upload starts
-      uppyInstance.addPreProcessor((fileIDs) => {
-        return Promise.all(fileIDs.map(async (fileID) => {
-          const file = uppyInstance!.getFile(fileID)
-          let payloadToUpload: File | Blob = file.data as File;
-          const mediaType = getMediaType(payloadToUpload as File) || 'image'
-          
-          // Generate a real thumbnail via Web Worker BEFORE encryption
-          let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-          try {
-            const generatedThumb = await generateThumbnail(payloadToUpload as File);
-            if (generatedThumb) thumbBase64 = generatedThumb;
-          } catch (err) {
-            console.error('Thumbnail generation failed:', err);
-          }
-          
-          // PHASE 3: Streaming Encryption
-          const { currentRoom, vaultKeys } = useRoomStore.getState()
-          const isVault = currentRoom?.isVault
-          const vaultKey = vaultKeys[roomId]
+      uppyInstance.addPreProcessor(async (fileIDs) => {
+        const concurrencyLimit = 3;
+        for (let i = 0; i < fileIDs.length; i += concurrencyLimit) {
+          const batch = fileIDs.slice(i, i + concurrencyLimit);
+          await Promise.all(batch.map(async (fileID) => {
+            const file = uppyInstance!.getFile(fileID)
+            let payloadToUpload: File | Blob = file.data as File;
+            const mediaType = getMediaType(payloadToUpload as File) || 'image'
+            
+            // Generate a real thumbnail via Web Worker BEFORE encryption
+            let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+            try {
+              const generatedThumb = await generateThumbnail(payloadToUpload as File);
+              if (generatedThumb) thumbBase64 = generatedThumb;
+            } catch (err) {
+              console.error('Thumbnail generation failed:', err);
+            }
+            
+            // PHASE 3: Streaming Encryption
+            const { currentRoom, vaultKeys } = useRoomStore.getState()
+            const isVault = currentRoom?.isVault
+            const vaultKey = vaultKeys[roomId]
 
-          if (isVault) {
-             if (!vaultKey) throw new Error('Vault key missing. Cannot encrypt.');
-             const { stream } = await encryptStream(payloadToUpload, vaultKey);
-             
-             const reader = stream.getReader();
-             const chunks: Uint8Array[] = [];
-             for (;;) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-             }
-             payloadToUpload = new Blob(chunks as any[], { type: 'application/octet-stream' });
-             
-             // Update Uppy file with encrypted payload
-             uppyInstance!.setFileState(fileID, {
-               data: payloadToUpload,
-               size: payloadToUpload.size,
-             });
-             
-             // Encrypt the thumbnail using the Vault Key
-             if (thumbBase64.length > 50) {
-               try {
-                 thumbBase64 = await encryptString(thumbBase64, vaultKey);
-               } catch (e) {
-                 console.error('Thumbnail encryption failed:', e);
+            if (isVault) {
+               if (!vaultKey) throw new Error('Vault key missing. Cannot encrypt.');
+               const { stream } = await encryptStream(payloadToUpload, vaultKey);
+               
+               const reader = stream.getReader();
+               const chunks: Uint8Array[] = [];
+               for (;;) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  chunks.push(value);
                }
-             }
-          }
-          
-          // Insert row to get ID
-          const tempKey = 'pending_' + crypto.randomUUID()
-          const { data: row, error } = await supabase.from('photos').insert({
-            event_id: eventId,
-            room_id: roomId,
-            uploader_id: userId,
-            filename: file.name,
-            media_type: mediaType,
-            thumbnail_base64: thumbBase64,
-            s3_url: 'https://pending',
-            s3_key: tempKey,
-            is_encrypted: isVault || false,
-          }).select('*').single()
-          
-          if (error || !row) {
-            console.error('Failed to init DB row:', error)
-            throw new Error('Database error')
-          }
-          
-          // Pass the photoId directly to TUS metadata
-          uppyInstance!.setFileMeta(fileID, { 
-            photoId: row.id,
-            filename: file.name,
-            filetype: file.type || 'application/octet-stream'
-          })
-        }))
+               payloadToUpload = new Blob(chunks as any[], { type: 'application/octet-stream' });
+               
+               // Update Uppy file with encrypted payload
+               uppyInstance!.setFileState(fileID, {
+                 data: payloadToUpload,
+                 size: payloadToUpload.size,
+               });
+               
+               // Encrypt the thumbnail using the Vault Key
+               if (thumbBase64.length > 50) {
+                 try {
+                   thumbBase64 = await encryptString(thumbBase64, vaultKey);
+                 } catch (e) {
+                   console.error('Thumbnail encryption failed:', e);
+                 }
+               }
+            }
+            
+            // Insert row to get ID
+            const tempKey = 'pending_' + crypto.randomUUID()
+            const { data: row, error } = await supabase.from('photos').insert({
+              event_id: eventId,
+              room_id: roomId,
+              uploader_id: userId,
+              filename: file.name,
+              media_type: mediaType,
+              thumbnail_base64: thumbBase64,
+              s3_url: 'https://pending',
+              s3_key: tempKey,
+              is_encrypted: isVault || false,
+            }).select('*').single()
+            
+            if (error || !row) {
+              console.error('Failed to init DB row:', error)
+              throw new Error('Database error')
+            }
+            
+            // Pass the photoId directly to TUS metadata
+            uppyInstance!.setFileMeta(fileID, { 
+              photoId: row.id,
+              filename: file.name,
+              filetype: file.type || 'application/octet-stream'
+            })
+          }))
+        }
       })
 
       // Finish hook to update the final URL in the database

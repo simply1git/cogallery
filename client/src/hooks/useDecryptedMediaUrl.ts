@@ -19,7 +19,17 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
   const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track the photo id to avoid stale closures
+  // Track the photo id to immediately sync state on change (avoiding 1-frame stale flashes)
+  const prevPhotoIdRef = useRef(photo?.id);
+  
+  if (photo?.id !== prevPhotoIdRef.current) {
+    prevPhotoIdRef.current = photo?.id;
+    setUrl(cachedUrl || '');
+    setIsDecrypting(false);
+    setError(null);
+  }
+
+  // Also need a ref to prevent race conditions in async operations
   const photoIdRef = useRef(photo?.id);
   photoIdRef.current = photo?.id;
 
