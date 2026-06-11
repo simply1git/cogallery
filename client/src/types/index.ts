@@ -14,7 +14,6 @@ export interface User {
   email?: string
   displayName: string
   avatarUrl?: string
-  isGuest: boolean
   createdAt: string
 }
 
@@ -59,8 +58,6 @@ export interface RoomWithMembers extends Room {
 // EVENT TYPES (Within rooms: days, occasions, themes)
 // ============================================================================
 
-export type ArchiveStatus = 'none' | 'processing' | 'completed' | 'failed'
-
 export interface Event {
   id: string
   roomId: string
@@ -71,10 +68,6 @@ export interface Event {
   thumbnailUrl?: string
   createdAt: string
   updatedAt: string
-  githubRepoUrl?: string
-  githubPagesUrl?: string
-  archiveStatus?: ArchiveStatus
-  archivedAt?: string
 }
 
 export interface EventMember {

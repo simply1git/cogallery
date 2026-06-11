@@ -71,7 +71,6 @@ export async function getCurrentUser(): Promise<User | null> {
       email: user.email,
       displayName: user.user_metadata?.displayName || user.email?.split('@')[0] || 'User',
       avatarUrl: user.user_metadata?.avatarUrl,
-      isGuest: false,
       createdAt: user.created_at,
     }
   } catch (error) {

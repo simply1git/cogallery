@@ -14,10 +14,6 @@ function mapEvent(data: any): Event {
     thumbnailUrl: data.thumbnail_url,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    githubRepoUrl: data.github_repo_url,
-    githubPagesUrl: data.github_pages_url,
-    archiveStatus: data.archive_status ?? 'none',
-    archivedAt: data.archived_at,
   }
 }
 

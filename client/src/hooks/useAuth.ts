@@ -18,7 +18,6 @@ export function useAuth() {
             email: session.user.email,
             displayName: session.user.user_metadata?.displayName || session.user.email?.split('@')[0] || 'User',
             avatarUrl: session.user.user_metadata?.avatarUrl,
-            isGuest: false,
             createdAt: session.user.created_at,
           }
           setUser(userData)
@@ -42,7 +41,6 @@ export function useAuth() {
           email: session.user.email,
           displayName: session.user.user_metadata?.displayName || session.user.email?.split('@')[0] || 'User',
           avatarUrl: session.user.user_metadata?.avatarUrl,
-          isGuest: false,
           createdAt: session.user.created_at,
         }
         setUser(userData)

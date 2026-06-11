@@ -10,12 +10,12 @@ import { registerSW } from 'virtual:pwa-register'
 // Register Service Worker for PWA and Background Sync
 const updateSW = registerSW({
   onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      updateSW(true)
-    }
+    // Silently update the service worker — the next navigation will use the new version.
+    // This avoids a jarring confirm() dialog that blocks the main thread.
+    updateSW(true)
   },
   onOfflineReady() {
-    console.log('App ready to work offline')
+    // App is cached and ready to work offline
   },
 })
 
