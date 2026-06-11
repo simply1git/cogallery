@@ -50,11 +50,11 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
       })
       
       // Pre-processor to handle WebAssembly compression and Stream Encryption BEFORE upload starts
-      uppyInstance.addPreProcessor(async (fileIDs) => {
+      uppyInstance.addPreProcessor(async (fileIDs: string[]) => {
         const concurrencyLimit = 3;
         for (let i = 0; i < fileIDs.length; i += concurrencyLimit) {
           const batch = fileIDs.slice(i, i + concurrencyLimit);
-          await Promise.all(batch.map(async (fileID) => {
+          await Promise.all(batch.map(async (fileID: string) => {
             const file = uppyInstance!.getFile(fileID)
             let payloadToUpload: File | Blob = file.data as File;
             const mediaType = getMediaType(payloadToUpload as File) || 'image'
@@ -132,7 +132,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
       })
 
       // Finish hook to update the final URL in the database
-      uppyInstance.on('upload-success', async (file) => {
+      uppyInstance.on('upload-success', async (file: any) => {
         if (!file) return;
         
         // Wait 1.5 seconds to allow the backend TUS server POST_FINISH 
