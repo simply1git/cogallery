@@ -138,6 +138,15 @@ export function PhotoGrid({
   )
   const resizeObserver = useResizeObserver(positioner)
 
+  const contextValue = useMemo(() => ({
+    onPhotoClick,
+    onPhotoDelete,
+    canDelete,
+    selectedIds,
+    onToggleSelect,
+    activePhotoId
+  }), [onPhotoClick, onPhotoDelete, canDelete, selectedIds, onToggleSelect, activePhotoId])
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -155,15 +164,6 @@ export function PhotoGrid({
   if (photos.length === 0) {
     return null
   }
-
-  const contextValue = useMemo(() => ({
-    onPhotoClick,
-    onPhotoDelete,
-    canDelete,
-    selectedIds,
-    onToggleSelect,
-    activePhotoId
-  }), [onPhotoClick, onPhotoDelete, canDelete, selectedIds, onToggleSelect, activePhotoId])
 
   return (
     <PhotoGridContext.Provider value={contextValue}>
