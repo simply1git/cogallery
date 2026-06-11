@@ -689,14 +689,7 @@ export function EventDetailPage() {
           isLoading={isLoadingPhotos}
           activePhotoId={selectedPhoto?.id}
           onPhotoClick={(photo) => {
-            if (document.startViewTransition) {
-              const transition = document.startViewTransition(() => setSelectedPhoto(photo))
-              transition.ready.catch(() => {})
-              transition.finished.catch(() => {})
-              transition.updateCallbackDone.catch(() => {})
-            } else {
-              setSelectedPhoto(photo)
-            }
+            setSelectedPhoto(photo)
           }}
           onPhotoDelete={handleDeletePhoto}
           canDelete={canDeletePhoto}

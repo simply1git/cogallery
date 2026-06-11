@@ -19,7 +19,6 @@ const MasonicCard = memo(function MasonicCard({ data, index }: { data: Photo; in
   return (
     <PhotoCard
       photo={data}
-      isActiveTransition={ctx.activePhotoId === data.id}
       onClick={() => ctx.onPhotoClick?.(data, index)}
       onDelete={() => ctx.onPhotoDelete?.(data)}
       canDelete={ctx.canDelete?.(data) ?? false}

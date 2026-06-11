@@ -19,7 +19,6 @@ interface PhotoCardProps {
   selectable?: boolean
   selected?: boolean
   onSelect?: () => void
-  isActiveTransition?: boolean
 }
 
 export const PhotoCard = memo(function PhotoCard({
@@ -32,7 +31,6 @@ export const PhotoCard = memo(function PhotoCard({
   selectable = false,
   selected = false,
   onSelect,
-  isActiveTransition = false,
 }: PhotoCardProps) {
   const [imgError, setImgError] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -112,7 +110,6 @@ export const PhotoCard = memo(function PhotoCard({
             className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] ${
               isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-0'
             }`}
-            style={{ viewTransitionName: isActiveTransition ? undefined : `photo-${photo.id}` }}
             loading="lazy"
             decoding="async"
             onLoad={() => setIsLoaded(true)}
