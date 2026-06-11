@@ -388,7 +388,14 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
       // Clean up the .info file
       await fs.unlink(`${tusFilePath}.info`).catch(() => {});
       
-      console.log(`[Upload] TUS upload completed and moved for photoId: ${photoId}`);
+      const nodeUrl = process.env.NODE_URL || process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const finalUrl = `${nodeUrl}/stream/${photoId}`;
+      if (supabaseAdmin) {
+        await supabaseAdmin.from('photos').update({ s3_url: finalUrl }).eq('id', photoId);
+        console.log(`[Upload] TUS upload completed and Sharded Storage Node URL stamped: ${finalUrl}`);
+      } else {
+        console.log(`[Upload] TUS upload completed for photoId: ${photoId} (No Supabase Admin - URL not stamped)`);
+      }
     }
   } catch (error) {
     console.error(`[Upload] Error in TUS finish handler:`, error);

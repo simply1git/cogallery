@@ -141,13 +141,11 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         
         const photoId = file.meta.photoId as string;
         
-        // The backend moved the file to cache directory.
         // The actual streaming URL uses the photoId directly!
-        const finalUrl = `${backendUrl}/stream/${photoId}`
+        // s3_url is explicitly set by the Backend Node (Sharded Storage Architecture)
         
         await supabase.from('photos').update({
-          s3_key: photoId, // We use photoId as the streaming key
-          s3_url: finalUrl
+          s3_key: photoId // We use photoId as the streaming key
         }).eq('id', photoId)
 
         // Fetch final photo to notify UI
