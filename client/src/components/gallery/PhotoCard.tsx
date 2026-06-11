@@ -6,7 +6,6 @@ import { getSecureMediaUrl } from '@/services/photoService'
 import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
-import { motion } from 'framer-motion'
 import { useHaptics } from '@/hooks/useHaptics'
 
 interface PhotoCardProps {
@@ -76,12 +75,8 @@ export const PhotoCard = memo(function PhotoCard({
   }
 
   return (
-    <motion.div
-      layout
-      whileTap={{ scale: 0.95 }}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-colors duration-200 ${
+    <div
+      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-all duration-300 hover:scale-[0.98] ${
         selected ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)]' : 'border-white/[0.06] hover:border-white/[0.15]'
       }`}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}
@@ -110,8 +105,6 @@ export const PhotoCard = memo(function PhotoCard({
             className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] ${
               isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-0'
             }`}
-            loading="lazy"
-            decoding="async"
             onLoad={() => setIsLoaded(true)}
             onError={() => setImgError(true)}
           />
@@ -192,6 +185,6 @@ export const PhotoCard = memo(function PhotoCard({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 })

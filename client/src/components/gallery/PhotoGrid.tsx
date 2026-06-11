@@ -3,7 +3,7 @@ import { PhotoCard } from './PhotoCard'
 import type { Photo } from '@/types'
 import { MasonryScroller, usePositioner, useResizeObserver } from 'masonic'
 import { useHaptics } from '@/hooks/useHaptics'
-import { createContext, useContext, memo } from 'react'
+import { createContext, useContext, memo, useMemo, useDeferredValue, startTransition } from 'react'
 
 const PhotoGridContext = createContext<{
   onPhotoClick?: (photo: Photo, index: number) => void
@@ -101,7 +101,9 @@ export function PhotoGrid({
           haptic('light')
         }
         
-        setColWidth(newWidth)
+        startTransition(() => {
+          setColWidth(newWidth)
+        })
       }
     }
 
@@ -123,14 +125,16 @@ export function PhotoGrid({
     }
   }, [colWidth, haptic])
 
+  const deferredColWidth = useDeferredValue(colWidth)
+
   const windowSize = useWindowSize()
   const positioner = usePositioner(
     { 
       width: containerRef.current?.offsetWidth ?? windowSize[0], 
-      columnWidth: colWidth, 
+      columnWidth: deferredColWidth, 
       columnGutter: 16 
     },
-    [photos.length, colWidth, windowSize[0]]
+    [photos.length, deferredColWidth, windowSize[0]]
   )
   const resizeObserver = useResizeObserver(positioner)
 
@@ -152,9 +156,18 @@ export function PhotoGrid({
     return null
   }
 
+  const contextValue = useMemo(() => ({
+    onPhotoClick,
+    onPhotoDelete,
+    canDelete,
+    selectedIds,
+    onToggleSelect,
+    activePhotoId
+  }), [onPhotoClick, onPhotoDelete, canDelete, selectedIds, onToggleSelect, activePhotoId])
+
   return (
-    <PhotoGridContext.Provider value={{ onPhotoClick, onPhotoDelete, canDelete, selectedIds, onToggleSelect, activePhotoId }}>
-      <div ref={containerRef} className="w-full touch-pan-y">
+    <PhotoGridContext.Provider value={contextValue}>
+      <div ref={containerRef} className="w-full touch-pan-y" style={{ willChange: 'transform' }}>
         <MasonryScroller
           positioner={positioner}
           resizeObserver={resizeObserver}
@@ -162,7 +175,7 @@ export function PhotoGrid({
           items={photos}
           height={windowSize[1]}
           offset={containerRef.current?.offsetTop ?? 0}
-          overscanBy={2}
+          overscanBy={3}
           itemKey={(data) => data.id}
           render={MasonicCard}
         />
