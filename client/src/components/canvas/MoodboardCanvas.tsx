@@ -43,7 +43,7 @@ const customAssetStore: TLAssetStore = {
         if (assetUrlCache.has(photoId)) {
           return assetUrlCache.get(photoId)
         }
-        const url = await getSecureMediaUrl(photo.s3Key || photo.filename)
+        const url = await getSecureMediaUrl(photo)
         assetUrlCache.set(photoId, url)
         return url
       }
@@ -56,7 +56,7 @@ const customAssetStore: TLAssetStore = {
         return assetUrlCache.get(photoId)
       }
 
-      const secureUrl = await getSecureMediaUrl(photo.s3Key || photo.filename)
+      const secureUrl = await getSecureMediaUrl(photo)
       const response = await fetch(secureUrl)
       if (!response.ok) throw new Error('Failed to fetch')
       

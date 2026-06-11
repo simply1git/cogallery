@@ -105,7 +105,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       if (!photo.isEncrypted) {
         let fetchPromise = inflightRequests.get(cacheKey);
         if (!fetchPromise) {
-          fetchPromise = getSecureMediaUrl(s3Key);
+          fetchPromise = getSecureMediaUrl(photo);
           inflightRequests.set(cacheKey, fetchPromise);
         }
 
@@ -134,7 +134,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       let fetchPromise = inflightRequests.get(cacheKey);
       if (!fetchPromise) {
         fetchPromise = (async () => {
-          const secureUrl = await getSecureMediaUrl(s3Key);
+          const secureUrl = await getSecureMediaUrl(photo);
           const response = await fetch(secureUrl);
           if (!response.ok) throw new Error('Failed to fetch encrypted media');
 

@@ -123,12 +123,21 @@ export async function uploadPhotoWithMetadata(
     photoId = photoRow.id
     onProgress?.(20)
 
-    // Oracle Backend URL for generating the presigned URL
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-    
     // 1. Determine Upload Strategy
     const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
     
+    // Fetch a live node URL from the Distributed Control Plane (DB)
+    let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+    try {
+      const { data: activeNode, error: nodeError } = await supabase.rpc('get_active_node')
+      if (!nodeError && activeNode) {
+        targetNodeUrl = activeNode
+        console.log(`[P2P Routing] Uploading directly to active node: ${targetNodeUrl}`)
+      }
+    } catch (e) {
+      console.warn("Could not fetch active node, falling back to default.", e)
+    }
+
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData.session?.access_token
 
@@ -147,7 +156,7 @@ export async function uploadPhotoWithMetadata(
       
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${backendUrl}/upload/chunk`, true);
+        xhr.open('POST', `${targetNodeUrl}/upload/chunk`, true);
         
         xhr.setRequestHeader('x-photo-id', r2Key);
         xhr.setRequestHeader('x-chunk-index', chunkIndex.toString());
@@ -196,7 +205,7 @@ export async function uploadPhotoWithMetadata(
     // Finalize URL in database
     // Note: Since we are using zero-trust streams, the s3_url stored here is just a placeholder.
     // The actual viewing URL is generated dynamically via getSecureMediaUrl.
-    const finalUrl = `${backendUrl}/stream/${r2Key}`
+    const finalUrl = `${targetNodeUrl}/stream/${r2Key}`
     const { error: updateError } = await supabase.from('photos').update({
       s3_key: r2Key,
       s3_url: finalUrl
@@ -225,25 +234,33 @@ export async function uploadPhotoWithMetadata(
   }
 }
 
-export async function getSecureMediaUrl(s3Key: string): Promise<string> {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'>): Promise<string> {
+  let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+  
+  if (photo.s3Url && photo.s3Url.startsWith('http')) {
+    try {
+      const urlObj = new URL(photo.s3Url);
+      targetNodeUrl = urlObj.origin;
+    } catch {}
+  }
+
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
 
   if (!token) throw new Error('Not authenticated')
 
-  const res = await fetch(`${backendUrl}/media/presign-get`, {
+  const res = await fetch(`${targetNodeUrl}/media/presign-get`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ key: s3Key })
+    body: JSON.stringify({ key: photo.s3Key })
   });
 
   if (!res.ok) throw new Error('Failed to get secure media url');
   const { url } = await res.json();
-  return url.startsWith('http') ? url : `${backendUrl}${url}`;
+  return url.startsWith('http') ? url : `${targetNodeUrl}${url}`;
 }
 
 // ─── Photo Listing ───────────────────────────────────────────────────────────

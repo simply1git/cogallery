@@ -59,15 +59,7 @@ export const PhotoCard = memo(function PhotoCard({
         return
       }
 
-      let s3Key = photo.s3Key;
-      if (!s3Key) {
-        if (photo.s3Url?.includes('.r2.dev/')) s3Key = photo.s3Url.split('.r2.dev/')[1];
-        else if (photo.s3Url?.includes('/stream/')) s3Key = photo.s3Url.split('/stream/')[1];
-        else if (photo.s3Url?.includes('/proxy/')) s3Key = photo.s3Url.split('/proxy/')[1];
-        else s3Key = photo.filename;
-      }
-      
-      const secureUrl = await getSecureMediaUrl(s3Key)
+      const secureUrl = await getSecureMediaUrl(photo)
       downloadFile(secureUrl, photo.filename)
     } catch (err) {
       toast.error('Failed to generate download link')
