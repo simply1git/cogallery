@@ -55,6 +55,12 @@ export interface SupabaseTableCounts {
   reactions: number;
 }
 
+export interface StorageNode {
+  id: string;
+  node_url: string;
+  last_heartbeat: string;
+}
+
 export async function getAllUsers(): Promise<AdminUser[]> {
   const { data, error } = await supabase.rpc('admin_get_all_users')
   if (error) throw error
@@ -124,8 +130,21 @@ export async function checkIsAdmin(): Promise<boolean> {
   return data
 }
 
-export async function getTelemetry(): Promise<TelemetryData> {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+export async function getActiveStorageNodes(): Promise<StorageNode[]> {
+  // Get nodes that have heartbeat within the last 5 minutes
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const { data, error } = await supabase
+    .from('storage_nodes')
+    .select('*')
+    .gte('last_heartbeat', fiveMinutesAgo)
+    .order('node_url', { ascending: true })
+  
+  if (error) throw error
+  return data as StorageNode[]
+}
+
+export async function getTelemetry(nodeUrl?: string): Promise<TelemetryData> {
+  const backendUrl = nodeUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
 
@@ -138,12 +157,27 @@ export async function getTelemetry(): Promise<TelemetryData> {
     }
   });
 
-  if (!res.ok) throw new Error('Failed to fetch telemetry');
+  if (!res.ok) throw new Error(`Failed to fetch telemetry from ${backendUrl}`);
   return res.json();
 }
 
-export async function clearTempStorage(): Promise<{ deletedCount: number }> {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+export async function updateServerCode(nodeUrl: string): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${nodeUrl}/developer/server/update`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}))
+    throw new Error(err.error || `Failed to update code on ${nodeUrl}`)
+  }
+}
+
+export async function clearTempStorage(nodeUrl?: string): Promise<{ deletedCount: number }> {
+  const backendUrl = nodeUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
   if (!token) throw new Error('Not authenticated')
@@ -159,8 +193,8 @@ export async function clearTempStorage(): Promise<{ deletedCount: number }> {
   return res.json()
 }
 
-export async function clearOldStorage(): Promise<{ deletedCount: number }> {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+export async function clearOldStorage(nodeUrl?: string): Promise<{ deletedCount: number }> {
+  const backendUrl = nodeUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
   if (!token) throw new Error('Not authenticated')
@@ -176,8 +210,8 @@ export async function clearOldStorage(): Promise<{ deletedCount: number }> {
   return res.json()
 }
 
-export async function wipeAllStorage(): Promise<void> {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+export async function wipeAllStorage(nodeUrl?: string): Promise<void> {
+  const backendUrl = nodeUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
   if (!token) throw new Error('Not authenticated')

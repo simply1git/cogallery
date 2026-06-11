@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2, Database, Network } from 'lucide-react'
-import { AdminUser, TelemetryData, GlobalConfig, SupabaseDbSize, SupabaseTableCounts, getAllUsers, getTelemetry, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, downloadBackup, getSupabaseDbSize, getSupabaseTableCounts } from '@/services/adminService'
+import { AdminUser, TelemetryData, GlobalConfig, SupabaseDbSize, SupabaseTableCounts, StorageNode, getAllUsers, getTelemetry, getActiveStorageNodes, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, getSupabaseDbSize, getSupabaseTableCounts, updateServerCode } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -9,8 +9,9 @@ import { QuotaModal } from '@/components/modals/QuotaModal'
 export function DeveloperDashboard() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
-  const [telemetry, setTelemetry] = useState<TelemetryData | null>(null)
-  const [telemetryError, setTelemetryError] = useState<string | null>(null)
+  const [activeNodes, setActiveNodes] = useState<StorageNode[]>([])
+  const [telemetry, setTelemetry] = useState<Record<string, TelemetryData>>({})
+  const [telemetryError, setTelemetryError] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<'users' | 'server' | 'supabase' | 'settings'>('server')
   const [dbSize, setDbSize] = useState<SupabaseDbSize | null>(null)
   const [tableCounts, setTableCounts] = useState<SupabaseTableCounts | null>(null)
@@ -44,14 +45,28 @@ export function DeveloperDashboard() {
 
   useEffect(() => {
     if (!isAdmin || activeTab !== 'server') return
-    // Poll telemetry every 5 seconds
-    const fetchTelemetry = () => {
-      getTelemetry()
-        .then(data => { setTelemetry(data); setTelemetryError(null); })
-        .catch(err => setTelemetryError(err.message))
+    
+    const fetchClusterState = async () => {
+      try {
+        const nodes = await getActiveStorageNodes()
+        setActiveNodes(nodes)
+        
+        // Fetch telemetry for all nodes in parallel
+        nodes.forEach(node => {
+          getTelemetry(node.node_url)
+            .then(data => { 
+              setTelemetry(prev => ({ ...prev, [node.id]: data }))
+              setTelemetryError(prev => ({ ...prev, [node.id]: '' }))
+            })
+            .catch(err => setTelemetryError(prev => ({ ...prev, [node.id]: err.message })))
+        })
+      } catch (err) {
+        console.error("Failed to fetch active nodes", err)
+      }
     }
-    fetchTelemetry()
-    const interval = setInterval(fetchTelemetry, 5000)
+    
+    fetchClusterState()
+    const interval = setInterval(fetchClusterState, 5000)
     return () => clearInterval(interval)
   }, [isAdmin, activeTab])
 
@@ -99,43 +114,61 @@ export function DeveloperDashboard() {
     finally { setIsProcessing(false) }
   }
 
-  const handleBackup = async () => {
+  const handleSyncAllCode = async () => {
+    if (!confirm('Are you sure you want to pull the latest code and restart PM2 across the ENTIRE cluster?')) return
     try {
       setIsProcessing(true)
-      toast.loading('Preparing backup zip...', { id: 'backup' })
-      await downloadBackup()
-      toast.success('Backup downloaded successfully.', { id: 'backup' })
-    } catch(e: any) { toast.error(e.message, { id: 'backup' }) }
-    finally { setIsProcessing(false) }
+      toast.loading('Deploying to cluster...', { id: 'ota' })
+      let successCount = 0
+      for (const node of activeNodes) {
+        try {
+          await updateServerCode(node.node_url)
+          successCount++
+        } catch (e: any) {
+          toast.error(`Failed on ${node.node_url}: ${e.message}`, { id: 'ota' })
+        }
+      }
+      toast.success(`Successfully deployed to ${successCount} nodes.`, { id: 'ota' })
+    } finally { setIsProcessing(false) }
   }
 
   const handleClearTemp = async () => {
-    if (!confirm('Clear all abandoned temporary chunks?')) return
+    if (!confirm('Clear all abandoned temporary chunks across ALL nodes?')) return
     try {
       setIsProcessing(true)
-      const res = await clearTempStorage()
-      toast.success(`Cleared ${res.deletedCount} temporary chunk folders.`)
+      let totalDeleted = 0
+      for (const node of activeNodes) {
+        const res = await clearTempStorage(node.node_url).catch(() => ({ deletedCount: 0 }))
+        totalDeleted += res.deletedCount
+      }
+      toast.success(`Cleared ${totalDeleted} temporary chunk folders across the cluster.`)
     } catch(e: any) { toast.error(e.message) }
     finally { setIsProcessing(false) }
   }
 
   const handleClearOld = async () => {
-    if (!confirm('WARNING: This will delete files older than 30 days from the main storage folder. Continue?')) return
+    if (!confirm('WARNING: This will delete files older than 30 days from ALL nodes. Continue?')) return
     try {
       setIsProcessing(true)
-      const res = await clearOldStorage()
-      toast.success(`Deleted ${res.deletedCount} old files.`)
+      let totalDeleted = 0
+      for (const node of activeNodes) {
+        const res = await clearOldStorage(node.node_url).catch(() => ({ deletedCount: 0 }))
+        totalDeleted += res.deletedCount
+      }
+      toast.success(`Deleted ${totalDeleted} old files across the cluster.`)
     } catch(e: any) { toast.error(e.message) }
     finally { setIsProcessing(false) }
   }
 
   const handleWipeAll = async () => {
-    if (!confirm('DANGER! This will delete ALL files in the main storage and temp folder! Are you sure?')) return
+    if (!confirm('DANGER! This will delete ALL files in the main storage and temp folder on ALL nodes! Are you sure?')) return
     if (!confirm('Are you ABSOLUTELY sure? This cannot be undone!')) return
     try {
       setIsProcessing(true)
-      await wipeAllStorage()
-      toast.success('All storage files have been wiped.')
+      for (const node of activeNodes) {
+        await wipeAllStorage(node.node_url).catch(e => toast.error(`Wipe failed on ${node.node_url}: ${e.message}`))
+      }
+      toast.success('All storage files have been wiped across the cluster.')
     } catch(e: any) { toast.error(e.message) }
     finally { setIsProcessing(false) }
   }
@@ -218,142 +251,122 @@ export function DeveloperDashboard() {
         {/* Content */}
         {activeTab === 'server' && (
           <div className="space-y-6 animate-fade-in">
-            {telemetryError ? (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-4">
-                <Server className="text-red-400" size={48} />
-                <div>
-                  <h3 className="text-lg font-bold text-red-400">Failed to Connect to Oracle Server</h3>
-                  <p className="text-white/50 text-sm mt-1">{telemetryError}</p>
-                </div>
-                <p className="text-xs text-white/30">Ensure the PM2 backend process is running on your VPS.</p>
+            <div className="flex items-center justify-between bg-[#111] border border-white/10 rounded-xl p-6 shadow-xl">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2"><Network className="text-blue-400"/> Cluster Control Plane</h3>
+                <p className="text-sm text-white/50 mt-1">Found {activeNodes.length} active Oracle storage nodes</p>
               </div>
-            ) : !telemetry ? (
-              <div className="flex flex-col items-center justify-center py-24 space-y-4">
+              <div className="flex gap-2">
+                <button onClick={handleSyncAllCode} disabled={isProcessing || activeNodes.length === 0} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors flex items-center gap-2">
+                  <Terminal size={16}/> Deploy to Cluster
+                </button>
+              </div>
+            </div>
+
+            {activeNodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 space-y-4 bg-[#111] border border-white/10 rounded-xl">
                 <Activity className="animate-spin text-white/30" size={32} />
-                <p className="text-white/50 text-sm">Connecting to Oracle Server...</p>
+                <p className="text-white/50 text-sm">Discovering Oracle Nodes via Supabase Heartbeat...</p>
+                <p className="text-xs text-white/30 max-w-md text-center">Ensure your backend has `NODE_URL` in its `.env` and PM2 is running. It takes up to 60 seconds to register.</p>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-2">
-                <div className="flex items-center gap-2 text-white/50 mb-4"><Activity size={16}/> CPU Load (1m, 5m, 15m)</div>
-                <div className="text-2xl font-mono">{telemetry.cpuLoad[0].toFixed(2)}</div>
-                <div className="text-xs text-white/30">{telemetry.cpuLoad[1].toFixed(2)} / {telemetry.cpuLoad[2].toFixed(2)}</div>
-              </div>
-              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-2">
-                <div className="flex items-center gap-2 text-white/50 mb-4"><HardDrive size={16}/> Memory Usage</div>
-                <div className="text-2xl font-mono">{telemetry.memory.percent}%</div>
-                <div className="text-xs text-white/30">{formatFileSize(telemetry.memory.used)} / {formatFileSize(telemetry.memory.total)}</div>
-                <div className="w-full bg-black/50 rounded-full h-1 mt-2">
-                  <div className="bg-blue-500 h-1 rounded-full transition-all" style={{ width: `${telemetry.memory.percent}%` }} />
-                </div>
-              </div>
-              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-2">
-                <div className="flex items-center gap-2 text-white/50 mb-4"><Server size={16}/> Server Uptime</div>
-                <div className="text-2xl font-mono">{Math.floor(telemetry.uptime / 3600)}h {Math.floor((telemetry.uptime % 3600) / 60)}m</div>
-                <div className="text-xs text-[#00ff00]">PM2 Process Online</div>
-              </div>
-            </div>
+              <div className="space-y-8">
+                {activeNodes.map((node, index) => {
+                  const nodeUrl = node.node_url;
+                  const error = telemetryError[node.id];
+                  const data = telemetry[node.id];
+                  return (
+                    <div key={node.id} className="bg-black border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                      {/* Node Header */}
+                      <div className="bg-white/5 px-6 py-4 border-b border-white/10 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${data ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`} />
+                          <div>
+                            <div className="font-mono text-sm text-white font-bold">NODE {index + 1}</div>
+                            <div className="text-xs text-white/50">{nodeUrl}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-white/30">Last Heartbeat: {new Date(node.last_heartbeat).toLocaleTimeString()}</div>
+                      </div>
 
-            {/* Storage Management */}
-            {telemetry.storage && telemetry.disk && (
-              <div className="bg-[#111] border border-white/10 rounded-xl p-6 space-y-4 shadow-xl">
-                <div className="flex items-center gap-2 text-white/80 font-semibold mb-4 border-b border-white/10 pb-4">
-                  <HardDrive size={18} className="text-blue-400" />
-                  Disk & Local Storage Management
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Stats */}
-                  <div className="space-y-4">
-                    <div className="bg-black/40 rounded-lg p-4 space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-white/50">Disk Used:</span>
-                        <span className="font-mono">{formatFileSize(telemetry.disk.used)} / {formatFileSize(telemetry.disk.total)}</span>
-                      </div>
-                      
-                      {/* Advanced Disk Breakdown */}
-                      <div className="w-full h-3 rounded-full flex overflow-hidden bg-black/50 border border-white/10">
-                        {/* OS / System Data (Calculated as Total Used - App Data) */}
-                        <div 
-                          className="bg-gray-500/80 transition-all group relative cursor-help" 
-                          style={{ width: `${Math.max(0, ((telemetry.disk.used - telemetry.storage.main.size - telemetry.storage.temp.size) / telemetry.disk.total) * 100)}%` }}
-                          title="OS & System Software"
-                        />
-                        {/* Platform Developer Data */}
-                        <div 
-                          className="bg-blue-500 transition-all group relative cursor-help" 
-                          style={{ width: `${Math.max(0, ((telemetry.storage.main.size + telemetry.storage.temp.size) / telemetry.disk.total) * 100)}%` }}
-                          title="Platform Developer Data"
-                        />
-                      </div>
-                      
-                      {/* Legend */}
-                      <div className="flex justify-between text-xs pt-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gray-500/80" />
-                          <span className="text-white/50">OS & System <span className="font-mono">({formatFileSize(telemetry.disk.used - telemetry.storage.main.size - telemetry.storage.temp.size)})</span></span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          <span className="text-white/50">App Data <span className="font-mono">({formatFileSize(telemetry.storage.main.size + telemetry.storage.temp.size)})</span></span>
-                        </div>
+                      <div className="p-6">
+                        {error ? (
+                          <div className="text-center py-8">
+                            <Server className="text-red-400 mx-auto mb-2" size={32} />
+                            <p className="text-red-400 text-sm">Connection Failed: {error}</p>
+                            <p className="text-white/30 text-xs mt-2">Ensure the Node URL is publicly accessible and not blocked by CORS.</p>
+                          </div>
+                        ) : !data ? (
+                           <div className="flex justify-center py-8"><Activity className="animate-spin text-white/30" /></div>
+                        ) : (
+                          <div className="space-y-6">
+                            {/* Stats */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-[#111] border border-white/10 rounded-xl p-4">
+                                <div className="text-white/50 text-xs mb-2">CPU Load</div>
+                                <div className="text-xl font-mono">{data.cpuLoad[0].toFixed(2)}</div>
+                              </div>
+                              <div className="bg-[#111] border border-white/10 rounded-xl p-4">
+                                <div className="text-white/50 text-xs mb-2">Memory ({data.memory.percent}%)</div>
+                                <div className="text-xl font-mono">{formatFileSize(data.memory.used)} <span className="text-xs text-white/30">/ {formatFileSize(data.memory.total)}</span></div>
+                              </div>
+                              <div className="bg-[#111] border border-white/10 rounded-xl p-4">
+                                <div className="text-white/50 text-xs mb-2">Disk Used ({data.disk?.percent}%)</div>
+                                <div className="text-xl font-mono">{formatFileSize(data.disk?.used || 0)} <span className="text-xs text-white/30">/ {formatFileSize(data.disk?.total || 0)}</span></div>
+                              </div>
+                            </div>
+                            
+                            {/* Storage Details */}
+                            {data.storage && (
+                              <div className="flex gap-4">
+                                <div className="flex-1 bg-[#111] border border-white/10 rounded-xl p-4 flex justify-between items-center">
+                                  <div>
+                                    <div className="text-xs text-blue-400">Main Storage</div>
+                                    <div className="font-mono">{formatFileSize(data.storage.main.size)}</div>
+                                  </div>
+                                  <div className="text-xs text-white/30">{data.storage.main.count} files</div>
+                                </div>
+                                <div className="flex-1 bg-[#111] border border-white/10 rounded-xl p-4 flex justify-between items-center">
+                                  <div>
+                                    <div className="text-xs text-blue-400">Temp Chunks</div>
+                                    <div className="font-mono">{formatFileSize(data.storage.temp.size)}</div>
+                                  </div>
+                                  <div className="text-xs text-white/30">{data.storage.temp.count} folders</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Terminal logs preview */}
+                            <div className="bg-black/50 border border-white/5 rounded-lg overflow-hidden">
+                              <div className="px-3 py-1 bg-white/5 text-[10px] text-white/30 font-mono">PM2 LOGS</div>
+                              <pre className="p-3 text-[10px] text-[#00ff00] h-24 overflow-y-auto font-mono whitespace-pre-wrap">{data.logs}</pre>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-black/40 rounded-lg p-4 border border-blue-500/20">
-                        <div className="text-xs text-blue-400 mb-1 flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"/> Main Storage
-                        </div>
-                        <div className="text-lg font-mono text-white">{formatFileSize(telemetry.storage.main.size)}</div>
-                        <div className="text-xs text-white/30">{telemetry.storage.main.count} files</div>
-                      </div>
-                      <div className="bg-black/40 rounded-lg p-4 border border-blue-500/20">
-                        <div className="text-xs text-blue-400 mb-1 flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"/> Temp / Chunks
-                        </div>
-                        <div className="text-lg font-mono text-white">{formatFileSize(telemetry.storage.temp.size)}</div>
-                        <div className="text-xs text-white/30">{telemetry.storage.temp.count} folders</div>
-                      </div>
-                    </div>
-                  </div>
+                  )
+                })}
 
-                  {/* Actions */}
-                  <div className="grid grid-cols-1 gap-3">
-                    <button onClick={handleBackup} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-lg text-sm transition-colors text-left disabled:opacity-50">
-                      <div className="flex items-center gap-2"><Shield size={16}/> Download Full Backup (ZIP)</div>
+                {/* Cluster Actions */}
+                <div className="bg-[#111] border border-white/10 rounded-xl p-6 shadow-xl mt-8">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2"><HardDrive size={18} className="text-blue-400"/> Cluster-Wide Storage Actions</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onClick={handleClearTemp} disabled={isProcessing} className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-left transition-colors">
+                      <div className="flex items-center gap-2 text-white mb-1"><Trash2 size={16}/> Clear Abandoned Chunks</div>
+                      <div className="text-xs text-white/40">Frees temp space on all active nodes</div>
                     </button>
-                    
-                    <button onClick={handleClearTemp} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-left disabled:opacity-50">
-                      <div className="flex items-center gap-2"><Trash2 size={16}/> Clear Abandoned Chunks</div>
-                      <span className="text-xs text-white/30">Frees temp space</span>
+                    <button onClick={handleClearOld} disabled={isProcessing} className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-left transition-colors">
+                      <div className="flex items-center gap-2 text-white mb-1"><Trash2 size={16}/> Clear &gt;30 Days Old</div>
+                      <div className="text-xs text-white/40">Deletes old files on all active nodes</div>
                     </button>
-                    
-                    <button onClick={handleClearOld} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors text-left disabled:opacity-50">
-                      <div className="flex items-center gap-2"><Trash2 size={16}/> Clear &gt;30 Days Old Files</div>
-                      <span className="text-xs text-white/30">Deletes old files</span>
-                    </button>
-
-                    <button onClick={handleWipeAll} disabled={isProcessing} className="w-full flex items-center justify-between p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-sm transition-colors text-left mt-2 disabled:opacity-50">
-                      <div className="flex items-center gap-2"><Ban size={16}/> Wipe All Storage</div>
-                      <span className="text-xs text-red-400/50">DANGER</span>
+                    <button onClick={handleWipeAll} disabled={isProcessing} className="p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-left transition-colors">
+                      <div className="flex items-center gap-2 text-red-400 mb-1"><Ban size={16}/> Wipe All Storage</div>
+                      <div className="text-xs text-red-400/50">DANGER: Wipes all media across cluster</div>
                     </button>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Terminal */}
-            <div className="bg-black border border-white/10 rounded-xl overflow-hidden shadow-2xl">
-              <div className="bg-white/5 px-4 py-2 border-b border-white/10 flex items-center gap-2 text-xs font-mono text-white/50">
-                <Terminal size={14} /> Live PM2 Logs (cogallery-seedbox)
-              </div>
-              <pre className="p-4 text-xs font-mono text-[#00ff00] h-[400px] overflow-y-auto whitespace-pre-wrap">
-                {telemetry.logs}
-              </pre>
-            </div>
-              </>
             )}
           </div>
         )}

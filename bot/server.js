@@ -78,6 +78,32 @@ setInterval(async () => {
   }
 }, 24 * 60 * 60 * 1000);
 
+// --- CLUSTER HEARTBEAT ---
+// Register this specific node in Supabase so the Developer Dashboard can discover it
+const startHeartbeat = () => {
+  const nodeUrl = process.env.NODE_URL;
+  if (!nodeUrl) {
+    console.warn('[Cluster] NODE_URL not set. This node will not be discoverable by the Developer Dashboard.');
+    return;
+  }
+  
+  const ping = async () => {
+    try {
+      await supabaseAdmin.from('storage_nodes').upsert(
+        { node_url: nodeUrl, last_heartbeat: new Date().toISOString() },
+        { onConflict: 'node_url' }
+      );
+    } catch (e) {
+      console.error('[Cluster] Heartbeat failed:', e.message);
+    }
+  };
+  
+  ping(); // Initial ping
+  setInterval(ping, 60000); // Ping every 60 seconds
+};
+startHeartbeat();
+
+
 // --- ZERO-TRUST SECURITY MIDDLEWARE ---
 // Keep JWT_SECRET for internal short-lived streaming tokens
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
@@ -194,8 +220,30 @@ app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
   }
 });
 
-// --- STORAGE MANAGEMENT ENDPOINTS ---
+// --- CLUSTER / OTA MANAGEMENT ENDPOINTS ---
 
+app.post('/developer/server/update', authenticateJWT, async (req, res) => {
+  try {
+    // 1. Acknowledge the request immediately so the frontend knows it succeeded before the process dies
+    res.json({ success: true, message: 'Syncing code and restarting...' });
+    
+    // 2. Run the update in the background after a short delay to let the response flush
+    setTimeout(async () => {
+      console.log('[OTA] Running git pull and npm install...');
+      try {
+        await execPromise('git pull origin main && npm install');
+        console.log('[OTA] Update successful. Restarting PM2...');
+        await execPromise('pm2 restart all');
+      } catch (e) {
+        console.error('[OTA] Update failed:', e);
+      }
+    }, 2000);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- STORAGE MANAGEMENT ENDPOINTS ---
 app.post('/developer/storage/clear-temp', authenticateJWT, async (req, res) => {
   try {
     const dirs = await fs.readdir(TEMP_DIR);
