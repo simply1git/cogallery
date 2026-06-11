@@ -19,7 +19,6 @@ import dotenv from 'dotenv';
 import jwksClient from 'jwks-rsa';
 import { Server, EVENTS } from '@tus/server';
 import { FileStore } from '@tus/file-store';
-import { archiveEventToGitHub } from './lib/githubArchive.js';
 
 dotenv.config();
 
