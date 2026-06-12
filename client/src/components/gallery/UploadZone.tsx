@@ -36,7 +36,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
 
       uppyInstance = new Uppy({
         id: 'cogallery-uploader',
-        autoProceed: true,
+        autoProceed: false,
         restrictions: {
           maxFileSize: null, // Unlimited!
         }
@@ -102,30 +102,17 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                }
             }
             
-            // Insert row to get ID
-            const tempKey = 'pending_' + crypto.randomUUID()
-            const { data: row, error } = await supabase.from('photos').insert({
-              event_id: eventId,
-              room_id: roomId,
-              uploader_id: userId,
-              filename: file.name,
-              media_type: mediaType,
-              thumbnail_base64: thumbBase64,
-              s3_url: 'https://pending',
-              s3_key: tempKey,
-              is_encrypted: isVault || false,
-            }).select('*').single()
+            // We no longer insert to DB here. We generate an ID and pass it along.
+            const photoId = crypto.randomUUID()
             
-            if (error || !row) {
-              console.error('Failed to init DB row:', error)
-              throw new Error('Database error')
-            }
-            
-            // Pass the photoId directly to TUS metadata
+            // Pass metadata to TUS and for the success handler
             uppyInstance!.setFileMeta(fileID, { 
-              photoId: row.id,
+              photoId: photoId,
               filename: file.name,
-              filetype: file.type || 'application/octet-stream'
+              filetype: file.type || 'application/octet-stream',
+              mediaType: mediaType,
+              thumbBase64: thumbBase64,
+              isEncrypted: isVault || false
             })
           }))
         }
@@ -139,17 +126,27 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         // handler to complete the fs.rename of the uploaded file.
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        const photoId = file.meta.photoId as string;
+        const { photoId, filename, mediaType, thumbBase64, isEncrypted } = file.meta;
+        const finalUrl = `${tusEndpoint.replace('/upload/tus', '')}/stream/${photoId}`;
         
-        // The actual streaming URL uses the photoId directly!
-        // s3_url is explicitly set by the Backend Node (Sharded Storage Architecture)
-        
-        await supabase.from('photos').update({
-          s3_key: photoId // We use photoId as the streaming key
-        }).eq('id', photoId)
+        const { data: finalPhoto, error } = await supabase.from('photos').insert({
+          id: photoId,
+          event_id: eventId,
+          room_id: roomId,
+          uploader_id: userId,
+          filename: filename,
+          media_type: mediaType,
+          thumbnail_base64: thumbBase64,
+          s3_url: finalUrl,
+          s3_key: photoId,
+          is_encrypted: isEncrypted,
+        }).select('*').single()
 
-        // Fetch final photo to notify UI
-        const { data: finalPhoto } = await supabase.from('photos').select('*').eq('id', photoId).single();
+        if (error) {
+          console.error('Failed to insert final photo:', error)
+          return
+        }
+
         if (finalPhoto && onUploadSuccess) {
           onUploadSuccess(finalPhoto as any);
         }
