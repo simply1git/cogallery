@@ -76,32 +76,6 @@ export interface PhotoUploadOptions {
   onProgress?: (progress: number) => void
 }
 
-let cachedActiveNode: string | null = null;
-let nodePromise: Promise<string> | null = null;
-
-export async function getActiveNodeUrl(): Promise<string> {
-  if (cachedActiveNode) return cachedActiveNode;
-  if (nodePromise) return nodePromise;
-  
-  nodePromise = (async () => {
-    try {
-      const { data: activeNode, error } = await supabase.rpc('get_active_node')
-      if (!error && activeNode) {
-        cachedActiveNode = activeNode;
-        // Cache for 5 minutes
-        setTimeout(() => { cachedActiveNode = null }, 5 * 60 * 1000);
-        return activeNode;
-      }
-    } catch (e) {}
-    // Ultimate fallback if DB completely fails
-    return import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-  })();
-  
-  const result = await nodePromise;
-  nodePromise = null;
-  return result;
-}
-
 export async function uploadPhotoWithMetadata(
   opts: PhotoUploadOptions
 ): Promise<{ data: Photo | null; error: string | null }> {
@@ -153,8 +127,16 @@ export async function uploadPhotoWithMetadata(
     const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
     
     // Fetch a live node URL from the Distributed Control Plane (DB)
-    const targetNodeUrl = await getActiveNodeUrl();
-    console.log(`[P2P Routing] Uploading directly to active node: ${targetNodeUrl}`)
+    let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+    try {
+      const { data: activeNode, error: nodeError } = await supabase.rpc('get_active_node')
+      if (!nodeError && activeNode) {
+        targetNodeUrl = activeNode
+        console.log(`[P2P Routing] Uploading directly to active node: ${targetNodeUrl}`)
+      }
+    } catch (e) {
+      console.warn("Could not fetch active node, falling back to default.", e)
+    }
 
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData.session?.access_token
@@ -253,17 +235,17 @@ export async function uploadPhotoWithMetadata(
 }
 
 export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & Partial<Pick<Photo, 'filename'>>): Promise<string> {
-  let targetNodeUrl: string | null = null;
+  let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   
   if (photo.s3Url && photo.s3Url.startsWith('http') && !photo.s3Url.includes('pending')) {
-    try {
-      const urlObj = new URL(photo.s3Url);
-      targetNodeUrl = urlObj.origin;
-    } catch {}
-  }
-
-  if (!targetNodeUrl) {
-    targetNodeUrl = await getActiveNodeUrl();
+    // ONLY extract origin if it's one of our backend nodes.
+    // Legacy Cloudflare R2 urls (.r2.dev) do not host the Node API, so we must fall back to the central backend.
+    if (!photo.s3Url.includes('.r2.dev')) {
+      try {
+        const urlObj = new URL(photo.s3Url);
+        targetNodeUrl = urlObj.origin;
+      } catch {}
+    }
   }
 
   let s3Key = photo.s3Key;
