@@ -94,31 +94,51 @@ export async function updateGlobalConfig(maintenance: boolean, signups: boolean,
 }
 
 export async function nukeUser(userId: string): Promise<{ deletedFiles: number }> {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
 
   if (!token) throw new Error('Not authenticated')
 
-  const res = await fetch(`${backendUrl}/developer/nuke-user`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ 
-      target_uid: userId,
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-      supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY
-    })
-  })
+  // 1. Fetch all photos for this user
+  const { data: photos, error: fetchError } = await supabase
+    .from('photos')
+    .select('filename')
+    .eq('uploader_id', userId);
 
-  if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error || 'Failed to nuke user')
+  if (fetchError) throw fetchError;
+  const filenames = photos?.map(p => p.filename) || [];
+
+  let totalDeletedFiles = 0;
+
+  // 2. Broadcast delete to all active storage nodes
+  if (filenames.length > 0) {
+    const activeNodes = await getActiveStorageNodes();
+    
+    await Promise.all(activeNodes.map(async (node) => {
+      try {
+        const res = await fetch(`${node.node_url}/developer/storage/nuke-files`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ filenames })
+        });
+        if (res.ok) {
+          const { deletedFiles } = await res.json();
+          totalDeletedFiles += (deletedFiles || 0);
+        }
+      } catch (e) {
+        console.error(`Failed to nuke files on node ${node.node_url}:`, e);
+      }
+    }));
   }
 
-  return res.json()
+  // 3. Finally, call the RPC to permanently delete the user from the database
+  const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid: userId });
+  if (rpcError) throw rpcError;
+
+  return { deletedFiles: totalDeletedFiles };
 }
 
 export async function checkIsAdmin(): Promise<boolean> {

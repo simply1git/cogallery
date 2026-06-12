@@ -326,49 +326,29 @@ app.get('/developer/storage/backup', authenticateJWT, (req, res) => {
 });
 
 
-app.post('/developer/nuke-user', authenticateJWT, async (req, res) => {
+app.post('/developer/storage/nuke-files', authenticateJWT, async (req, res) => {
   try {
-    const { target_uid, supabaseUrl, supabaseAnonKey } = req.body;
-    const token = req.headers.authorization.split(' ')[1];
-
-    if (!target_uid || !supabaseUrl || !supabaseAnonKey) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    const { filenames } = req.body;
+    if (!filenames || !Array.isArray(filenames)) {
+      return res.status(400).json({ error: 'Missing filenames array' });
     }
 
-    // 1. Init Supabase client with the Admin's JWT token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } }
-    });
-
-    // 2. Fetch all photos for this user (Since we use the admin token, God View RLS allows us to see all photos)
-    const { data: photos, error: fetchError } = await supabase
-      .from('photos')
-      .select('filename')
-      .eq('uploader_id', target_uid);
-
-    if (fetchError) throw fetchError;
-
-    // 3. Batch delete from Local Storage
-    if (photos && photos.length > 0) {
-      for (const p of photos) {
-        try {
-          const dataPath = path.join(CACHE_DIR, `${p.filename}.data`);
-          const metaPath = path.join(CACHE_DIR, `${p.filename}.meta.json`);
-          await fs.unlink(dataPath).catch(() => {});
-          await fs.unlink(metaPath).catch(() => {});
-        } catch (e) {
-          console.error(`Failed to delete local file ${p.filename}:`, e);
-        }
+    let deletedCount = 0;
+    for (const filename of filenames) {
+      try {
+        const dataPath = path.join(CACHE_DIR, `${filename}.data`);
+        const metaPath = path.join(CACHE_DIR, `${filename}.meta.json`);
+        await fs.unlink(dataPath).catch(() => {});
+        await fs.unlink(metaPath).catch(() => {});
+        deletedCount++;
+      } catch (e) {
+        console.error(`Failed to delete local file ${filename}:`, e);
       }
     }
 
-    // 4. Finally, call the RPC to permanently delete the user from the database
-    const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid });
-    if (rpcError) throw rpcError;
-
-    res.json({ success: true, deletedFiles: photos ? photos.length : 0 });
+    res.json({ success: true, deletedFiles: deletedCount });
   } catch (error) {
-    console.error("Nuke user failed:", error);
+    console.error("Nuke files failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
