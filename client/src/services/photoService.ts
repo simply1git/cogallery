@@ -329,7 +329,7 @@ export async function getPhotoDetails(
 ): Promise<PhotoWithReactions | null> {
   try {
     const [photoRes, reactionsRes, commentsRes] = await Promise.all([
-      supabase.from('photos').select('*').eq('id', photoId).single(),
+      supabase.from('photos').select('*').eq('id', photoId).maybeSingle(),
       supabase.from('reactions').select('*').eq('photo_id', photoId).order('created_at'),
       supabase
         .from('comments')
@@ -363,8 +363,13 @@ export async function deletePhotoById(
   _s3Key: string
 ): Promise<{ error: string | null }> {
   try {
-    const { error } = await supabase.from('photos').delete().eq('id', photoId)
+    const { data, error } = await supabase.from('photos').delete().eq('id', photoId).select()
     if (error) throw error
+    if (!data || data.length === 0) throw new Error("Permission denied or photo already deleted")
+
+    // We should also delete the file from the distributed storage cluster here, but 
+    // for now we rely on the nuke-user or cleanup jobs to handle dangling files,
+    // or we can implement an RPC/fetch to the active nodes later.
 
     return { error: null }
   } catch (err: any) {
