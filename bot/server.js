@@ -58,6 +58,69 @@ await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 await fs.mkdir(TEMP_DIR, { recursive: true }).catch(() => {});
 await fs.mkdir(path.join(TEMP_DIR, 'tus'), { recursive: true }).catch(() => {});
 
+// --- AUTOMATED HEALTH MONITORING ---
+async function sendEmailAlert(subject, text) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const toEmail = process.env.ALERT_EMAIL_ADDRESS;
+  if (!apiKey || !toEmail) return;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'CoGallery Alerts <onboarding@resend.dev>',
+        to: [toEmail],
+        subject: `[CoGallery] ${subject}`,
+        html: `<p>${text.replace(/\n/g, '<br>')}</p>`
+      })
+    });
+    if (!res.ok) {
+      console.error('Failed to send email alert:', await res.text());
+    }
+  } catch (err) {
+    console.error('Email alert error:', err);
+  }
+}
+
+let lastAlertTime = 0;
+setInterval(async () => {
+  try {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const ramPercent = (usedMem / totalMem) * 100;
+
+    let diskPercent = 0;
+    try {
+      const stats = await fs.statfs(__dirname);
+      const total = stats.blocks * stats.bsize;
+      const free = stats.bfree * stats.bsize;
+      const used = total - free;
+      diskPercent = (used / total) * 100;
+    } catch (e) {}
+
+    if (diskPercent > 85 || ramPercent > 95) {
+      const now = Date.now();
+      if (now - lastAlertTime > 1000 * 60 * 60) { // Max 1 alert per hour
+        await sendEmailAlert(
+          `CRITICAL: Node Resource Alert on ${os.hostname()}`,
+          `Node ${os.hostname()} is running dangerously low on resources.\n\nDisk Usage: ${diskPercent.toFixed(1)}%\nRAM Usage: ${ramPercent.toFixed(1)}%\n\nPlease connect to the Developer Dashboard to clean up storage or scale up nodes.`
+        );
+        lastAlertTime = now;
+      }
+    }
+  } catch (err) {
+    console.error('Health monitor error', err);
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
+
+// Send startup alert
+sendEmailAlert(`Node Online: ${os.hostname()}`, `A new CoGallery storage node has successfully booted up and is running PM2.`);
+
 // --- DISK JANITOR ---
 // Clean up temp chunks older than 24 hours every day
 setInterval(async () => {

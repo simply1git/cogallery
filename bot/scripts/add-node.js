@@ -13,7 +13,8 @@ const envPath = path.join(__dirname, '../.env');
 if (!fs.existsSync(configPath)) {
   const template = {
     "SSH_COMMAND": "ssh -i C:\\Users\\Hp\\Downloads\\mykey.key ubuntu@123.45.67.89",
-    "NODE_URL": "https://node2.25012004.xyz"
+    "NODE_URL": "https://node2.25012004.xyz",
+    "CLOUDFLARE_TUNNEL_TOKEN": ""
   };
   fs.writeFileSync(configPath, JSON.stringify(template, null, 2));
   console.log('✅ Created node-config.json template in the bot/ folder.');
@@ -21,14 +22,12 @@ if (!fs.existsSync(configPath)) {
   process.exit(0);
 }
 
-// 2. Read configuration
-const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-if (config.SSH_COMMAND.includes('123.45.67.89')) {
-  console.log('❌ You need to update node-config.json with your actual SSH command and NODE_URL.');
-  process.exit(1);
+let configs = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+if (!Array.isArray(configs)) {
+  // Backwards compatibility if it's a single object
+  configs = [configs];
 }
 
-// 3. Read local .env file
 let localEnv = '';
 if (fs.existsSync(envPath)) {
   localEnv = fs.readFileSync(envPath, 'utf-8');
@@ -37,24 +36,32 @@ if (fs.existsSync(envPath)) {
   process.exit(1);
 }
 
-// 4. Inject the new NODE_URL
-localEnv = localEnv.split('\n').filter(line => !line.startsWith('NODE_URL=')).join('\n');
-localEnv += `\nNODE_URL=${config.NODE_URL}\n`;
+for (let i = 0; i < configs.length; i++) {
+  const config = configs[i];
+  
+  // Skip instructions or comments
+  if (!config.SSH_COMMAND || !config.NODE_URL) continue;
+  
+  if (config.SSH_COMMAND.includes('123.45.67.89') || config.SSH_COMMAND.includes('YOUR_NEW_IP_HERE')) {
+    console.log(`⚠️ Skipping node ${config.NODE_URL} because it still has placeholder IP addresses.`);
+    continue;
+  }
 
-// 5. Construct the bash script to execute on the remote server
-const setupScript = `
+  // Inject the new NODE_URL
+  let nodeEnv = localEnv.split('\n').filter(line => !line.startsWith('NODE_URL=')).join('\n');
+  nodeEnv += `\nNODE_URL=${config.NODE_URL}\n`;
+
+  const setupScript = `
 #!/bin/bash
 set -e
 
 echo "🚀 Starting automated node setup for ${config.NODE_URL}..."
 
-# Wait for apt lock to clear
 while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
   echo "Waiting for dpkg lock..."
   sleep 2
 done
 
-# Install Node.js if missing
 if ! command -v node &> /dev/null
 then
   echo "📦 Installing Node.js..."
@@ -62,14 +69,25 @@ then
   sudo apt-get install -y nodejs
 fi
 
-# Install PM2 if missing
 if ! command -v pm2 &> /dev/null
 then
   echo "📦 Installing PM2..."
   sudo npm install -g pm2
 fi
 
-# Clone or Update CoGallery
+if [ -n "${config.CLOUDFLARE_TUNNEL_TOKEN || ''}" ]; then
+  if ! command -v cloudflared &> /dev/null
+  then
+    echo "🛡️ Installing Cloudflare Tunnel..."
+    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    sudo dpkg -i cloudflared.deb
+    rm cloudflared.deb
+  fi
+  echo "🛡️ Securing node with Cloudflare Tunnel..."
+  sudo cloudflared service install ${config.CLOUDFLARE_TUNNEL_TOKEN} || true
+  sudo systemctl start cloudflared || true
+fi
+
 if [ -d "cogallery" ]; then
   echo "🔄 Updating existing CoGallery repo..."
   cd cogallery/bot
@@ -81,13 +99,11 @@ else
   cd cogallery/bot
 fi
 
-# Write .env file
 echo "🔑 Writing environment variables..."
 cat << 'EOF' > .env
-${localEnv}
+${nodeEnv}
 EOF
 
-# Install & Start
 echo "⚙️ Installing dependencies..."
 npm install --production
 
@@ -95,17 +111,21 @@ echo "🚀 Starting PM2..."
 pm2 start ecosystem.config.cjs || pm2 restart cogallery-seedbox
 pm2 save
 
-echo "✅ Node Setup Complete! It will appear in your Developer Dashboard within 60 seconds."
+echo "✅ Node Setup Complete for ${config.NODE_URL}!"
 `;
 
-// 6. Execute over SSH
-console.log(`🔌 Connecting to server via SSH...`);
-try {
-  execSync(`${config.SSH_COMMAND} "bash -s"`, { 
-    input: setupScript,
-    stdio: ['pipe', 'inherit', 'inherit'] 
-  });
-  console.log('🎉 Setup successfully finished!');
-} catch (error) {
-  console.error('❌ SSH Command failed. Please check your connection string and key path.');
+  console.log(`\n======================================================`);
+  console.log(`🔌 [${i+1}/${configs.length}] Deploying to ${config.NODE_URL}...`);
+  console.log(`======================================================`);
+  
+  try {
+    execSync(`${config.SSH_COMMAND} "bash -s"`, { 
+      input: setupScript,
+      stdio: ['pipe', 'inherit', 'inherit'] 
+    });
+    console.log(`🎉 Successfully finished ${config.NODE_URL}!\n`);
+  } catch (error) {
+    console.error(`❌ SSH Command failed for ${config.NODE_URL}. Moving to next...`);
+  }
 }
+
