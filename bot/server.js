@@ -61,7 +61,7 @@ await fs.mkdir(path.join(TEMP_DIR, 'tus'), { recursive: true }).catch(() => {});
 // --- AUTOMATED HEALTH MONITORING ---
 async function sendEmailAlert(subject, text) {
   const apiKey = process.env.RESEND_API_KEY;
-  const toEmail = process.env.ALERT_EMAIL_ADDRESS;
+  const toEmail = process.env.ALERT_EMAIL_ADDRESS || 'etlabcode@gmail.com';
   if (!apiKey || !toEmail) return;
 
   try {
