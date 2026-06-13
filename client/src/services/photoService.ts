@@ -310,9 +310,13 @@ export async function downloadAndDecryptMedia(
   let receivedBytes = 0;
   const chunks: Uint8Array[] = [];
 
-  while (true) {
+  let isDone = false;
+  while (!isDone) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      isDone = true;
+      break;
+    }
     
     if (value) {
       chunks.push(value);

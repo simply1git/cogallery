@@ -136,7 +136,7 @@ export function PhotoGrid({
   const windowSize = useWindowSize()
   const positioner = usePositioner(
     { 
-      width: containerRef.current?.offsetWidth ?? windowSize[0], 
+      width: windowSize[0], 
       columnWidth: deferredColWidth, 
       columnGutter: 16 
     },
@@ -201,7 +201,7 @@ export function PhotoGrid({
           containerRef={containerRef}
           items={photos}
           height={windowSize[1]}
-          offset={containerRef.current?.offsetTop ?? 0}
+          offset={0}
           overscanBy={3}
           itemKey={(data) => data.id}
           render={MasonicCard}

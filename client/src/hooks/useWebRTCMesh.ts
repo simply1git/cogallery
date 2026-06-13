@@ -15,59 +15,24 @@ export function useWebRTCMesh(roomId: string, userId: string) {
   // This channel acts as our Signaling Server
   const signalingChannel = useRef(supabase.channel(`room-signaling:${roomId}`))
 
-  useEffect(() => {
-    if (!roomId || !userId) return
+  const updatePeersState = () => {
+    setActivePeers(Array.from(peersRef.current.keys()))
+  }
 
-    const channel = signalingChannel.current
-
-    channel
-      .on('broadcast', { event: 'webrtc-offer' }, async ({ payload }) => {
-        if (payload.targetId !== userId) return
-        
-        const pc = createPeerConnection(payload.senderId)
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-        const answer = await pc.createAnswer()
-        await pc.setLocalDescription(answer)
-        
-        channel.send({
-          type: 'broadcast',
-          event: 'webrtc-answer',
-          payload: { targetId: payload.senderId, senderId: userId, sdp: answer }
-        })
-      })
-      .on('broadcast', { event: 'webrtc-answer' }, async ({ payload }) => {
-        if (payload.targetId !== userId) return
-        const peer = peersRef.current.get(payload.senderId)
-        if (peer) {
-          await peer.connection.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-        }
-      })
-      .on('broadcast', { event: 'webrtc-ice' }, async ({ payload }) => {
-        if (payload.targetId !== userId) return
-        const peer = peersRef.current.get(payload.senderId)
-        if (peer) {
-          await peer.connection.addIceCandidate(new RTCIceCandidate(payload.candidate))
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-           // Announce presence
-           channel.send({ type: 'broadcast', event: 'peer-joined', payload: { senderId: userId } })
-        }
-      })
-
-    channel.on('broadcast', { event: 'peer-joined' }, ({ payload }) => {
-      if (payload.senderId === userId) return
-      // Create offer to new peer
-      initiateConnection(payload.senderId)
-    })
-
-    return () => {
-      peersRef.current.forEach(p => p.connection.close())
-      peersRef.current.clear()
-      supabase.removeChannel(channel)
+  const setupDataChannel = (dc: RTCDataChannel, peerId: string) => {
+    dc.onopen = () => {
+      console.log(`[WebRTC] Connected to peer ${peerId}`)
+      toast.success(`Connected to local peer (AirDrop active)`)
     }
-  }, [roomId, userId])
+    
+    dc.onmessage = (e) => {
+      // Handle incoming binary file chunks!
+      if (e.data instanceof ArrayBuffer) {
+        // In a full implementation, we reassemble chunks and save the Blob using FileSaver
+        console.log(`[WebRTC] Received chunk of ${e.data.byteLength} bytes`)
+      }
+    }
+  }
 
   const createPeerConnection = (targetId: string) => {
     const pc = new RTCPeerConnection({
@@ -120,24 +85,61 @@ export function useWebRTCMesh(roomId: string, userId: string) {
     })
   }
 
-  const setupDataChannel = (dc: RTCDataChannel, peerId: string) => {
-    dc.onopen = () => {
-      console.log(`[WebRTC] Connected to peer ${peerId}`)
-      toast.success(`Connected to local peer (AirDrop active)`)
-    }
-    
-    dc.onmessage = (e) => {
-      // Handle incoming binary file chunks!
-      if (e.data instanceof ArrayBuffer) {
-        // In a full implementation, we reassemble chunks and save the Blob using FileSaver
-        console.log(`[WebRTC] Received chunk of ${e.data.byteLength} bytes`)
-      }
-    }
-  }
+  useEffect(() => {
+    if (!roomId || !userId) return
 
-  const updatePeersState = () => {
-    setActivePeers(Array.from(peersRef.current.keys()))
-  }
+    const channel = signalingChannel.current
+
+    channel
+      .on('broadcast', { event: 'webrtc-offer' }, async ({ payload }) => {
+        if (payload.targetId !== userId) return
+        
+        const pc = createPeerConnection(payload.senderId)
+        await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+        const answer = await pc.createAnswer()
+        await pc.setLocalDescription(answer)
+        
+        channel.send({
+          type: 'broadcast',
+          event: 'webrtc-answer',
+          payload: { targetId: payload.senderId, senderId: userId, sdp: answer }
+        })
+      })
+      .on('broadcast', { event: 'webrtc-answer' }, async ({ payload }) => {
+        if (payload.targetId !== userId) return
+        const peer = peersRef.current.get(payload.senderId)
+        if (peer) {
+          await peer.connection.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+        }
+      })
+      .on('broadcast', { event: 'webrtc-ice' }, async ({ payload }) => {
+        if (payload.targetId !== userId) return
+        const peer = peersRef.current.get(payload.senderId)
+        if (peer) {
+          await peer.connection.addIceCandidate(new RTCIceCandidate(payload.candidate))
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+           // Announce presence
+           channel.send({ type: 'broadcast', event: 'peer-joined', payload: { senderId: userId } })
+        }
+      })
+
+    channel.on('broadcast', { event: 'peer-joined' }, ({ payload }) => {
+      if (payload.senderId === userId) return
+      // Create offer to new peer
+      initiateConnection(payload.senderId)
+    })
+
+    return () => {
+      const currentPeers = peersRef.current;
+      currentPeers.forEach(p => p.connection.close())
+      currentPeers.clear()
+      supabase.removeChannel(channel)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, userId])
 
   // Public API to broadcast a file
   const sendFileToAllPeers = (fileBuffer: ArrayBuffer) => {

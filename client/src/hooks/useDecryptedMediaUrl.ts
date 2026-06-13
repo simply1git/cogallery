@@ -61,7 +61,10 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
 
   // Also need a ref to prevent race conditions in async operations
   const photoIdRef = useRef(photo?.id);
-  photoIdRef.current = photo?.id;
+  
+  useEffect(() => {
+    photoIdRef.current = photo?.id;
+  }, [photo?.id]);
 
   useEffect(() => {
     if (!photo) return;
