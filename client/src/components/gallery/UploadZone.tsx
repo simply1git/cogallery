@@ -34,6 +34,8 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
       
       if (!isMounted) return;
 
+      const localThumbMap = new Map<string, string>();
+
       uppyInstance = new Uppy({
         id: 'cogallery-uploader',
         autoProceed: false,
@@ -104,6 +106,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             
             // We no longer insert to DB here. We generate an ID and pass it along.
             const photoId = crypto.randomUUID()
+            localThumbMap.set(photoId, thumbBase64);
             
             // Pass metadata to TUS and for the success handler
             uppyInstance!.setFileMeta(fileID, { 
@@ -111,7 +114,6 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
               filename: file.name,
               filetype: file.type || 'application/octet-stream',
               mediaType: mediaType,
-              thumbBase64: thumbBase64,
               isEncrypted: isVault || false
             })
           }))
@@ -126,7 +128,8 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         // handler to complete the fs.rename of the uploaded file.
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        const { photoId, filename, mediaType, thumbBase64, isEncrypted } = file.meta;
+        const { photoId, filename, mediaType, isEncrypted } = file.meta;
+        const thumbBase64 = localThumbMap.get(photoId) || '';
         const finalUrl = `${tusEndpoint.replace('/upload/tus', '')}/stream/${photoId}`;
         
         const { data: finalPhoto, error } = await supabase.from('photos').insert({
