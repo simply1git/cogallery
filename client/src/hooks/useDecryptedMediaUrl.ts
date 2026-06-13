@@ -26,7 +26,7 @@ function setCachedUrl(key: string, url: string) {
 // when Masonic unmounts/remounts cards rapidly during scroll
 const inflightRequests = new Map<string, Promise<string>>();
 
-export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferFullRes: boolean = false) {
+export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?: CryptoKey, preferFullRes: boolean = false) {
   // Synchronous cache hit — no flicker on re-mount
   const cacheKey = photo ? `${photo.id}:${preferFullRes ? 'full' : 'thumb'}` : '';
   const cachedUrl = cacheKey ? urlCache.get(cacheKey) : undefined;
@@ -75,6 +75,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
     let isActive = true;
 
     async function loadMedia() {
+      if (!photo) return;
       const s3Key = photo.s3Key || photo.filename;
 
       if (s3Key?.includes('pending') || photo.s3Url?.includes('pending')) {

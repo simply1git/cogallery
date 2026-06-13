@@ -288,15 +288,47 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
   return url.startsWith('http') ? url : `${targetNodeUrl}${url}`;
 }
 
-export async function downloadAndDecryptMedia(photo: Photo, vaultKey: CryptoKey): Promise<string> {
+export async function downloadAndDecryptMedia(
+  photo: Photo, 
+  vaultKey: CryptoKey,
+  onProgress?: (loaded: number, total: number) => void
+): Promise<string> {
   const secureUrl = await getSecureMediaUrl(photo);
   const response = await fetch(secureUrl);
   if (!response.ok) throw new Error('Failed to fetch encrypted media');
 
-  const encryptedBuffer = await response.arrayBuffer();
+  const totalBytes = Number(response.headers.get('Content-Length')) || photo.fileSizeBytes;
   const mimeType = photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
-  const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType);
 
+  if (!response.body) {
+    const encryptedBuffer = await response.arrayBuffer();
+    const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType);
+    return URL.createObjectURL(decryptedBlob);
+  }
+
+  const reader = response.body.getReader();
+  let receivedBytes = 0;
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    if (value) {
+      chunks.push(value);
+      receivedBytes += value.length;
+      onProgress?.(receivedBytes, totalBytes);
+    }
+  }
+
+  const concatenated = new Uint8Array(receivedBytes);
+  let position = 0;
+  for (const chunk of chunks) {
+    concatenated.set(chunk, position);
+    position += chunk.length;
+  }
+
+  const decryptedBlob = await decryptBuffer(concatenated.buffer, vaultKey, mimeType);
   return URL.createObjectURL(decryptedBlob);
 }
 

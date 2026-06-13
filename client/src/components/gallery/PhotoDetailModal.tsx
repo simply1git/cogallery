@@ -57,6 +57,15 @@ export function PhotoDetailModal({
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < allPhotos.length - 1
 
+  const prevPhoto = hasPrev ? allPhotos[currentIndex - 1] : undefined;
+  const nextPhoto = hasNext ? allPhotos[currentIndex + 1] : undefined;
+
+  // Prefetch adjacent media
+  // Images get pre-fetched at full resolution for instant swiping.
+  // Videos only pre-fetch their thumbnail to save bandwidth.
+  useDecryptedMediaUrl(prevPhoto, vaultKey, prevPhoto && !prevPhoto.mediaType.startsWith('video') ? true : false)
+  useDecryptedMediaUrl(nextPhoto, vaultKey, nextPhoto && !nextPhoto.mediaType.startsWith('video') ? true : false)
+
   const loadDetails = useCallback(async (p: Photo) => {
     setIsLoadingDetails(true)
     const data = await getPhotoDetails(p.id)
@@ -117,26 +126,37 @@ export function PhotoDetailModal({
         return
       }
 
-      toast.promise(
-        (async () => {
-          if (photo.isEncrypted && vaultKey) {
-            return await downloadAndDecryptMedia(photo, vaultKey)
-          } else if (photo.isEncrypted && !vaultKey) {
-            throw new Error('Vault key missing')
-          }
-          return await getSecureMediaUrl(photo)
-        })().then(url => {
-          downloadFile(url, photo.filename)
-          if (url.startsWith('blob:')) {
-            setTimeout(() => URL.revokeObjectURL(url), 1000)
-          }
-        }),
-        {
-          loading: `Preparing ${photo.filename}...`,
-          success: 'Download started',
-          error: 'Failed to generate download link'
+      const toastId = toast.loading(`Preparing ${photo.filename}...`)
+      
+      try {
+        let url: string;
+        if (photo.isEncrypted && vaultKey) {
+          url = await downloadAndDecryptMedia(photo, vaultKey, (loaded, total) => {
+            if (total > 0) {
+              const percent = Math.round((loaded / total) * 100);
+              const mbLoaded = (loaded / (1024 * 1024)).toFixed(1);
+              const mbTotal = (total / (1024 * 1024)).toFixed(1);
+              toast.loading(`Decrypting: ${percent}% (${mbLoaded}MB / ${mbTotal}MB)`, { id: toastId });
+            } else {
+              const mbLoaded = (loaded / (1024 * 1024)).toFixed(1);
+              toast.loading(`Decrypting: ${mbLoaded}MB...`, { id: toastId });
+            }
+          })
+        } else if (photo.isEncrypted && !vaultKey) {
+          throw new Error('Vault key missing')
+        } else {
+          url = await getSecureMediaUrl(photo)
         }
-      )
+        
+        toast.success('Download started', { id: toastId })
+        downloadFile(url, photo.filename)
+        if (url.startsWith('blob:')) {
+          setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+      } catch (err) {
+        toast.error('Failed to generate download link', { id: toastId })
+        console.error(err);
+      }
     } catch (err) {
       toast.error('Failed to generate download link')
     }
