@@ -19,6 +19,7 @@ import dotenv from 'dotenv';
 import jwksClient from 'jwks-rsa';
 import { Server, EVENTS } from '@tus/server';
 import { FileStore } from '@tus/file-store';
+import sharp from 'sharp';
 
 dotenv.config();
 
@@ -382,8 +383,51 @@ app.get('/developer/storage/backup', authenticateJWT, (req, res) => {
     
     archive.finalize();
   } catch (err) {
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+// Stream Media Preview (WebP 800px)
+app.get('/preview/:photoId', async (req, res) => {
+  const { photoId } = req.params;
+  const token = req.query.t;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Missing access token (Zero Trust)' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.key !== photoId) {
+      return res.status(403).json({ error: 'Token does not match file' });
+    }
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+
+  const previewPath = path.join(CACHE_DIR, `${photoId}.preview.webp`);
+  const dataPath = path.join(CACHE_DIR, `${photoId}.data`);
+  const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
+  
+  try {
+    // Try to serve preview first
+    await fs.access(previewPath);
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+    const stream = fsSync.createReadStream(previewPath);
+    stream.pipe(res);
+  } catch {
+    // Fallback to original
+    try {
+      await fs.access(dataPath);
+      const metaRaw = await fs.readFile(metaPath, 'utf-8');
+      const meta = JSON.parse(metaRaw);
+      res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      const stream = fsSync.createReadStream(dataPath);
+      stream.pipe(res);
+    } catch {
+      if (!res.headersSent) res.status(404).json({ error: 'Preview/File not found' });
     }
   }
 });
@@ -419,12 +463,12 @@ app.post('/developer/storage/nuke-files', authenticateJWT, async (req, res) => {
 // --- EPHEMERAL SECURE GET URL (ZERO TRUST) ---
 app.post('/media/presign-get', authenticateJWT, async (req, res) => {
   try {
-    const { key } = req.body;
+    const { key, type } = req.body;
     if (!key) return res.status(400).json({ error: 'Missing key' });
     
     // Generate a short-lived JWT token that grants read access to this specific file
     const streamToken = jwt.sign({ key }, JWT_SECRET, { expiresIn: '12h' });
-    const url = `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
+    const url = type === 'preview' ? `/preview/${encodeURIComponent(key)}?t=${streamToken}` : `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
     
     res.json({ url });
   } catch (error) {
@@ -464,6 +508,7 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
     const photoId = upload.metadata?.photoId;
     const filename = upload.metadata?.filename || 'file';
     const mimeType = upload.metadata?.filetype || 'application/octet-stream';
+    const isEncrypted = upload.metadata?.isEncrypted === 'true' || upload.metadata?.isEncrypted === true;
     
     if (photoId) {
       const finalPath = path.join(CACHE_DIR, `${photoId}.data`);
@@ -477,6 +522,20 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
       
       // Clean up the .info file
       await fs.unlink(`${tusFilePath}.info`).catch(() => {});
+      
+      // Generate WebP preview for images (skip if encrypted)
+      if (mimeType.startsWith('image/') && !isEncrypted) {
+        try {
+          const previewPath = path.join(CACHE_DIR, `${photoId}.preview.webp`);
+          await sharp(finalPath)
+            .resize({ width: 800, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toFile(previewPath);
+          console.log(`[Upload] Generated preview for ${photoId}`);
+        } catch (err) {
+          console.error(`[Upload] Failed to generate preview for ${photoId}:`, err);
+        }
+      }
       
       const nodeUrl = process.env.NODE_URL || process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
       const finalUrl = `${nodeUrl}/stream/${photoId}`;

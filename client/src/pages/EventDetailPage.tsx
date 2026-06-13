@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Upload, Image, Video, Users,
+  Upload, Image, Video, Users,
   Loader2, Camera, RefreshCw, UploadCloud,
-  CheckSquare, X, Download, Trash2,
-  CalendarDays, UserPlus, Check, Settings, PenTool
+  X, Download, Trash2,
+  CalendarDays, Check, PenTool
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { getEventById, requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail, getEventUploaders } from '@/services/eventService'
@@ -17,15 +17,14 @@ import { startSeeding } from '@/services/p2pService'
 import { PhotoGrid } from '@/components/gallery/PhotoGrid'
 import { PhotoDetailModal } from '@/components/gallery/PhotoDetailModal'
 import { UploadZone } from '@/components/gallery/UploadZone'
-import { PresenceAvatars } from '@/components/shared/PresenceAvatars'
 import { usePresence } from '@/hooks/realtime/usePresence'
 import { InviteMemberModal } from '@/components/modals/InviteMemberModal'
 import { EventSettingsModal } from '@/components/modals/EventSettingsModal'
+import { EventHeader } from '@/components/events/EventHeader'
 import { LiveNotes } from '@/components/events/LiveNotes'
 import { PageHeaderSkeleton } from '@/components/shared/Skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { EventWithDetails, Photo, RoomWithMembers } from '@/types'
-import { formatFileSize } from '@/services/uploadService'
 import { downloadFilesAsZip } from '@/services/downloadService'
 import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
@@ -449,110 +448,29 @@ export function EventDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      {/* Breadcrumb */}
-      {room && (
-        <button
-          onClick={() => navigate(`/room/${roomId}`)}
-          className="flex items-center gap-2 text-[#71717a] hover:text-[#a1a1aa] mb-6 text-sm transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to Room
-        </button>
-      )}
-
-      {/* Event Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#f4f4f5]">{event.title}</h1>
-            <PresenceAvatars users={onlineUsers} />
-          </div>
-          {event.description && (
-            <p className="text-[#a1a1aa]">{event.description}</p>
-          )}
-
-          {/* Stats row */}
-          <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-[#71717a]">
-            <span className="flex items-center gap-1.5">
-              <Image size={14} className="text-blue-400" />
-              {imageCount} photos
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Video size={14} className="text-purple-400" />
-              {videoCount} videos
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Users size={14} />
-              {event.participantCount} participants
-            </span>
-            {totalSize > 0 && (
-              <span className="text-[#52525b]">
-                {formatFileSize(totalSize)} total
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto pb-1 -mb-1">
-          {canManageEvent && (
-            <button
-              onClick={() => setShowInvite(true)}
-              className="btn-secondary"
-            >
-              <UserPlus size={16} />
-              <span className="hidden sm:inline">Invite</span>
-            </button>
-          )}
-
-          {isEventOwner && (
-            <>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="btn-secondary"
-              >
-                <Settings size={16} />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
-              <button
-                onClick={handleDeleteEvent}
-                className="p-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors"
-                title="Delete Event"
-              >
-                <Trash2 size={16} />
-              </button>
-            </>
-          )}
-
-          <button
-            onClick={() => {
-              setIsSelectionMode(!isSelectionMode)
-              if (!isSelectionMode) setSelectedIds(new Set())
-            }}
-            className={isSelectionMode ? 'btn-blue' : 'btn-secondary'}
-          >
-            <CheckSquare size={16} />
-            <span className="hidden sm:inline">{isSelectionMode ? 'Done' : 'Select'}</span>
-          </button>
-          
-          <button
-            onClick={() => loadPhotos(false)}
-            className="btn-icon"
-            title="Refresh"
-          >
-            <RefreshCw size={16} />
-          </button>
-          {user && !isSelectionMode && (
-            <button
-              id="toggle-upload-btn"
-              onClick={() => setShowUpload((s) => !s)}
-              className={showUpload ? 'btn-secondary' : 'btn-blue'}
-            >
-              <UploadCloud size={16} />
-              {showUpload ? 'Hide Upload' : 'Upload'}
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Event Header Component */}
+      <EventHeader
+        event={event}
+        room={room}
+        roomId={roomId}
+        imageCount={imageCount}
+        videoCount={videoCount}
+        totalSize={totalSize}
+        onlineUsers={onlineUsers}
+        canManageEvent={canManageEvent}
+        isEventOwner={isEventOwner}
+        isSelectionMode={isSelectionMode}
+        showUpload={showUpload}
+        onToggleSelectionMode={() => {
+          setIsSelectionMode(!isSelectionMode)
+          if (!isSelectionMode) setSelectedIds(new Set())
+        }}
+        onRefresh={() => loadPhotos(false)}
+        onToggleUpload={() => setShowUpload(s => !s)}
+        onShowInvite={() => setShowInvite(true)}
+        onShowSettings={() => setShowSettings(true)}
+        onDeleteEvent={handleDeleteEvent}
+      />
 
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-white/10 mb-6">

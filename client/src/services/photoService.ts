@@ -247,7 +247,7 @@ export async function uploadPhotoWithMetadata(
   }
 }
 
-export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & Partial<Pick<Photo, 'filename'>>): Promise<string> {
+export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & Partial<Pick<Photo, 'filename'>>, type: 'stream' | 'preview' = 'stream'): Promise<string> {
   let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   
   if (photo.s3Url && photo.s3Url.startsWith('http') && !photo.s3Url.includes('pending')) {
@@ -280,7 +280,7 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ key: s3Key })
+    body: JSON.stringify({ key: s3Key, type })
   });
 
   if (!res.ok) throw new Error('Failed to get secure media url');
