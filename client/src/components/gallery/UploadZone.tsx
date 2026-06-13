@@ -49,6 +49,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         },
         chunkSize: 5 * 1024 * 1024,
         limit: 3,
+        removeFingerprintOnSuccess: true,
       })
       
       // Pre-processor to handle WebAssembly compression and Stream Encryption BEFORE upload starts
