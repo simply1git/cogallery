@@ -10,17 +10,9 @@ export async function downloadFile(url: string | null, filename: string) {
   }
 
   try {
-    const res = await fetch(url, {
-      headers: {
-      }
-    })
-    if (!res.ok) throw new Error('Network response was not ok')
-    
-    const blob = await res.blob()
+    const downloadUrl = url.includes('?') ? `${url}&download=1&filename=${encodeURIComponent(filename)}` : `${url}?download=1&filename=${encodeURIComponent(filename)}`;
     const a = document.createElement('a')
-    const objectUrl = URL.createObjectURL(blob)
-    
-    a.href = objectUrl
+    a.href = downloadUrl
     a.download = filename
     document.body.appendChild(a)
     a.click()
@@ -28,7 +20,6 @@ export async function downloadFile(url: string | null, filename: string) {
     // Cleanup
     setTimeout(() => {
       document.body.removeChild(a)
-      URL.revokeObjectURL(objectUrl)
     }, 100)
     
     toast.success('Download started')

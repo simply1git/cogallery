@@ -67,8 +67,6 @@ export function EventDetailPage() {
   // Selection state
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false)
-  const [downloadProgress, setDownloadProgress] = useState(0)
 
   // Presence
   const { onlineUsers } = usePresence(roomId || '', eventId || '')
@@ -215,25 +213,20 @@ export function EventDetailPage() {
 
   const handleBatchDownload = async () => {
     if (selectedIds.size === 0) return
-    setIsDownloadingZip(true)
-    setDownloadProgress(0)
 
     const selectedPhotos = photos.filter(p => selectedIds.has(p.id))
     const result = await downloadFilesAsZip(
       selectedPhotos, 
-      `${event?.title || 'Event'}_Export`,
-      (prog) => setDownloadProgress(prog)
+      `${event?.title || 'Event'}_Export`
     )
 
     if (!result.success) {
       toast.error(result.error)
     } else {
-      toast.success('Downloaded successfully!')
+      toast.success('Download started in your browser!')
       setIsSelectionMode(false)
       setSelectedIds(new Set())
     }
-    
-    setIsDownloadingZip(false)
   }
 
   const handleBatchIndividualDownload = async () => {
@@ -726,7 +719,7 @@ export function EventDetailPage() {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={handleBatchIndividualDownload}
-                  disabled={selectedIds.size === 0 || isDownloadingZip}
+                  disabled={selectedIds.size === 0}
                   className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border border-white/10 text-[#a1a1aa] hover:text-white hover:bg-white/5 transition-all disabled:opacity-40"
                 >
                   <Download size={18} />
@@ -735,25 +728,16 @@ export function EventDetailPage() {
 
                 <button
                   onClick={handleBatchDownload}
-                  disabled={selectedIds.size === 0 || isDownloadingZip}
+                  disabled={selectedIds.size === 0}
                   className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-40 shadow-lg shadow-blue-900/30"
                 >
-                  {isDownloadingZip ? (
-                    <>
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" />
-                      <span className="text-[11px] font-medium">{downloadProgress}%</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download size={18} />
-                      <span className="text-[11px] font-medium">ZIP</span>
-                    </>
-                  )}
+                  <Download size={18} />
+                  <span className="text-[11px] font-medium">ZIP</span>
                 </button>
 
                 <button
                   onClick={handleBatchDelete}
-                  disabled={selectedIds.size === 0 || isDownloadingZip}
+                  disabled={selectedIds.size === 0}
                   className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
                 >
                   <Trash2 size={18} />

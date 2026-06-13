@@ -172,8 +172,8 @@ const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'super-secret-jwt-token-wi
 
 const authenticateJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const token = authHeader.split(' ')[1];
+  const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
+  if (token) {
     
     // Verify using Supabase JWKS (supports both ES256 and RS256)
     jwt.verify(token, getSupabaseKey, { algorithms: ['RS256', 'ES256'] }, (err, user) => {
@@ -533,22 +533,35 @@ app.get('/stream/:photoId', async (req, res) => {
       
       const file = fsSync.createReadStream(dataPath, { start, end });
       
-      res.writeHead(206, {
+      const download = req.query.download === '1';
+      const filename = req.query.filename || photoId;
+      const headers = {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunksize,
         'Content-Type': meta.mimeType,
         'Access-Control-Allow-Origin': '*',
-      });
+      };
+      if (download) {
+        headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;
+      }
+      
+      res.writeHead(206, headers);
       
       file.pipe(res);
     } else {
       // Full download/stream
-      res.writeHead(200, {
+      const download = req.query.download === '1';
+      const filename = req.query.filename || photoId;
+      const headers = {
         'Content-Length': fileSize,
         'Content-Type': meta.mimeType,
         'Access-Control-Allow-Origin': '*',
-      });
+      };
+      if (download) {
+        headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;
+      }
+      res.writeHead(200, headers);
       fsSync.createReadStream(dataPath).pipe(res);
     }
   } catch (err) {
@@ -586,24 +599,20 @@ app.post('/api/download-zip', authenticateJWT, [express.json({ limit: '10mb' }),
 
   archive.pipe(res);
 
-  // Append each file from its URL stream sequentially to avoid overwhelming server sockets
+  // Append each file directly from local storage to bypass network loop
   for (const photo of photos) {
-    if (!photo.url || !photo.filename) continue;
+    if (!photo.id || !photo.filename) continue;
     try {
-      await new Promise((resolve) => {
-        const reqStream = photo.url.startsWith('https') ? https : null; // Assuming S3 presigned URLs are HTTPS
-        if (!reqStream) return resolve();
-
-        reqStream.get(photo.url, (response) => {
-          if (response.statusCode === 200) {
-            archive.append(response, { name: photo.filename });
-            response.on('end', resolve);
-            response.on('error', resolve);
-          } else {
-            resolve();
-          }
-        }).on('error', resolve);
-      });
+      const dataPath = path.join(CACHE_DIR, `${photo.id}.data`);
+      
+      // Check if file exists locally
+      try {
+        await fs.access(dataPath);
+        archive.file(dataPath, { name: photo.filename });
+      } catch (err) {
+        console.error(`File missing for zip: ${photo.id}`);
+        archive.append(`File not found: ${photo.id}`, { name: `${photo.filename}.error.txt` });
+      }
     } catch (e) {
       console.error('Error fetching photo for zip:', e);
     }
