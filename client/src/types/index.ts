@@ -108,6 +108,7 @@ export interface Photo {
   s3Url?: string
   thumbnailUrl?: string
   thumbnailBase64?: string
+  blurhash?: string
   isEncrypted?: boolean
   
   // EXIF metadata
