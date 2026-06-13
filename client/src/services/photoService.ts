@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import type { Photo, PhotoWithReactions, Reaction, Comment, MediaType } from '@/types'
 import { generateThumbnail } from './thumbnailService'
 import { getMediaType } from './uploadService'
+import { decryptBuffer } from './cryptoService'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -285,6 +286,18 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
   if (!res.ok) throw new Error('Failed to get secure media url');
   const { url } = await res.json();
   return url.startsWith('http') ? url : `${targetNodeUrl}${url}`;
+}
+
+export async function downloadAndDecryptMedia(photo: Photo, vaultKey: CryptoKey): Promise<string> {
+  const secureUrl = await getSecureMediaUrl(photo);
+  const response = await fetch(secureUrl);
+  if (!response.ok) throw new Error('Failed to fetch encrypted media');
+
+  const encryptedBuffer = await response.arrayBuffer();
+  const mimeType = photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
+  const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType);
+
+  return URL.createObjectURL(decryptedBlob);
 }
 
 // ─── Photo Listing ───────────────────────────────────────────────────────────

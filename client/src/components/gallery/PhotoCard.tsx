@@ -2,7 +2,7 @@ import { useState, memo } from 'react'
 import { Heart, MessageCircle, Play, Trash2, Download, Film, Image as ImageIcon } from 'lucide-react'
 import type { Photo } from '@/types'
 import { downloadFile } from '@/utils/download'
-import { getSecureMediaUrl } from '@/services/photoService'
+import { getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
 import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
@@ -60,8 +60,26 @@ export const PhotoCard = memo(function PhotoCard({
         return
       }
 
-      const secureUrl = await getSecureMediaUrl(photo)
-      downloadFile(secureUrl, photo.filename)
+      toast.promise(
+        (async () => {
+          if (photo.isEncrypted && vaultKey) {
+            return await downloadAndDecryptMedia(photo, vaultKey)
+          } else if (photo.isEncrypted && !vaultKey) {
+            throw new Error('Vault key missing')
+          }
+          return await getSecureMediaUrl(photo)
+        })().then(url => {
+          downloadFile(url, photo.filename)
+          if (url.startsWith('blob:')) {
+            setTimeout(() => URL.revokeObjectURL(url), 1000)
+          }
+        }),
+        {
+          loading: `Preparing ${photo.filename}...`,
+          success: 'Download started',
+          error: 'Failed to generate download link'
+        }
+      )
     } catch (err) {
       toast.error('Failed to generate download link')
     }

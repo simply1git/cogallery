@@ -23,6 +23,23 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     reportError(error, { componentStack: errorInfo.componentStack });
+
+    // Auto-recover from PWA chunk mismatch or React Hook mismatch (Error 310)
+    if (
+      error.message.includes('Minified React error #310') || 
+      error.message.includes('Rendered more hooks') ||
+      error.message.includes('Failed to fetch dynamically imported module') ||
+      error.message.includes('ChunkLoadError')
+    ) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      setTimeout(() => window.location.reload(), 1000);
+    }
   }
 
   public render() {

@@ -5,7 +5,7 @@ import {
   ChevronUp, ChevronDown
 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { getPhotoDetails, addReaction, addComment, deleteComment } from '@/services/photoService'
+import { getPhotoDetails, addReaction, addComment, deleteComment, getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
 import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
@@ -109,13 +109,37 @@ export function PhotoDetailModal({
   }
 
   async function handleDownload() {
-    if (!photo || !secureUrl) return
+    if (!photo) return
     haptic('medium')
-    if (photo.isEncrypted && secureUrl) {
-      await downloadFile(secureUrl, photo.filename)
-      return
+    try {
+      if (photo.isEncrypted && secureUrl && !isDecrypting) {
+        downloadFile(secureUrl, photo.filename)
+        return
+      }
+
+      toast.promise(
+        (async () => {
+          if (photo.isEncrypted && vaultKey) {
+            return await downloadAndDecryptMedia(photo, vaultKey)
+          } else if (photo.isEncrypted && !vaultKey) {
+            throw new Error('Vault key missing')
+          }
+          return await getSecureMediaUrl(photo)
+        })().then(url => {
+          downloadFile(url, photo.filename)
+          if (url.startsWith('blob:')) {
+            setTimeout(() => URL.revokeObjectURL(url), 1000)
+          }
+        }),
+        {
+          loading: `Preparing ${photo.filename}...`,
+          success: 'Download started',
+          error: 'Failed to generate download link'
+        }
+      )
+    } catch (err) {
+      toast.error('Failed to generate download link')
     }
-    await downloadFile(secureUrl, photo.filename)
   }
 
   // Group reactions by emoji

@@ -9,9 +9,10 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { getEventById, requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail, getEventUploaders } from '@/services/eventService'
 import { getRoomById, updateRoomThumbnail } from '@/services/roomService'
-import { listPhotos, deletePhotoById, getSecureMediaUrl } from '@/services/photoService'
+import { listPhotos, deletePhotoById, getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
 import { getUserProfile } from '@/services/authService'
 import { usePhotoSubscription } from '@/hooks/realtime/usePhotoSubscription'
+import { useRoomStore } from '@/store/roomStore'
 import { startSeeding } from '@/services/p2pService'
 import { PhotoGrid } from '@/components/gallery/PhotoGrid'
 import { PhotoDetailModal } from '@/components/gallery/PhotoDetailModal'
@@ -73,6 +74,8 @@ export function EventDetailPage() {
 
   // Presence
   const { onlineUsers } = usePresence(roomId || '', eventId || '')
+  
+  const vaultKey = useRoomStore((s) => s.vaultKeys[roomId || ''])
 
   // Load event and room
   useEffect(() => {
@@ -254,19 +257,42 @@ export function EventDetailPage() {
     const selectedPhotos = photos.filter(p => selectedIds.has(p.id))
     
     // Download them individually sequentially to not crash the browser
+    let count = 0;
+    const loadingToast = toast.loading(`Downloading ${selectedPhotos.length} files...`);
+
     for (const p of selectedPhotos) {
+      count++;
+      toast.loading(`Downloading ${count} of ${selectedPhotos.length}: ${p.filename}`, { id: loadingToast });
+
       if (p.s3Url) {
          let targetUrl = p.s3Url;
-         if (!p.isEncrypted) {
-            try { targetUrl = await getSecureMediaUrl(p) } catch (e) {}
+         if (p.isEncrypted && vaultKey) {
+            try { 
+               // Wait for the full file to be downloaded and decrypted to a blob URL in RAM
+               targetUrl = await downloadAndDecryptMedia(p, vaultKey) 
+            } catch (e) {
+               console.error('Decryption failed for', p.filename, e)
+               toast.error(`Failed to decrypt ${p.filename}`)
+               continue
+            }
+         } else if (p.isEncrypted && !vaultKey) {
+            toast.error(`No vault key available for ${p.filename}`)
+            continue
+         } else if (!p.isEncrypted && targetUrl?.includes('pending')) {
+            try { targetUrl = await getSecureMediaUrl(p) } catch(e) {}
          }
          await downloadFile(targetUrl, p.filename)
+         
+         // Cleanup Blob URL to free RAM after download starts
+         if (targetUrl.startsWith('blob:')) {
+           setTimeout(() => URL.revokeObjectURL(targetUrl), 1000)
+         }
       }
-      // Small pause between downloads to allow the browser to process
-      await new Promise(res => setTimeout(res, 300))
+      // Small pause between downloads to allow the browser to process and prompt Save As
+      await new Promise(res => setTimeout(res, 500))
     }
     
-    toast.success(`Started download of ${selectedPhotos.length} files`)
+    toast.success(`Successfully downloaded ${count} files`, { id: loadingToast })
     setIsSelectionMode(false)
     setSelectedIds(new Set())
   }
@@ -737,24 +763,26 @@ export function EventDetailPage() {
               </div>
 
               {/* Action buttons — always centered and accessible */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className={`grid ${room?.isVault ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
                 <button
                   onClick={handleBatchIndividualDownload}
                   disabled={selectedIds.size === 0}
                   className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border border-white/10 text-[#a1a1aa] hover:text-white hover:bg-white/5 transition-all disabled:opacity-40"
                 >
                   <Download size={18} />
-                  <span className="text-[11px] font-medium">Originals</span>
+                  <span className="text-[11px] font-medium">Download</span>
                 </button>
 
-                <button
-                  onClick={handleBatchDownload}
-                  disabled={selectedIds.size === 0}
-                  className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-40 shadow-lg shadow-blue-900/30"
-                >
-                  <Download size={18} />
-                  <span className="text-[11px] font-medium">ZIP</span>
-                </button>
+                {!room?.isVault && (
+                  <button
+                    onClick={handleBatchDownload}
+                    disabled={selectedIds.size === 0}
+                    className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-all disabled:opacity-40 shadow-lg shadow-blue-900/30"
+                  >
+                    <Download size={18} />
+                    <span className="text-[11px] font-medium">ZIP</span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleBatchDelete}
