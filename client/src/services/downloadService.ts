@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import { Photo } from '@/types'
+import { getSecureMediaUrl } from '@/services/photoService'
 
 export async function downloadFilesAsZip(photos: Photo[], zipFilename: string, onProgress?: (progress: number) => void) {
   try {
@@ -16,8 +17,13 @@ export async function downloadFilesAsZip(photos: Photo[], zipFilename: string, o
       
       await Promise.all(batch.map(async (photo) => {
         try {
-          if (!photo.s3Url) throw new Error('Missing URL');
-          const response = await fetch(photo.s3Url)
+          let targetUrl = photo.s3Url
+          if (targetUrl && !photo.isEncrypted) {
+             try { targetUrl = await getSecureMediaUrl(photo) } catch (e) {}
+          }
+          if (!targetUrl) throw new Error('Missing URL');
+          
+          const response = await fetch(targetUrl)
           if (!response.ok) throw new Error(`Failed to fetch ${photo.filename}`)
           
           const blob = await response.blob()

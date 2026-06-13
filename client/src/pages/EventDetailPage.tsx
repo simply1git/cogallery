@@ -9,7 +9,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { getEventById, requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail, getEventUploaders } from '@/services/eventService'
 import { getRoomById, updateRoomThumbnail } from '@/services/roomService'
-import { listPhotos, deletePhotoById } from '@/services/photoService'
+import { listPhotos, deletePhotoById, getSecureMediaUrl } from '@/services/photoService'
 import { getUserProfile } from '@/services/authService'
 import { usePhotoSubscription } from '@/hooks/realtime/usePhotoSubscription'
 import { startSeeding } from '@/services/p2pService'
@@ -242,7 +242,13 @@ export function EventDetailPage() {
     
     // Download them individually sequentially to not crash the browser
     for (const p of selectedPhotos) {
-      if (p.s3Url) await downloadFile(p.s3Url, p.filename)
+      if (p.s3Url) {
+         let targetUrl = p.s3Url;
+         if (!p.isEncrypted) {
+            try { targetUrl = await getSecureMediaUrl(p) } catch (e) {}
+         }
+         await downloadFile(targetUrl, p.filename)
+      }
       // Small pause between downloads to allow the browser to process
       await new Promise(res => setTimeout(res, 300))
     }
