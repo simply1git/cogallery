@@ -93,7 +93,7 @@ export function RoomDetailPage() {
   // Calculate visible events for partial access
   const visibleEvents = isRoomMember
     ? events
-    : events.filter(e => e.members.some(m => m.userId === user?.id && m.status === 'approved'))
+    : events.filter(e => e.members?.some(m => m.userId === user?.id && m.status === 'approved'))
 
   const hasAccess = isRoomMember || visibleEvents.length > 0
 
@@ -424,7 +424,7 @@ export function RoomDetailPage() {
         isOpen={showCreateEvent}
         roomId={roomId!}
         onClose={() => setShowCreateEvent(false)}
-        onCreated={(event) => setEvents((prev) => [event as EventWithDetails, ...prev])}
+        onCreated={(event) => setEvents((prev) => [{ ...event, members: [], photoCount: 0, participantCount: 0 } as EventWithDetails, ...prev])}
       />
       <InviteMemberModal
         isOpen={showInvite}
