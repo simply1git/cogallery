@@ -144,6 +144,27 @@ export function PhotoGrid({
   )
   const resizeObserver = useResizeObserver(positioner)
 
+  // Intersection Observer for Infinite Scroll
+  // IMPORTANT: These hooks MUST be above any early returns to satisfy React's Rules of Hooks.
+  const observerTarget = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && onLoadMore) {
+          onLoadMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '400px' } // Pre-fetch before scrolling completely to bottom
+    )
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current)
+    }
+    
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, onLoadMore])
+
   const contextValue = useMemo(() => ({
     onPhotoClick,
     onPhotoDelete,
@@ -170,26 +191,6 @@ export function PhotoGrid({
   if (photos.length === 0) {
     return null
   }
-
-  // Intersection Observer for Infinite Scroll
-  const observerTarget = useRef<HTMLDivElement>(null)
-  
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore && onLoadMore) {
-          onLoadMore()
-        }
-      },
-      { threshold: 0.1, rootMargin: '400px' } // Pre-fetch before scrolling completely to bottom
-    )
-    
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current)
-    }
-    
-    return () => observer.disconnect()
-  }, [hasMore, isLoadingMore, onLoadMore])
 
   return (
     <PhotoGridContext.Provider value={contextValue}>
