@@ -65,7 +65,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
             try {
               const generatedThumb = await generateThumbnail(payloadToUpload as File);
-              if (generatedThumb) thumbBase64 = generatedThumb;
+              if (generatedThumb) thumbBase64 = generatedThumb.base64;
             } catch (err) {
               console.error('Thumbnail generation failed:', err);
             }

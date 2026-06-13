@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { Photo } from '@/types';
 import { getSecureMediaUrl } from '@/services/photoService';
 import { decryptBuffer, decryptString } from '@/services/cryptoService';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/lib/supabase';
 
 // Module-level cache to prevent re-decrypting the same photo if unmounted/remounted in the virtual grid
 const urlCache = new Map<string, string>();
@@ -37,7 +37,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
   const [tokenVersion, setTokenVersion] = useState(0);
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === 'TOKEN_REFRESHED') {
         urlCache.clear();
         inflightRequests.clear();

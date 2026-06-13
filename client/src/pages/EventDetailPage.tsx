@@ -213,8 +213,6 @@ export function EventDetailPage() {
     }
   }
 
-  const canDeletePhoto = useCallback((photo: Photo) => photo.uploaderId === user?.id, [user?.id])
-
   // Selection mode handlers
   const handleToggleSelect = useCallback((photoId: string) => {
     setSelectedIds((prev) => {
@@ -511,7 +509,7 @@ export function EventDetailPage() {
           </button>
           
           <button
-            onClick={loadPhotos}
+            onClick={() => loadPhotos(false)}
             className="btn-icon"
             title="Refresh"
           >
@@ -709,7 +707,7 @@ export function EventDetailPage() {
           photos={photos}
           onPhotoClick={(photo) => setSelectedPhoto(photo)}
           onPhotoDelete={handleDeletePhoto}
-          canDelete={(photo) => user?.id === event.created_by || user?.id === photo.user_id}
+          canDelete={(photo) => user?.id === event.creatorId || user?.id === photo.uploaderId}
           isLoading={isLoadingPhotos}
           selectedIds={isSelectionMode ? selectedIds : undefined}
           onToggleSelect={handleToggleSelect}
