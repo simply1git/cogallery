@@ -1,0 +1,12 @@
+[
+  {
+    "SSH_COMMAND": "ssh -i E:\\project\\cogallery\\oracleinstance\\cogallery-seedbox\\ssh-key-2026-05-29.key ubuntu@68.233.106.173",
+    "NODE_URL": "https://api.25012004.xyz",
+    "CLOUDFLARE_TUNNEL_TOKEN": "eyJhIjoiYjA1YTkxZWIxNWY5MDk5MDE1ODA0Mjg3OTA5OWIwYjMiLCJ0IjoiOTJiMjZlODktODU0NC00ZjhjLWI3YTEtZTllYWFhN2ZkMTcyIiwicyI6Ik1qbGlPVFZpWXpJdFptWm1OaTAwWVRFekxXSmtNMkV0TTJVMU5qVXlZMlZsTURreiJ9"
+  },
+  {
+    "SSH_COMMAND": "ssh -i E:\\project\\cogallery\\oracleinstance\\cogallerynode1\\ssh-key-2026-06-11.key ubuntu@68.233.107.22",
+    "NODE_URL": "https://node1.25012004.xyz",
+    "CLOUDFLARE_TUNNEL_TOKEN": "eyJhIjoiYjA1YTkxZWIxNWY5MDk5MDE1ODA0Mjg3OTA5OWIwYjMiLCJ0IjoiYmRjMjViNTItY2M2ZC00ZTdlLWE3MGUtMTQzZWRjZDViOWYwIiwicyI6IlpEQm1Nek5qWW1VdE9UUmhZeTAwT1dJeUxXRmpNelF0WXpWbE5UazFZV1EwTmpjeiJ9"
+  }
+]

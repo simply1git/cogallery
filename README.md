@@ -102,10 +102,18 @@ npm run dev          # Start Vite dev server
 npm run type-check   # TypeScript
 npm run lint         # ESLint
 npm test             # Vitest unit tests
+npm run test:e2e     # Playwright E2E tests
 npm run build        # Production build
 ```
 
 CI runs on every push via `.github/workflows/ci.yml`.
+
+---
+
+## Observability & Analytics
+CoGallery is configured for production-grade observability:
+- **Sentry**: Error tracking and session replay. Requires `VITE_SENTRY_DSN` in your `.env`.
+- **PostHog**: Product analytics. Requires `VITE_POSTHOG_KEY` in your `.env`.
 
 ---
 

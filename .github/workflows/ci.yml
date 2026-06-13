@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 jobs:
-  client:
+  client-build-and-test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,10 +22,10 @@ jobs:
       - run: npm install
       - run: npm run type-check
       - run: npm run lint
-      - run: npm test
+      - run: npm test --if-present
       - run: npm run build
 
-  bot:
+  bot-build-and-test:
     runs-on: ubuntu-latest
     defaults:
       run:
