@@ -541,6 +541,7 @@ app.get('/stream/:photoId', async (req, res) => {
         'Content-Length': chunksize,
         'Content-Type': meta.mimeType,
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=31536000, immutable',
       };
       if (download) {
         headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;
@@ -557,6 +558,7 @@ app.get('/stream/:photoId', async (req, res) => {
         'Content-Length': fileSize,
         'Content-Type': meta.mimeType,
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=31536000, immutable',
       };
       if (download) {
         headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;

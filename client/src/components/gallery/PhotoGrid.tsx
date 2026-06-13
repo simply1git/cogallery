@@ -51,6 +51,9 @@ interface PhotoGridProps {
   selectedIds?: Set<string>
   onToggleSelect?: (photoId: string) => void
   activePhotoId?: string
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 export function PhotoGrid({
@@ -62,6 +65,9 @@ export function PhotoGrid({
   selectedIds,
   onToggleSelect,
   activePhotoId,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: PhotoGridProps) {
   const [colWidth, setColWidth] = useState(200)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -165,6 +171,26 @@ export function PhotoGrid({
     return null
   }
 
+  // Intersection Observer for Infinite Scroll
+  const observerTarget = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && onLoadMore) {
+          onLoadMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '400px' } // Pre-fetch before scrolling completely to bottom
+    )
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current)
+    }
+    
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, onLoadMore])
+
   return (
     <PhotoGridContext.Provider value={contextValue}>
       <div ref={containerRef} className="w-full touch-pan-y" style={{ willChange: 'transform' }}>
@@ -179,6 +205,15 @@ export function PhotoGrid({
           itemKey={(data) => data.id}
           render={MasonicCard}
         />
+        
+        {/* Infinite Scroll Sentinel */}
+        {hasMore && (
+          <div ref={observerTarget} className="w-full py-8 flex justify-center">
+            {isLoadingMore && (
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            )}
+          </div>
+        )}
       </div>
     </PhotoGridContext.Provider>
   )

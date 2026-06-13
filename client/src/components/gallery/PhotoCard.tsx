@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useHaptics } from '@/hooks/useHaptics'
+import { Blurhash } from 'react-blurhash'
 
 interface PhotoCardProps {
   photo: Photo
@@ -91,15 +92,22 @@ export const PhotoCard = memo(function PhotoCard({
             <span className="text-xs font-medium">Decrypting...</span>
           </div>
         ) : (
-          <img
-            src={mediaUrl}
-            alt={photo.filename}
-            className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] ${
-              isLoaded ? 'blur-0 opacity-100' : 'blur-sm opacity-0'
-            }`}
-            onLoad={() => setIsLoaded(true)}
-            onError={() => setImgError(true)}
-          />
+          <>
+            {photo.blurhash && (!isLoaded || !mediaUrl) && (
+              <div className="absolute inset-0 z-0">
+                <Blurhash hash={photo.blurhash} width="100%" height="100%" resolutionX={32} resolutionY={32} punch={1} />
+              </div>
+            )}
+            <img
+              src={mediaUrl}
+              alt={photo.filename}
+              className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] relative z-10 ${
+                isLoaded && mediaUrl ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'
+              }`}
+              onLoad={() => setIsLoaded(true)}
+              onError={() => setImgError(true)}
+            />
+          </>
         )}
         
         {isVideo && (

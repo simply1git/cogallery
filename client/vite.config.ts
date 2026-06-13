@@ -35,6 +35,41 @@ export default defineConfig({
             purpose: 'any maskable'
           }
         ]
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            // Cache Supabase API calls
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-api-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            // Cache Media Streams from the Oracle Node (assuming it might match an IP or domain)
+            // For now, we will cache any /stream/ URL
+            urlPattern: /\/stream\//i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'oracle-media-cache',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200, 206]
+              }
+            }
+          }
+        ]
       }
     })
   ],

@@ -1,5 +1,6 @@
 // Web Worker for Image Processing
 // Decodes images and generates thumbnails completely off the main thread using OffscreenCanvas
+import { encode } from 'blurhash';
 
 const MAX_THUMB_DIM = 800;
 const THUMB_QUALITY = 0.8;
@@ -44,8 +45,21 @@ self.onmessage = async (e: MessageEvent) => {
     
     // Convert to base64 to match our existing database format requirements
     const base64 = await blobToBase64(blob);
-    
-    self.postMessage({ id, success: true, base64 });
+
+    // Generate a tiny BlurHash string for immediate UI placeholders
+    const hashWidth = 32;
+    const hashHeight = Math.round(32 * (height / width));
+    const hashCanvas = new OffscreenCanvas(hashWidth, hashHeight);
+    const hashCtx = hashCanvas.getContext('2d');
+    if (hashCtx) {
+      hashCtx.drawImage(bitmap, 0, 0, hashWidth, hashHeight);
+      const hashData = hashCtx.getImageData(0, 0, hashWidth, hashHeight);
+      const blurhashStr = encode(hashData.data, hashData.width, hashData.height, 4, 3);
+      
+      self.postMessage({ id, success: true, base64, blurhash: blurhashStr });
+    } else {
+      self.postMessage({ id, success: true, base64 });
+    }
     
     // Cleanup
     bitmap.close();

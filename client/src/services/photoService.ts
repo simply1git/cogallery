@@ -30,6 +30,7 @@ function mapPhoto(data: any): Photo {
     s3Url: finalS3Url,
     thumbnailUrl: data.thumbnail_url,
     thumbnailBase64: data.thumbnail_base64,
+    blurhash: data.blurhash,
     takenAt: data.taken_at,
     cameraMake: data.camera_make,
     cameraModel: data.camera_model,
@@ -74,12 +75,13 @@ export interface PhotoUploadOptions {
   userId: string
   isEncrypted?: boolean
   onProgress?: (progress: number) => void
+  metadata?: any
 }
 
 export async function uploadPhotoWithMetadata(
   opts: PhotoUploadOptions
 ): Promise<{ data: Photo | null; error: string | null }> {
-  const { file, eventId, roomId, userId, isEncrypted, onProgress } = opts
+  const { file, eventId, roomId, userId, isEncrypted, onProgress, metadata } = opts
   let photoId: string | null = null;
 
   try {
@@ -92,9 +94,13 @@ export async function uploadPhotoWithMetadata(
 
     onProgress?.(10)
 
+    // 1. Generate thumbnail and blurhash (Web Worker handles it off-thread)
     let thumbnailBase64 = ''
+    let blurhash = ''
     try {
-      thumbnailBase64 = await generateThumbnail(file)
+      const thumbResult = await generateThumbnail(file)
+      thumbnailBase64 = thumbResult.base64
+      blurhash = thumbResult.blurhash || ''
     } catch (e) {
       console.warn('Thumbnail generation failed, continuing without:', e)
     }
@@ -113,7 +119,13 @@ export async function uploadPhotoWithMetadata(
         media_type: mediaType,
         s3_key: `oracle:pending:${Date.now()}-${Math.random().toString(36).substring(7)}`,
         s3_url: 'https://pending', // will update after upload
+        taken_at: metadata?.takenAt?.toISOString() || null,
+        camera_make: metadata?.cameraMake || null,
+        camera_model: metadata?.cameraModel || null,
+        iso: metadata?.iso || null,
+        aperture: metadata?.aperture || null,
         thumbnail_base64: thumbnailBase64,
+        blurhash: blurhash,
         is_encrypted: isEncrypted ?? false,
       })
       .select()

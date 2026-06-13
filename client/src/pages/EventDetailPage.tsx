@@ -51,6 +51,9 @@ export function EventDetailPage() {
   const [event, setEvent] = useState<EventWithDetails | null>(null)
   const [eventError, setEventError] = useState<string | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [isLoadingEvent, setIsLoadingEvent] = useState(true)
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(true)
@@ -120,21 +123,40 @@ export function EventDetailPage() {
   }, [eventId, roomId, user?.id])
 
   // Load photos
-  const loadPhotos = useCallback(async () => {
+  // Load photos
+  const loadPhotos = useCallback(async (isLoadMore = false) => {
     if (!eventId) return
-    setIsLoadingPhotos(true)
-    const { data } = await listPhotos({
+    if (!isLoadMore) setIsLoadingPhotos(true)
+    else setIsLoadingMore(true)
+    
+    const targetPage = isLoadMore ? page + 1 : 1
+    
+    const { data, hasMore: more } = await listPhotos({
       eventId,
       mediaType: filter === 'all' ? undefined : filter,
       uploaderId: uploaderFilter === 'all' ? undefined : uploaderFilter,
-      pageSize: 200,
+      page: targetPage,
+      pageSize: 50,
     })
-    setPhotos(data)
+    
+    if (isLoadMore) {
+      setPhotos(prev => {
+        // Filter out duplicates (e.g. if realtime inserted something)
+        const existingIds = new Set(prev.map(p => p.id))
+        return [...prev, ...data.filter(p => !existingIds.has(p.id))]
+      })
+      setPage(targetPage)
+    } else {
+      setPhotos(data)
+      setPage(1)
+    }
+    setHasMore(more)
     setIsLoadingPhotos(false)
-    setNewPhotoCount(0)
-  }, [eventId, filter, uploaderFilter])
+    setIsLoadingMore(false)
+    if (!isLoadMore) setNewPhotoCount(0)
+  }, [eventId, filter, uploaderFilter, page])
 
-  useEffect(() => { loadPhotos() }, [loadPhotos])
+  useEffect(() => { loadPhotos(false) }, [eventId, filter, uploaderFilter])
 
   // Real-time subscription
   usePhotoSubscription({
@@ -685,15 +707,16 @@ export function EventDetailPage() {
       ) : (
         <PhotoGrid
           photos={photos}
-          isLoading={isLoadingPhotos}
-          activePhotoId={selectedPhoto?.id}
-          onPhotoClick={(photo) => {
-            setSelectedPhoto(photo)
-          }}
+          onPhotoClick={(photo) => setSelectedPhoto(photo)}
           onPhotoDelete={handleDeletePhoto}
-          canDelete={canDeletePhoto}
+          canDelete={(photo) => user?.id === event.created_by || user?.id === photo.user_id}
+          isLoading={isLoadingPhotos}
           selectedIds={isSelectionMode ? selectedIds : undefined}
           onToggleSelect={handleToggleSelect}
+          activePhotoId={selectedPhoto?.id}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={() => loadPhotos(true)}
         />
       )}
 

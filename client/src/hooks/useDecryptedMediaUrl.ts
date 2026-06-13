@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { Photo } from '@/types';
 import { getSecureMediaUrl } from '@/services/photoService';
 import { decryptBuffer, decryptString } from '@/services/cryptoService';
+import { supabase } from '@/services/supabase';
 
 // Module-level cache to prevent re-decrypting the same photo if unmounted/remounted in the virtual grid
 const urlCache = new Map<string, string>();
@@ -33,6 +34,20 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
   const [url, setUrl] = useState<string>(cachedUrl || '');
   const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenVersion, setTokenVersion] = useState(0);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') {
+        urlCache.clear();
+        inflightRequests.clear();
+        setTokenVersion(v => v + 1);
+      }
+    });
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   // Track the photo id to immediately sync state on change (avoiding 1-frame stale flashes)
   const prevPhotoIdRef = useRef(photo?.id);
@@ -168,7 +183,7 @@ export function useDecryptedMediaUrl(photo: Photo, vaultKey?: CryptoKey, preferF
       isActive = false;
     };
   // Stable primitive dependencies — no object reference churn
-  }, [photo?.id, photo?.s3Key, photo?.isEncrypted, photo?.thumbnailBase64, preferFullRes, vaultKey]);
+  }, [photo?.id, photo?.s3Key, photo?.isEncrypted, photo?.thumbnailBase64, preferFullRes, vaultKey, tokenVersion]);
 
   return { url, isDecrypting, error };
 }

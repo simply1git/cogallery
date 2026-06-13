@@ -23,17 +23,17 @@ async function blobToBase64(blob: Blob): Promise<string> {
 // Initialize the Web Worker (only once)
 let worker: Worker | null = null;
 let jobIdCounter = 0;
-const workerPromises = new Map<number, { resolve: (val: string) => void, reject: (err: any) => void }>();
+const workerPromises = new Map<number, { resolve: (val: { base64: string, blurhash?: string }) => void, reject: (err: any) => void }>();
 
 function getWorker() {
   if (typeof window === 'undefined') return null;
   if (!worker) {
     worker = new Worker(new URL('../workers/imageWorker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e) => {
-      const { id, success, base64, error } = e.data;
+      const { id, success, base64, blurhash, error } = e.data;
       const promise = workerPromises.get(id);
       if (promise) {
-        if (success) promise.resolve(base64);
+        if (success) promise.resolve({ base64, blurhash });
         else promise.reject(new Error(error));
         workerPromises.delete(id);
       }
@@ -46,7 +46,7 @@ function getWorker() {
  * Generate a base64 JPEG thumbnail from an image File.
  * Offloads all processing to a Web Worker so the UI never freezes!
  */
-export function generateImageThumbnail(file: File): Promise<string> {
+export function generateImageThumbnail(file: File): Promise<{ base64: string, blurhash?: string }> {
   const w = getWorker();
   
   if (!w || !window.OffscreenCanvas) {
@@ -65,7 +65,7 @@ export function generateImageThumbnail(file: File): Promise<string> {
           const ctx = canvas.getContext('2d')!
           ctx.drawImage(img, 0, 0, width, height)
           canvas.toBlob(async (blob) => {
-            if (blob) resolve(await blobToBase64(blob))
+            if (blob) resolve({ base64: await blobToBase64(blob) })
             else reject(new Error('Canvas blob failed'))
           }, 'image/jpeg', THUMB_QUALITY)
         }
@@ -87,7 +87,7 @@ export function generateImageThumbnail(file: File): Promise<string> {
  * Generate a base64 JPEG thumbnail from a video File.
  * Seeks to 1 second and captures a single frame.
  */
-export function generateVideoThumbnail(file: File): Promise<string> {
+export function generateVideoThumbnail(file: File): Promise<{ base64: string, blurhash?: string }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
     video.preload = 'metadata'
@@ -127,7 +127,7 @@ export function generateVideoThumbnail(file: File): Promise<string> {
         URL.revokeObjectURL(url)
         if (blob) {
           try {
-            resolve(await blobToBase64(blob))
+            resolve({ base64: await blobToBase64(blob) })
           } catch (e) {
             reject(new Error('Failed to encode video frame'))
           }
@@ -142,7 +142,7 @@ export function generateVideoThumbnail(file: File): Promise<string> {
 /**
  * Generate thumbnail for any media file (auto-detects image vs video).
  */
-export async function generateThumbnail(file: File): Promise<string> {
+export async function generateThumbnail(file: File): Promise<{ base64: string, blurhash?: string }> {
   if (file.type.startsWith('video/')) {
     return generateVideoThumbnail(file)
   }
