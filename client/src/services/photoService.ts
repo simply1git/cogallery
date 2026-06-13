@@ -267,7 +267,7 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ key: photo.s3Key })
+    body: JSON.stringify({ key: s3Key })
   });
 
   if (!res.ok) throw new Error('Failed to get secure media url');
