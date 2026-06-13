@@ -9,12 +9,14 @@
     "lint": "eslint src --ext ts,tsx",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@sentry/react": "^10.57.0",
     "@supabase/realtime-js": "^2.10.2",
     "@supabase/supabase-js": "^2.43.0",
     "@uppy/core": "^5.2.0",
@@ -22,6 +24,7 @@
     "@uppy/react": "^5.2.0",
     "@uppy/tus": "^5.1.1",
     "axios": "^1.7.7",
+    "browser-image-compression": "^2.0.2",
     "client-zip": "^2.5.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
@@ -35,6 +38,7 @@
     "masonic": "^4.1.0",
     "pg": "^8.21.0",
     "photoswipe": "^5.4.1",
+    "posthog-js": "^1.386.6",
     "qrcode": "^1.5.3",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
@@ -50,6 +54,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.13",
     "@types/downloadjs": "^1.4.6",
