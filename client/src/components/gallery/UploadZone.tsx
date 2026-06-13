@@ -61,6 +61,26 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             let payloadToUpload: File | Blob = file.data as File;
             const mediaType = getMediaType(payloadToUpload as File) || 'image'
             
+            // PHASE 2.5: Free Forever Image Compression (WebP)
+            if (mediaType === 'image') {
+              try {
+                // Dynamically import to avoid bloating main bundle
+                const imageCompression = (await import('browser-image-compression')).default
+                const options = {
+                  maxSizeMB: 1, // Max 1MB
+                  maxWidthOrHeight: 1920,
+                  useWebWorker: true,
+                  fileType: 'image/webp' // Free edge optimization alternative
+                }
+                const compressedFile = await imageCompression(payloadToUpload as File, options)
+                payloadToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, ".webp"), {
+                  type: 'image/webp',
+                })
+              } catch (error) {
+                console.error('Image compression failed, using original:', error)
+              }
+            }
+            
             // Generate a real thumbnail via Web Worker BEFORE encryption
             let thumbBase64 = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
             try {
@@ -86,13 +106,9 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                   if (done) break;
                   chunks.push(value);
                }
-               payloadToUpload = new Blob(chunks as any[], { type: 'application/octet-stream' });
-               
-               // Update Uppy file with encrypted payload
-               uppyInstance!.setFileState(fileID, {
-                 data: payloadToUpload,
-                 size: payloadToUpload.size,
-               });
+               // Keep the original name from compression step (if applicable) but change type to octet-stream
+               const currentName = (payloadToUpload as File).name || file.name;
+               payloadToUpload = new File(chunks as any[], currentName, { type: 'application/octet-stream' });
                
                // Encrypt the thumbnail using the Vault Key
                if (thumbBase64.length > 50) {
@@ -104,6 +120,16 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                }
             }
             
+            // ALWAYS update Uppy file state so compression/encryption changes are applied
+            uppyInstance!.setFileState(fileID, {
+              data: payloadToUpload,
+              size: payloadToUpload.size,
+              name: (payloadToUpload as File).name || file.name,
+              type: payloadToUpload.type || file.type,
+            });
+            
+            const updatedFile = uppyInstance!.getFile(fileID);
+            
             // We no longer insert to DB here. We generate an ID and pass it along.
             const photoId = crypto.randomUUID()
             localThumbMap.set(photoId, thumbBase64);
@@ -111,8 +137,8 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             // Pass metadata to TUS and for the success handler
             uppyInstance!.setFileMeta(fileID, { 
               photoId: photoId,
-              filename: file.name,
-              filetype: file.type || 'application/octet-stream',
+              filename: updatedFile.name,
+              filetype: updatedFile.type || 'application/octet-stream',
               mediaType: mediaType,
               isEncrypted: isVault || false
             })
