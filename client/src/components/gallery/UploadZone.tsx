@@ -52,7 +52,12 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         removeFingerprintOnSuccess: true,
         // Disable resume properly for tus-js-client v2
         // @ts-ignore
-        urlStorage: null,
+        urlStorage: {
+          findAllUploads: async () => [],
+          findUploadsByFingerprint: async () => [],
+          removeUpload: async () => {},
+          addUpload: async () => ''
+        },
       })
       
       // Pre-processor to handle WebAssembly compression and Stream Encryption BEFORE upload starts
