@@ -235,21 +235,23 @@ export function PhotoDetailModal({
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
                 />
-              ) : isDecrypting ? (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                  <span className="text-sm font-medium text-blue-400">Decrypting...</span>
-                </div>
               ) : (
                 <div className="relative flex items-center justify-center">
-                  {thumbUrl && (
+                  {thumbUrl ? (
                     <img 
                       src={thumbUrl} 
                       className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl blur-md opacity-50" 
                       alt="loading" 
                     />
+                  ) : (
+                    <div className="absolute w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
                   )}
-                  <div className="absolute w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                  {isDecrypting && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/20 rounded-lg">
+                      <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin shadow-lg" />
+                      <span className="text-xs font-medium text-white drop-shadow-md">Decrypting Video...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -284,19 +286,25 @@ export function PhotoDetailModal({
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none"
                   draggable={false}
                 />
-              ) : isDecrypting ? (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                  <span className="text-sm font-medium text-blue-400">Decrypting...</span>
-                </div>
               ) : (
-                <img
-                  key={`fallback-${photo.id}`}
-                  src={thumbUrl || ''} // use decrypted thumbnail while loading secure URL
-                  alt={photo.filename}
-                  className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none blur-sm transition-all"
-                  draggable={false}
-                />
+                <div className="relative flex items-center justify-center w-full h-full">
+                  {thumbUrl ? (
+                    <img
+                      key={`fallback-${photo.id}`}
+                      src={thumbUrl}
+                      alt={photo.filename}
+                      className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl select-none pointer-events-none blur-sm transition-all"
+                      draggable={false}
+                    />
+                  ) : (
+                    <div className="absolute w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                  )}
+                  {isDecrypting && thumbUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-lg">
+                      <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin shadow-lg" />
+                    </div>
+                  )}
+                </div>
               )}
             </motion.div>
           )}
