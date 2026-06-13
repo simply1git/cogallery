@@ -50,6 +50,8 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         chunkSize: 5 * 1024 * 1024,
         limit: 3,
         removeFingerprintOnSuccess: true,
+        // @ts-ignore: Uppy Tus plugin accepts tus-js-client options but types might be missing it
+        resume: false,
       })
       
       // Pre-processor to handle WebAssembly compression and Stream Encryption BEFORE upload starts

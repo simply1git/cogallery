@@ -63,8 +63,8 @@ export function PhotoDetailModal({
   // Prefetch adjacent media
   // Images get pre-fetched at full resolution for instant swiping.
   // Videos only pre-fetch their thumbnail to save bandwidth.
-  useDecryptedMediaUrl(prevPhoto, vaultKey, prevPhoto && !prevPhoto.mediaType.startsWith('video') ? true : false)
-  useDecryptedMediaUrl(nextPhoto, vaultKey, nextPhoto && !nextPhoto.mediaType.startsWith('video') ? true : false)
+  useDecryptedMediaUrl(prevPhoto, vaultKey, prevPhoto && !prevPhoto.mediaType?.startsWith('video') ? true : false)
+  useDecryptedMediaUrl(nextPhoto, vaultKey, nextPhoto && !nextPhoto.mediaType?.startsWith('video') ? true : false)
 
   const loadDetails = useCallback(async (p: Photo) => {
     setIsLoadingDetails(true)
