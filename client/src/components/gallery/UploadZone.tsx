@@ -32,9 +32,6 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
     let isMounted = true;
 
     const initUppy = async () => {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
       const tusEndpoint = `${backendUrl}/upload/tus`
       
@@ -50,8 +47,12 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         }
       }).use(Tus, {
         endpoint: tusEndpoint,
-        headers: {
-          Authorization: `Bearer ${token}`
+        onBeforeRequest: async (req: any) => {
+          const { data } = await supabase.auth.getSession();
+          const currentToken = data.session?.access_token;
+          if (currentToken) {
+            req.setHeader('Authorization', `Bearer ${currentToken}`);
+          }
         },
         chunkSize: 5 * 1024 * 1024,
         limit: 3,

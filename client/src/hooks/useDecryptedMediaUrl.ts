@@ -10,7 +10,8 @@ const urlCache = new Map<string, string>();
 function setCachedUrl(key: string, url: string) {
   urlCache.set(key, url);
   // Prevent infinite memory leak of Blob ObjectURLs
-  if (urlCache.size > 100) {
+  // Increased limit since we removed masonic virtualization and all grid items render simultaneously
+  if (urlCache.size > 1000) {
     const oldestKey = urlCache.keys().next().value;
     if (oldestKey) {
       const oldestUrl = urlCache.get(oldestKey);
