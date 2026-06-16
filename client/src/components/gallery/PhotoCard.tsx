@@ -88,10 +88,10 @@ export const PhotoCard = memo(function PhotoCard({
   return (
     <div
       ref={ref}
-      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#0a0a0a] transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 ${
+      className={`group relative cursor-pointer rounded-xl overflow-hidden bg-[#0a0a0a] aspect-square transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 ${
         selected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[#0a0a0a]' : ''
       }`}
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}
+      style={{ contentVisibility: 'auto' }}
       onClick={handleClick}
       // Add context menu action on mobile
       onContextMenu={() => {
@@ -99,7 +99,7 @@ export const PhotoCard = memo(function PhotoCard({
       }}
     >
       {/* Media */}
-      <div className="relative bg-[#0f0f0f] flex items-center justify-center min-h-[150px]">
+      <div className="relative bg-[#0f0f0f] flex items-center justify-center w-full h-full">
         {imgError || mediaError ? (
           <div className="w-full bg-[#141414] flex flex-col items-center justify-center gap-2 text-[#52525b] py-12">
             {isVideo ? <Film size={32} /> : <ImageIcon size={32} />}
@@ -126,7 +126,7 @@ export const PhotoCard = memo(function PhotoCard({
                 src={mediaUrl}
                 alt={photo.filename}
                 loading="lazy"
-                className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] relative z-10 ${
+                className={`w-full h-full object-cover block transition-all duration-500 group-hover:scale-[1.03] relative z-10 ${
                   isLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
                 onLoad={() => setIsLoaded(true)}

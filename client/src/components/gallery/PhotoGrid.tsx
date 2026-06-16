@@ -1,63 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useDeferredValue, startTransition } from 'react'
 import { PhotoCard } from './PhotoCard'
 import type { Photo } from '@/types'
-import { MasonryScroller, usePositioner, useResizeObserver } from 'masonic'
 import { useHaptics } from '@/hooks/useHaptics'
-import { createContext, useContext, memo, useMemo, useDeferredValue, startTransition } from 'react'
 
-const PhotoGridContext = createContext<{
-  onPhotoClick?: (photo: Photo, index: number) => void
-  onPhotoDelete?: (photo: Photo) => void
-  canDelete?: (photo: Photo) => boolean
-  selectedIds?: Set<string>
-  onToggleSelect?: (photoId: string) => void
-  activePhotoId?: string
-}>({})
 
-const MasonicCard = memo(function MasonicCard({ data, index }: { data: Photo; index: number }) {
-  const ctx = useContext(PhotoGridContext)
-  return (
-    <PhotoCard
-      photo={data}
-      onClick={() => ctx.onPhotoClick?.(data, index)}
-      onDelete={() => ctx.onPhotoDelete?.(data)}
-      canDelete={ctx.canDelete?.(data) ?? false}
-      selectable={ctx.selectedIds !== undefined}
-      selected={ctx.selectedIds?.has(data.id)}
-      onSelect={() => ctx.onToggleSelect?.(data.id)}
-    />
-  )
-})
-
-function useContainerSize(ref: React.RefObject<HTMLElement>) {
-  const [size, setSize] = useState([
-    typeof window !== 'undefined' ? window.innerWidth : 1200,
-    typeof window !== 'undefined' ? window.innerHeight : 800
-  ])
-  
-  useEffect(() => {
-    if (!ref.current) return
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) {
-        setSize([entry.contentRect.width, window.innerHeight])
-      }
-    })
-    observer.observe(ref.current)
-    
-    const onWindowResize = () => {
-      if (ref.current) setSize([ref.current.clientWidth, window.innerHeight])
-    }
-    window.addEventListener('resize', onWindowResize)
-    
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', onWindowResize)
-    }
-  }, [ref])
-  
-  return size
-}
 
 interface PhotoGridProps {
   photos: Photo[]
@@ -81,7 +27,6 @@ export function PhotoGrid({
   isLoading,
   selectedIds,
   onToggleSelect,
-  activePhotoId,
   hasMore,
   isLoadingMore,
   onLoadMore,
@@ -150,17 +95,6 @@ export function PhotoGrid({
 
   const deferredColWidth = useDeferredValue(colWidth)
 
-  const containerSize = useContainerSize(containerRef)
-  const positioner = usePositioner(
-    { 
-      width: containerSize[0] || (typeof window !== 'undefined' ? window.innerWidth : 1200), 
-      columnWidth: deferredColWidth, 
-      columnGutter: 16 
-    },
-    [photos.length, deferredColWidth, containerSize[0]]
-  )
-  const resizeObserver = useResizeObserver(positioner)
-
   // Intersection Observer for Infinite Scroll
   // IMPORTANT: These hooks MUST be above any early returns to satisfy React's Rules of Hooks.
   const observerTarget = useRef<HTMLDivElement>(null)
@@ -182,23 +116,13 @@ export function PhotoGrid({
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, onLoadMore])
 
-  const contextValue = useMemo(() => ({
-    onPhotoClick,
-    onPhotoDelete,
-    canDelete,
-    selectedIds,
-    onToggleSelect,
-    activePhotoId
-  }), [onPhotoClick, onPhotoDelete, canDelete, selectedIds, onToggleSelect, activePhotoId])
-
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-xl bg-white/[0.05] animate-pulse"
-            style={{ height: `${[180, 240, 160, 280, 200, 220][i % 6]}px` }}
+            className="rounded-xl bg-white/[0.05] animate-pulse aspect-square"
           />
         ))}
       </div>
@@ -209,30 +133,36 @@ export function PhotoGrid({
     return null
   }
 
-  return (
-    <PhotoGridContext.Provider value={contextValue}>
-      <div ref={containerRef} className="w-full touch-pan-y" style={{ willChange: 'transform' }}>
-        <MasonryScroller
-          positioner={positioner}
-          resizeObserver={resizeObserver}
-          containerRef={containerRef}
-          items={photos}
-          height={containerSize[1]}
-          offset={0}
-          overscanBy={3}
-          itemKey={(data) => data.id}
-          render={MasonicCard}
-        />
-        
-        {/* Infinite Scroll Sentinel */}
-        {hasMore && (
-          <div ref={observerTarget} className="w-full py-8 flex justify-center">
-            {isLoadingMore && (
-              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            )}
-          </div>
-        )}
+    <div className="w-full">
+      <div 
+        ref={containerRef} 
+        className="w-full touch-pan-y grid gap-4" 
+        style={{ 
+          willChange: 'transform',
+          gridTemplateColumns: `repeat(auto-fill, minmax(${deferredColWidth}px, 1fr))` 
+        }}
+      >
+        {photos.map((data, index) => (
+          <PhotoCard
+            key={data.id}
+            photo={data}
+            onClick={() => onPhotoClick?.(data, index)}
+            onDelete={() => onPhotoDelete?.(data)}
+            canDelete={canDelete?.(data) ?? false}
+            selectable={selectedIds !== undefined}
+            selected={selectedIds?.has(data.id)}
+            onSelect={() => onToggleSelect?.(data.id)}
+          />
+        ))}
       </div>
-    </PhotoGridContext.Provider>
-  )
+      
+      {/* Infinite Scroll Sentinel */}
+      {hasMore && (
+        <div ref={observerTarget} className="w-full py-8 flex justify-center">
+          {isLoadingMore && (
+            <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          )}
+        </div>
+      )}
+    </div>
 }
