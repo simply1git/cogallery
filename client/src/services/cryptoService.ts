@@ -1,7 +1,8 @@
 // Web Crypto API utility for End-to-End Encryption
 
 const ALGO = 'AES-GCM';
-const PBKDF2_ITERATIONS = 100000;
+// OWASP 2024+ recommends 600,000 iterations for PBKDF2 with SHA-256
+const PBKDF2_ITERATIONS = 600_000;
 
 export async function deriveKeyFromPassword(password: string, saltHex: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
@@ -93,6 +94,30 @@ export async function hashPasswordForVerification(password: string, saltHex: str
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ─── Binary-safe base64 encoding ─────────────────────────────────────────────
+// The built-in btoa() breaks on non-Latin1 characters. These helpers
+// work with raw Uint8Arrays and are safe for any binary payload.
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  // Use chunks to avoid stack overflow on large arrays
+  const CHUNK_SIZE = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export async function encryptString(text: string, key: CryptoKey): Promise<string> {
   const enc = new TextEncoder();
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -108,15 +133,11 @@ export async function encryptString(text: string, key: CryptoKey): Promise<strin
   finalBuffer.set(iv, 0);
   finalBuffer.set(new Uint8Array(encryptedBuffer), iv.length);
 
-  return btoa(String.fromCharCode(...finalBuffer));
+  return uint8ToBase64(finalBuffer);
 }
 
 export async function decryptString(encryptedBase64: string, key: CryptoKey): Promise<string> {
-  const binaryString = atob(encryptedBase64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  const bytes = base64ToUint8(encryptedBase64);
 
   const iv = bytes.slice(0, 12);
   const data = bytes.slice(12);
@@ -130,4 +151,3 @@ export async function decryptString(encryptedBase64: string, key: CryptoKey): Pr
   const dec = new TextDecoder();
   return dec.decode(decryptedBuffer);
 }
-

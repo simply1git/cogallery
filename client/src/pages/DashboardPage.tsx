@@ -1,29 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, FolderOpen, Users, CalendarDays, Image, Archive } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useRoomStore } from '@/store/roomStore'
 import { getRoomsByUser } from '@/services/roomService'
 import { CreateRoomModal } from '@/components/modals/CreateRoomModal'
 import { CardSkeleton } from '@/components/shared/Skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { RoomWithMembers } from '@/types'
+import { useQuery } from '@tanstack/react-query'
 
 export function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { rooms, setRooms, isLoading, setLoading } = useRoomStore()
   const [showCreateRoom, setShowCreateRoom] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
 
-  useEffect(() => {
-    if (!user) return
-    setLoading(true)
-    getRoomsByUser(user.id).then((data) => {
-      setRooms(data)
-      setLoading(false)
-    })
-  }, [user, setRooms, setLoading])
+  const { data: rooms = [], isLoading } = useQuery({
+    queryKey: ['rooms', user?.id],
+    queryFn: () => getRoomsByUser(user!.id),
+    enabled: !!user?.id,
+  })
 
   const activeRooms = rooms.filter((r) => !r.isArchived)
   const archivedRooms = rooms.filter((r) => r.isArchived)

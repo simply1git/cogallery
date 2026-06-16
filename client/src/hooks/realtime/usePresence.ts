@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useRoomStore } from '@/store/roomStore'
 
 export interface PresenceUser {
   id: string
@@ -11,12 +12,14 @@ export interface PresenceUser {
 
 export function usePresence(roomId: string, eventId?: string) {
   const { user } = useAuth()
-  const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([])
+  const { onlineUsers, setOnlineUsers } = useRoomStore()
+  
+  const channelName = eventId ? `presence:room_${roomId}:event_${eventId}` : `presence:room_${roomId}`
+  const activeUsers = useMemo(() => onlineUsers[channelName] || [], [onlineUsers, channelName])
 
   useEffect(() => {
     if (!user || !roomId) return
 
-    const channelName = eventId ? `presence:room_${roomId}:event_${eventId}` : `presence:room_${roomId}`
     const channel = supabase.channel(channelName)
 
     const userState: PresenceUser = {
@@ -35,7 +38,7 @@ export function usePresence(roomId: string, eventId?: string) {
         
         // Deduplicate by ID
         const uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values())
-        setOnlineUsers(uniqueUsers)
+        setOnlineUsers(channelName, uniqueUsers)
       })
       .on('presence', { event: 'join' }, () => {
         // sync will handle state updates
@@ -58,8 +61,10 @@ export function usePresence(roomId: string, eventId?: string) {
       clearInterval(interval)
       channel.untrack()
       supabase.removeChannel(channel)
+      // Optional: Clear out empty presence if needed
+      // setOnlineUsers(channelName, [])
     }
-  }, [roomId, eventId, user?.id, user?.displayName, user?.avatarUrl])
+  }, [roomId, eventId, channelName, user?.id, user?.displayName, user?.avatarUrl, setOnlineUsers])
 
-  return { onlineUsers }
+  return { onlineUsers: activeUsers }
 }

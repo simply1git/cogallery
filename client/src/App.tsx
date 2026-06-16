@@ -7,6 +7,9 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadQueueService } from '@/services/uploadQueueService'
 import { supabase } from '@/lib/supabase'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { queryClient } from '@/lib/queryClient'
 
 // ─── Lazy-loaded pages (each becomes its own chunk) ─────────────────────────
 const HomePage = lazy(() => import('@/pages/HomePage').then(m => ({ default: m.HomePage })))
@@ -166,27 +169,30 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <Router>
-        <Layout>
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
-        </Layout>
-      </Router>
-      <Toaster
-        theme="dark"
-        position="bottom-right"
-        richColors
-        toastOptions={{
-          style: {
-            background: '#141414',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#f4f4f5',
-          },
-        }}
-      />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <Router>
+          <Layout>
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
+          </Layout>
+        </Router>
+        <Toaster
+          theme="dark"
+          position="bottom-right"
+          richColors
+          toastOptions={{
+            style: {
+              background: '#141414',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#f4f4f5',
+            },
+          }}
+        />
+      </ThemeProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   )
 }
 

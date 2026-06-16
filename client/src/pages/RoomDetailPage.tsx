@@ -25,7 +25,7 @@ export function RoomDetailPage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { currentRoom, setCurrentRoom, vaultKeys, setVaultKey } = useRoomStore()
+  const { currentRoom, setCurrentRoom, vaultKeys, setVaultKey, loadVaultKey } = useRoomStore()
 
   const [events, setEvents] = useState<EventWithDetails[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,10 +52,13 @@ export function RoomDetailPage() {
         } else {
           setCurrentRoom(roomRes.data)
           setEvents(eventsData)
+          if (roomRes.data.isVault && !vaultKeys[roomId]) {
+            loadVaultKey(roomId)
+          }
         }
       })
       .finally(() => setIsLoading(false))
-  }, [roomId, setCurrentRoom])
+  }, [roomId, setCurrentRoom, loadVaultKey, vaultKeys])
 
   const room = currentRoom
 

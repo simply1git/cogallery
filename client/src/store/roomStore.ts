@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { Room, RoomWithMembers } from '@/types'
+import { vaultKeyService } from '@/services/vaultKeyService'
+import type { PresenceUser } from '@/hooks/realtime/usePresence'
 
 interface RoomStore {
   rooms: RoomWithMembers[]
@@ -14,22 +16,51 @@ interface RoomStore {
   removeRoom: (roomId: string) => void
   vaultKeys: Record<string, CryptoKey>
   setVaultKey: (roomId: string, key: CryptoKey) => void
+  loadVaultKey: (roomId: string) => Promise<boolean>
+  
+  // Realtime Presence State
+  onlineUsers: Record<string, PresenceUser[]> // key: channelName
+  setOnlineUsers: (channelName: string, users: PresenceUser[]) => void
+
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   reset: () => void
 }
 
-export const useRoomStore = create<RoomStore>((set) => ({
+export const useRoomStore = create<RoomStore>((set, get) => ({
   rooms: [],
   currentRoom: null,
   isLoading: false,
   error: null,
   vaultKeys: {},
+  onlineUsers: {},
 
-  setVaultKey: (roomId, key) =>
+  setOnlineUsers: (channelName, users) =>
+    set((state) => ({
+      onlineUsers: { ...state.onlineUsers, [channelName]: users },
+    })),
+
+  setVaultKey: (roomId, key) => {
+    vaultKeyService.saveKey(roomId, key).catch(console.error)
     set((state) => ({
       vaultKeys: { ...state.vaultKeys, [roomId]: key },
-    })),
+    }))
+  },
+
+  loadVaultKey: async (roomId) => {
+    try {
+      const key = await vaultKeyService.getKey(roomId)
+      if (key) {
+        set((state) => ({
+          vaultKeys: { ...state.vaultKeys, [roomId]: key },
+        }))
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  },
 
   setRooms: (rooms) => set({ rooms }),
 

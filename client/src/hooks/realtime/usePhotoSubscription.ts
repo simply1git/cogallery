@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Photo } from '@/types'
 
@@ -14,16 +14,22 @@ export function usePhotoSubscription({
   onPhotoDeleted,
 }: UsePhotoSubscriptionOptions) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const callbacksRef = useRef({ onNewPhoto, onPhotoDeleted })
+  
+  const [isReconnecting, setIsReconnecting] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
 
-    const callbacksRef = useRef({ onNewPhoto, onPhotoDeleted })
-  
-    useEffect(() => {
-      callbacksRef.current = { onNewPhoto, onPhotoDeleted }
-    }, [onNewPhoto, onPhotoDeleted])
-  
-    useEffect(() => {
-      if (!eventId) return
-  
+  useEffect(() => {
+    callbacksRef.current = { onNewPhoto, onPhotoDeleted }
+  }, [onNewPhoto, onPhotoDeleted])
+
+  useEffect(() => {
+    if (!eventId) return
+
+    let retryCount = 0
+    let retryTimer: ReturnType<typeof setTimeout>
+
+    const subscribeWithRetry = () => {
       const channel = supabase
         .channel(`photos:event:${eventId}`)
         .on(
@@ -81,7 +87,7 @@ export function usePhotoSubscription({
               thumbnailBase64: raw.thumbnail_base64,
               isEncrypted: raw.is_encrypted || false,
             }
-            callbacksRef.current.onNewPhoto?.(photo) // Can reuse onNewPhoto to trigger a state update
+            callbacksRef.current.onNewPhoto?.(photo)
           }
         )
         .on(
@@ -96,12 +102,41 @@ export function usePhotoSubscription({
             callbacksRef.current.onPhotoDeleted?.((payload.old as any).id)
           }
         )
-        .subscribe()
-  
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setIsConnected(true)
+            setIsReconnecting(false)
+            retryCount = 0
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setIsConnected(false)
+            setIsReconnecting(true)
+            
+            // Clean up the broken channel before creating a new one
+            supabase.removeChannel(channel)
+            
+            // Exponential backoff
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
+            retryCount++
+            
+            clearTimeout(retryTimer)
+            retryTimer = setTimeout(() => {
+              subscribeWithRetry()
+            }, delay)
+          }
+        })
+
       channelRef.current = channel
-  
-      return () => {
-        supabase.removeChannel(channel)
+    }
+
+    subscribeWithRetry()
+
+    return () => {
+      clearTimeout(retryTimer)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
       }
-    }, [eventId])
+    }
+  }, [eventId])
+
+  return { isConnected, isReconnecting }
 }

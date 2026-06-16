@@ -57,11 +57,43 @@ interface PendingRequest {
   receivedSize: number
   filename: string
   mimeType: string
-  timer: any
+  timer: ReturnType<typeof setTimeout> | null
 }
 
 const eventChannels = new Map<string, ReturnType<typeof supabase.channel>>()
 const pendingRequests = new Map<string, PendingRequest>() // Key: offerId
+
+// ─── Peer Connection Lifecycle Management ─────────────────────────────────────
+
+/**
+ * Attach connection state handlers to clean up dead peers automatically.
+ * This prevents memory leaks from zombie RTCPeerConnection objects.
+ */
+function monitorPeerConnection(
+  pc: RTCPeerConnection, 
+  peerId: string, 
+  peerMap: Map<string, RTCPeerConnection>,
+  label: string = 'seeder'
+): void {
+  pc.onconnectionstatechange = () => {
+    const state = pc.connectionState;
+    if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+      console.log(`[P2P/${label}] Connection ${peerId} → ${state}, cleaning up`);
+      pc.close();
+      peerMap.delete(peerId);
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    const state = pc.iceConnectionState;
+    if (state === 'failed') {
+      console.warn(`[P2P/${label}] ICE failed for ${peerId} — peer may be behind symmetric NAT`);
+      // If we had a TURN server, we'd retry here. For now, clean up.
+      pc.close();
+      peerMap.delete(peerId);
+    }
+  };
+}
 
 function getOrCreateChannel(eventId: string, userId: string) {
   if (eventChannels.has(eventId)) return eventChannels.get(eventId)!
@@ -82,6 +114,7 @@ function getOrCreateChannel(eventId: string, userId: string) {
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
       activePeers.set(offerId, pc)
+      monitorPeerConnection(pc, offerId, activePeers, 'seeder')
 
       const dc = pc.createDataChannel(`file:${photoId}`, { ordered: true })
       dc.onopen = async () => {
@@ -146,7 +179,11 @@ function getOrCreateChannel(eventId: string, userId: string) {
       const { offerId, sdp } = payload.payload
       const pc = activePeers.get(offerId)
       if (!pc) return
-      await pc.setRemoteDescription({ type: 'answer', sdp })
+      try {
+        await pc.setRemoteDescription({ type: 'answer', sdp })
+      } catch (err) {
+        console.warn('[P2P/seeder] Failed to set remote description:', err)
+      }
     })
     // ─── LEECHER LOGIC ───
     .on('broadcast', { event: 'offer' }, async (payload) => {
@@ -160,6 +197,11 @@ function getOrCreateChannel(eventId: string, userId: string) {
       const seederUserId = senderId || null
 
       req.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+      
+      // Monitor leecher-side connection for cleanup
+      const leecherPeers = new Map<string, RTCPeerConnection>()
+      leecherPeers.set(offerId, req.pc)
+      monitorPeerConnection(req.pc, offerId, leecherPeers, 'leecher')
 
       req.pc.ondatachannel = (e) => {
         const dc = e.channel
@@ -179,7 +221,7 @@ function getOrCreateChannel(eventId: string, userId: string) {
                 req.expectedSize = parsed.size
               } else if (parsed.type === 'done') {
                 const blob = new Blob(req.chunks, { type: req.mimeType })
-                clearTimeout(req.timer)
+                if (req.timer) clearTimeout(req.timer)
                 if (req.pc) req.pc.close()
                 pendingRequests.delete(offerId)
                 req.onFileReceived?.(payload.payload.photoId, blob, req.filename, req.mimeType)
@@ -206,15 +248,22 @@ function getOrCreateChannel(eventId: string, userId: string) {
         }
       }
 
-      await req.pc.setRemoteDescription({ type: 'offer', sdp })
-      const answer = await req.pc.createAnswer()
-      await req.pc.setLocalDescription(answer)
+      try {
+        await req.pc.setRemoteDescription({ type: 'offer', sdp })
+        const answer = await req.pc.createAnswer()
+        await req.pc.setLocalDescription(answer)
 
-      channel.send({
-        type: 'broadcast',
-        event: 'answer',
-        payload: { offerId, sdp: answer.sdp },
-      })
+        channel.send({
+          type: 'broadcast',
+          event: 'answer',
+          payload: { offerId, sdp: answer.sdp },
+        })
+      } catch (err) {
+        console.warn('[P2P/leecher] Failed to handle offer:', err)
+        if (req.pc) req.pc.close()
+        pendingRequests.delete(offerId)
+        req.resolve(null)
+      }
     })
     // ─── SHARED ICE CANDIDATES ───
     .on('broadcast', { event: 'ice-candidate' }, async (payload) => {
@@ -243,7 +292,7 @@ function getOrCreateChannel(eventId: string, userId: string) {
     activePeers.forEach((pc) => pc.close())
     activePeers.clear()
     pendingRequests.forEach((req) => {
-      clearTimeout(req.timer)
+      if (req.timer) clearTimeout(req.timer)
       if (req.pc) req.pc.close()
       req.resolve(null)
     })
@@ -258,9 +307,11 @@ function getOrCreateChannel(eventId: string, userId: string) {
 export function startSeeding(eventId: string, userId: string): () => void {
   getOrCreateChannel(eventId, userId)
   return () => {
-    // We do NOT immediately kill the channel because leeching might be using it.
-    // However, in a full implementation we'd ref-count it.
-    // For now, it lives until the user leaves the event page.
+    // Clean up when user navigates away from the event page
+    const channel = eventChannels.get(eventId)
+    if (channel && (channel as any).customCleanup) {
+      (channel as any).customCleanup()
+    }
   }
 }
 
@@ -274,7 +325,7 @@ export function requestFile(
 ): Promise<{ blob: Blob; filename: string; mimeType: string } | null> {
   return new Promise((resolve) => {
     const channel = getOrCreateChannel(eventId, userId)
-    const offerId = `${userId}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const offerId = `${userId}-${Date.now()}-${crypto.randomUUID()}`
 
     const timer = setTimeout(() => {
       const req = pendingRequests.get(offerId)

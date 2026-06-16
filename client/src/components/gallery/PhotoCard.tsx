@@ -7,8 +7,7 @@ import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useHaptics } from '@/hooks/useHaptics'
-import { Blurhash } from 'react-blurhash'
-
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 interface PhotoCardProps {
   photo: Photo
   onClick?: () => void
@@ -36,8 +35,8 @@ export const PhotoCard = memo(function PhotoCard({
   const [isLoaded, setIsLoaded] = useState(false)
   const isVideo = photo.mediaType === 'video'
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo.roomId])
-  const { url: mediaUrl, isDecrypting, error: mediaError } = useDecryptedMediaUrl(photo, vaultKey)
-  const { haptic } = useHaptics()
+  const [ref, inView] = useIntersectionObserver<HTMLDivElement>({ triggerOnce: true, rootMargin: '300px' })
+  const { url: mediaUrl, isDecrypting, error: mediaError } = useDecryptedMediaUrl(photo, inView ? vaultKey : undefined)
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectable) {
@@ -87,6 +86,7 @@ export const PhotoCard = memo(function PhotoCard({
 
   return (
     <div
+      ref={ref}
       className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-all duration-300 hover:scale-[0.98] ${
         selected ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)]' : 'border-white/[0.06] hover:border-white/[0.15]'
       }`}
@@ -111,20 +111,27 @@ export const PhotoCard = memo(function PhotoCard({
           </div>
         ) : (
           <>
-            {photo.blurhash && (!isLoaded || !mediaUrl) && (
-              <div className="absolute inset-0 z-0">
-                <Blurhash hash={photo.blurhash} width="100%" height="100%" resolutionX={32} resolutionY={32} punch={1} />
+            {photo.thumbnailBase64 && (!isLoaded || !mediaUrl) && (
+              <div className="absolute inset-0 z-0 overflow-hidden">
+                <img 
+                  src={photo.thumbnailBase64} 
+                  className="w-full h-full object-cover blur-sm scale-110 opacity-70" 
+                  alt="placeholder" 
+                />
               </div>
             )}
-            <img
-              src={mediaUrl}
-              alt={photo.filename}
-              className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] relative z-10 ${
-                isLoaded && mediaUrl ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'
-              }`}
-              onLoad={() => setIsLoaded(true)}
-              onError={() => setImgError(true)}
-            />
+            {inView && mediaUrl && (
+              <img
+                src={mediaUrl}
+                alt={photo.filename}
+                loading="lazy"
+                className={`w-full h-auto block transition-all duration-500 group-hover:scale-[1.03] relative z-10 ${
+                  isLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+                onLoad={() => setIsLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+            )}
           </>
         )}
         
@@ -132,12 +139,12 @@ export const PhotoCard = memo(function PhotoCard({
           <>
             {/* Play overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover:bg-black/80 transition-colors">
+              <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover:bg-black/80 transition-colors z-20">
                 <Play size={20} className="text-white ml-0.5" fill="white" />
               </div>
             </div>
             {/* Video badge */}
-            <div className="absolute top-2 left-2 pointer-events-none">
+            <div className="absolute top-2 left-2 pointer-events-none z-20">
               <span className="badge-purple text-[10px] px-1.5 py-0.5 shadow-md">VIDEO</span>
             </div>
           </>

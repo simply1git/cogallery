@@ -67,6 +67,28 @@ function mapComment(data: any): Comment {
   }
 }
 
+// ─── Retry Helper ─────────────────────────────────────────────────────────────
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 1000,
+): Promise<T> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err: any) {
+      lastError = err
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  throw lastError!
+}
+
 // ─── Photo Upload (P2P Mode) ─────────────────────────────────────────────────
 
 export interface PhotoUploadOptions {
@@ -77,15 +99,22 @@ export interface PhotoUploadOptions {
   isEncrypted?: boolean
   onProgress?: (progress: number) => void
   metadata?: any
+  /** Pass an AbortSignal to support upload cancellation */
+  signal?: AbortSignal
 }
 
 export async function uploadPhotoWithMetadata(
   opts: PhotoUploadOptions
 ): Promise<{ data: Photo | null; error: string | null }> {
-  const { file, eventId, roomId, userId, isEncrypted, onProgress, metadata } = opts
+  const { file, eventId, roomId, userId, isEncrypted, onProgress, metadata, signal } = opts
   let photoId: string | null = null;
 
   try {
+    // Check if already cancelled before starting
+    if (signal?.aborted) {
+      return { data: null, error: 'Upload cancelled' }
+    }
+
     onProgress?.(5)
 
     const mediaType = getMediaType(file)
@@ -118,7 +147,7 @@ export async function uploadPhotoWithMetadata(
         filename: file.name,
         file_size_bytes: file.size,
         media_type: mediaType,
-        s3_key: `oracle:pending:${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        s3_key: `oracle:pending:${Date.now()}-${crypto.randomUUID()}`,
         s3_url: 'https://pending', // will update after upload
         taken_at: metadata?.takenAt?.toISOString() || null,
         camera_make: metadata?.cameraMake || null,
@@ -162,58 +191,98 @@ export async function uploadPhotoWithMetadata(
     let hasError = false;
     
     const uploadChunk = async (chunkIndex: number) => {
-      if (hasError) return;
-      const start = chunkIndex * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const blob = file.slice(start, end);
-      
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${targetNodeUrl}/upload/chunk`, true);
+      if (hasError || signal?.aborted) return;
+
+      // Wrap the actual XHR call in withRetry for exponential backoff
+      await withRetry(async () => {
+        if (signal?.aborted) throw new Error('Upload cancelled');
+
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const blob = file.slice(start, end);
         
-        xhr.setRequestHeader('x-photo-id', r2Key);
-        xhr.setRequestHeader('x-chunk-index', chunkIndex.toString());
-        xhr.setRequestHeader('x-total-chunks', totalChunks.toString());
-        xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
-        xhr.setRequestHeader('x-mime-type', file.type || 'application/octet-stream');
-        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${targetNodeUrl}/upload/chunk`, true);
+          
+          xhr.setRequestHeader('x-photo-id', r2Key);
+          xhr.setRequestHeader('x-chunk-index', chunkIndex.toString());
+          xhr.setRequestHeader('x-total-chunks', totalChunks.toString());
+          xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
+          xhr.setRequestHeader('x-mime-type', file.type || 'application/octet-stream');
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            chunkProgress[chunkIndex] = e.loaded;
-            const totalLoaded = chunkProgress.reduce((a, b) => a + b, 0);
-            const percent = 20 + Math.round((totalLoaded / file.size) * 80);
-            onProgress?.(Math.min(percent, 99));
+          // Wire up AbortSignal to XHR
+          if (signal) {
+            signal.addEventListener('abort', () => {
+              xhr.abort();
+              reject(new Error('Upload cancelled'));
+            }, { once: true });
           }
-        };
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else {
-            hasError = true;
-            reject(new Error(`Chunk ${chunkIndex} failed with status ${xhr.status}`));
-          }
-        };
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              chunkProgress[chunkIndex] = e.loaded;
+              const totalLoaded = chunkProgress.reduce((a, b) => a + b, 0);
+              const percent = 20 + Math.round((totalLoaded / file.size) * 80);
+              onProgress?.(Math.min(percent, 99));
+            }
+          };
 
-        xhr.onerror = () => {
-          hasError = true;
-          reject(new Error('Network error on chunk upload'));
-        };
-        xhr.send(blob);
-      });
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else {
+              reject(new Error(`Chunk ${chunkIndex} failed with status ${xhr.status}`));
+            }
+          };
+
+          xhr.onerror = () => {
+            reject(new Error('Network error on chunk upload'));
+          };
+
+          xhr.ontimeout = () => {
+            reject(new Error('Chunk upload timed out'));
+          };
+
+          xhr.timeout = 120000; // 2 minute timeout per chunk
+          xhr.send(blob);
+        });
+      }, 3, 1000); // 3 retries, 1s base delay
     };
     
-    // Upload with concurrency of 2
+    // Upload with concurrency of 2 — using atomic index via mutex pattern
     const concurrency = 2;
-    let currentIndex = 0;
-    const workers = Array(concurrency).fill(null).map(async () => {
-      while (currentIndex < totalChunks) {
-        const index = currentIndex++;
-        await uploadChunk(index);
+    let nextChunkIndex = 0;
+    const getNextIndex = (): number => {
+      // Atomic: JS is single-threaded, so this is safe as long as we
+      // always read+increment before the next await yields control.
+      return nextChunkIndex++;
+    };
+
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (!hasError && !signal?.aborted) {
+        const index = getNextIndex();
+        if (index >= totalChunks) break;
+        try {
+          await uploadChunk(index);
+        } catch (err) {
+          hasError = true;
+          throw err;
+        }
       }
     });
-    await Promise.all(workers);
+
+    const results = await Promise.allSettled(workers);
+    const firstError = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    
+    if (signal?.aborted) {
+      throw new Error('Upload cancelled');
+    }
+    
+    if (firstError) {
+      throw firstError.reason;
+    }
 
     // Finalize URL in database
     // Note: Since we are using zero-trust streams, the s3_url stored here is just a placeholder.
