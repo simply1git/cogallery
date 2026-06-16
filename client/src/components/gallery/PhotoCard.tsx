@@ -36,6 +36,7 @@ export const PhotoCard = memo(function PhotoCard({
   const isVideo = photo.mediaType === 'video'
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo.roomId])
   const [ref, inView] = useIntersectionObserver<HTMLDivElement>({ triggerOnce: true, rootMargin: '300px' })
+  const { haptic } = useHaptics()
   const { url: mediaUrl, isDecrypting, error: mediaError } = useDecryptedMediaUrl(photo, inView ? vaultKey : undefined)
 
   const handleClick = (e: React.MouseEvent) => {

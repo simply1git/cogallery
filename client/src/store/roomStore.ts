@@ -27,7 +27,7 @@ interface RoomStore {
   reset: () => void
 }
 
-export const useRoomStore = create<RoomStore>((set, get) => ({
+export const useRoomStore = create<RoomStore>((set) => ({
   rooms: [],
   currentRoom: null,
   isLoading: false,

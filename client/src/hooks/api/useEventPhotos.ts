@@ -7,10 +7,9 @@ interface UseEventPhotosOptions {
   eventId?: string
   filter?: 'all' | 'image' | 'video'
   uploaderFilter?: string
-  userId?: string
 }
 
-export function useEventPhotos({ eventId, filter, uploaderFilter, userId }: UseEventPhotosOptions) {
+export function useEventPhotos({ eventId, filter, uploaderFilter }: UseEventPhotosOptions) {
   const queryClient = useQueryClient()
   
   const queryKey = ['photos', eventId, filter, uploaderFilter]
@@ -19,7 +18,6 @@ export function useEventPhotos({ eventId, filter, uploaderFilter, userId }: UseE
     data,
     fetchNextPage,
     hasNextPage,
-    isFetching,
     isFetchingNextPage,
     isLoading
   } = useInfiniteQuery({

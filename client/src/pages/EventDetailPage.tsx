@@ -7,7 +7,7 @@ import {
   CalendarDays, Check, PenTool
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { getEventById, requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail } from '@/services/eventService'
+import { requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail } from '@/services/eventService'
 import { updateRoomThumbnail } from '@/services/roomService'
 import { deletePhotoById, getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
 import { useEvent } from '@/hooks/api/useEvent'
@@ -24,7 +24,7 @@ import { EventHeader } from '@/components/events/EventHeader'
 import { LiveNotes } from '@/components/events/LiveNotes'
 import { PageHeaderSkeleton } from '@/components/shared/Skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
-import type { EventWithDetails, Photo, RoomWithMembers } from '@/types'
+import type { Photo } from '@/types'
 import { downloadFilesAsZip } from '@/services/downloadService'
 import { downloadFile } from '@/utils/download'
 import { toast } from 'sonner'
@@ -61,7 +61,19 @@ export function EventDetailPage() {
     imageCount, 
     videoCount, 
     totalSize 
-  } = useEventPhotos({ eventId, filter, uploaderFilter, userId: user?.id })
+  } = useEventPhotos({ eventId, filter, uploaderFilter })
+
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showUpload, setShowUpload] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
+  const [isRequestingJoin, setIsRequestingJoin] = useState(false)
+
+  const onlineUsers = useRoomStore(s => s.onlineUsers)
+  const vaultKey = useRoomStore(s => s.vaultKeys[roomId!])
+  usePresence(roomId || '', eventId || '')
 
   // P2P Seeding
   useEffect(() => {
@@ -82,8 +94,7 @@ export function EventDetailPage() {
 
   // Selection state
 
-  // Upload success handler
-  function handleUploadSuccess(photo: Photo) {
+  function handleUploadSuccess() {
     // React Query handles cache update via realtime subscription automatically
     // We just keep this handler to close modal or show toast if needed
   }
@@ -339,7 +350,7 @@ export function EventDetailPage() {
         imageCount={imageCount}
         videoCount={videoCount}
         totalSize={totalSize}
-        onlineUsers={onlineUsers}
+        onlineUsers={onlineUsers[roomId!] || []}
         canManageEvent={canManageEvent}
         isEventOwner={isEventOwner}
         isSelectionMode={isSelectionMode}
@@ -635,7 +646,7 @@ export function EventDetailPage() {
         isOpen={showSettings}
         event={event}
         onClose={() => setShowSettings(false)}
-        onUpdate={(updates) => { /* Will invalidate query in the modal component */ }}
+        onUpdate={() => { /* Will invalidate query in the modal component */ }}
       />
     </div>
   )
