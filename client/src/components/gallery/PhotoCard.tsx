@@ -91,7 +91,6 @@ export const PhotoCard = memo(function PhotoCard({
       className={`group relative cursor-pointer rounded-xl overflow-hidden bg-[#0a0a0a] aspect-square transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 ${
         selected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[#0a0a0a]' : ''
       }`}
-      style={{ contentVisibility: 'auto' }}
       onClick={handleClick}
       // Add context menu action on mobile
       onContextMenu={() => {
