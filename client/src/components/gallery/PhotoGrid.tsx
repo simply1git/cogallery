@@ -133,6 +133,7 @@ export function PhotoGrid({
     return null
   }
 
+  return (
     <div className="w-full">
       <div 
         ref={containerRef} 
@@ -165,4 +166,5 @@ export function PhotoGrid({
         </div>
       )}
     </div>
+  )
 }
