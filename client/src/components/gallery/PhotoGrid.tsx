@@ -29,16 +29,33 @@ const MasonicCard = memo(function MasonicCard({ data, index }: { data: Photo; in
   )
 })
 
-function useWindowSize() {
+function useContainerSize(ref: React.RefObject<HTMLElement>) {
   const [size, setSize] = useState([
     typeof window !== 'undefined' ? window.innerWidth : 1200,
     typeof window !== 'undefined' ? window.innerHeight : 800
   ])
+  
   useEffect(() => {
-    const onResize = () => setSize([window.innerWidth, window.innerHeight])
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
+    if (!ref.current) return
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry) {
+        setSize([entry.contentRect.width, window.innerHeight])
+      }
+    })
+    observer.observe(ref.current)
+    
+    const onWindowResize = () => {
+      if (ref.current) setSize([ref.current.clientWidth, window.innerHeight])
+    }
+    window.addEventListener('resize', onWindowResize)
+    
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', onWindowResize)
+    }
+  }, [ref])
+  
   return size
 }
 
@@ -133,14 +150,14 @@ export function PhotoGrid({
 
   const deferredColWidth = useDeferredValue(colWidth)
 
-  const windowSize = useWindowSize()
+  const containerSize = useContainerSize(containerRef)
   const positioner = usePositioner(
     { 
-      width: windowSize[0], 
+      width: containerSize[0] || (typeof window !== 'undefined' ? window.innerWidth : 1200), 
       columnWidth: deferredColWidth, 
       columnGutter: 16 
     },
-    [photos.length, deferredColWidth, windowSize[0]]
+    [photos.length, deferredColWidth, containerSize[0]]
   )
   const resizeObserver = useResizeObserver(positioner)
 
@@ -200,7 +217,7 @@ export function PhotoGrid({
           resizeObserver={resizeObserver}
           containerRef={containerRef}
           items={photos}
-          height={windowSize[1]}
+          height={containerSize[1]}
           offset={0}
           overscanBy={3}
           itemKey={(data) => data.id}

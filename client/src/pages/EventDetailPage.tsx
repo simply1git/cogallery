@@ -475,36 +475,36 @@ export function EventDetailPage() {
         </div>
       )}
 
-      {/* Filter tabs */}
+      {/* Filter tabs - Segmented Control Style */}
       {(imageCount > 0 || videoCount > 0 || uploadersList.length > 0) && (
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center bg-white/5 p-1 rounded-xl">
             {(['all', 'image', 'video'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`text-sm px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                className={`text-sm px-4 py-1.5 rounded-lg transition-all duration-300 flex items-center gap-1.5 font-medium ${
                   filter === f
-                    ? 'bg-white/10 text-[#f4f4f5]'
-                    : 'text-[#71717a] hover:text-[#a1a1aa]'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'text-[#71717a] hover:text-[#f4f4f5] hover:bg-white/5'
                 }`}
               >
-                {f === 'image' && <Image size={13} />}
-                {f === 'video' && <Video size={13} />}
-                {f === 'all' ? `All (${photos.length})` : f === 'image' ? `Photos (${imageCount})` : `Videos (${videoCount})`}
+                {f === 'image' && <Image size={14} />}
+                {f === 'video' && <Video size={14} />}
+                {f === 'all' ? `All` : f === 'image' ? `Photos` : `Videos`}
               </button>
             ))}
           </div>
 
           {uploadersList.length > 0 && (
             <div className="flex items-center gap-2">
-              <label className="text-xs text-[#71717a]">By:</label>
+              <label className="text-xs text-[#71717a] font-medium">Uploader</label>
               <select
-                className="input-base py-1.5 px-3 text-sm min-w-[140px]"
+                className="bg-white/5 border border-white/10 rounded-xl py-1.5 px-3 text-sm min-w-[140px] text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 value={uploaderFilter}
                 onChange={(e) => setUploaderFilter(e.target.value)}
               >
-                <option value="all">All Uploaders</option>
+                <option value="all">Everyone</option>
                 {uploadersList.map(u => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}

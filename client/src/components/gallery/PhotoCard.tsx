@@ -88,8 +88,8 @@ export const PhotoCard = memo(function PhotoCard({
   return (
     <div
       ref={ref}
-      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#141414] border transition-all duration-300 hover:scale-[0.98] ${
-        selected ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)]' : 'border-white/[0.06] hover:border-white/[0.15]'
+      className={`masonry-item group relative cursor-pointer rounded-xl overflow-hidden bg-[#0a0a0a] transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 ${
+        selected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[#0a0a0a]' : ''
       }`}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}
       onClick={handleClick}
@@ -156,59 +156,61 @@ export const PhotoCard = memo(function PhotoCard({
       {selectable && (
         <div className="absolute top-2 right-2 z-10">
           <div 
-            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+            className={`w-6 h-6 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-300 ${
               selected 
-                ? 'bg-blue-500 border-blue-500' 
-                : 'bg-black/50 border-white/50 group-hover:border-white/80 backdrop-blur-md'
+                ? 'bg-blue-500 border-blue-500 shadow-lg shadow-blue-500/30' 
+                : 'bg-black/20 border-white/40 group-hover:bg-black/40 group-hover:border-white/80 backdrop-blur-md'
             }`}
           >
             {selected && (
-              <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 5L5 9L13 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="12" height="9" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 5L5 9L13 1" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
           </div>
         </div>
       )}
 
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-2">
-          {/* Top of hover area - actions */}
-          <div className="flex items-center justify-end gap-2 mb-1 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+      {/* Hover overlay - clean minimalist gradient */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col gap-3">
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 ease-out pointer-events-auto">
             <button
               onClick={handleDownload}
-              className="p-1.5 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:scale-105 transition-all"
+              className="p-2 rounded-full bg-black/20 hover:bg-white/20 backdrop-blur-md text-white/90 hover:text-white transition-all hover:scale-110 active:scale-95"
               title="Download"
             >
-              <Download size={14} />
+              <Download size={14} strokeWidth={2.5} />
             </button>
             {canDelete && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete?.() }}
-                className="p-1.5 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 hover:bg-red-500/40 hover:scale-105 transition-all"
+                className="p-2 rounded-full bg-black/20 hover:bg-red-500/40 backdrop-blur-md text-white/90 hover:text-red-100 transition-all hover:scale-110 active:scale-95"
                 title="Delete"
               >
-                <Trash2 size={14} />
+                <Trash2 size={14} strokeWidth={2.5} />
               </button>
             )}
           </div>
           
-          {/* Bottom of hover area - info */}
-          <div className="flex items-center gap-3">
-            {reactionCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-white shadow-sm font-medium">
-                <Heart size={12} fill="currentColor" className="text-red-500" />
-                {reactionCount}
-              </span>
-            )}
-            {commentCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-white shadow-sm font-medium">
-                <MessageCircle size={12} />
-                {commentCount}
-              </span>
-            )}
-          </div>
+          {/* Info/Badges */}
+          {(reactionCount > 0 || commentCount > 0) && (
+            <div className="flex items-center gap-2.5">
+              {reactionCount > 0 && (
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-white/90 bg-black/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/5">
+                  <Heart size={10} fill="currentColor" className="text-red-500" />
+                  {reactionCount}
+                </div>
+              )}
+              {commentCount > 0 && (
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-white/90 bg-black/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/5">
+                  <MessageCircle size={10} fill="currentColor" className="text-blue-400" />
+                  {commentCount}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
