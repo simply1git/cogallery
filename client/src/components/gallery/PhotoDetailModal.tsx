@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   X, ChevronLeft, ChevronRight, Download, Trash2,
   MessageCircle, Camera, Calendar, HardDrive, Image as ImageIcon, Layout,
-  ChevronUp, ChevronDown
+  ChevronDown
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { getPhotoDetails, addReaction, addComment, deleteComment, getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
