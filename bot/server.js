@@ -330,11 +330,22 @@ async function requireAdmin(req, res, next) {
   next();
 }
 
-async function findPhotoByStorageKey(key) {
-  if (!supabaseAdmin || !isSafeStorageKey(key)) return null;
+function getScopedClient(token) {
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (SUPABASE_URL && anonKey && token) {
+    return createClient(SUPABASE_URL, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+  }
+  return supabaseAdmin;
+}
+
+async function findPhotoByStorageKey(key, token) {
+  const client = getScopedClient(token);
+  if (!client || !isSafeStorageKey(key)) return null;
 
   const columns = 'id,event_id,room_id,uploader_id,filename,s3_key,s3_url';
-  const byS3Key = await supabaseAdmin
+  const byS3Key = await client
     .from('photos')
     .select(columns)
     .eq('s3_key', key)
@@ -344,7 +355,7 @@ async function findPhotoByStorageKey(key) {
 
   const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
   if (uuidLike) {
-    const byId = await supabaseAdmin
+    const byId = await client
       .from('photos')
       .select(columns)
       .eq('id', key)
@@ -355,12 +366,13 @@ async function findPhotoByStorageKey(key) {
   return null;
 }
 
-async function userCanAccessPhoto(userId, photo) {
-  if (!supabaseAdmin || !userId || !photo) return false;
+async function userCanAccessPhoto(userId, photo, token) {
+  const client = getScopedClient(token);
+  if (!client || !userId || !photo) return false;
   if (photo.uploader_id === userId) return true;
 
   const [roomMember, eventMember] = await Promise.all([
-    supabaseAdmin
+    client
       .from('room_members')
       .select('id')
       .eq('room_id', photo.room_id)
@@ -368,7 +380,7 @@ async function userCanAccessPhoto(userId, photo) {
       .eq('status', 'approved')
       .limit(1)
       .maybeSingle(),
-    supabaseAdmin
+    client
       .from('event_members')
       .select('id')
       .eq('event_id', photo.event_id)
@@ -381,15 +393,15 @@ async function userCanAccessPhoto(userId, photo) {
   return Boolean(roomMember.data || eventMember.data);
 }
 
-async function requirePhotoAccess(userId, key) {
-  const photo = await findPhotoByStorageKey(key);
+async function requirePhotoAccess(userId, key, token) {
+  const photo = await findPhotoByStorageKey(key, token);
   if (!photo) {
     const error = new Error('Media not found');
     error.statusCode = 404;
     throw error;
   }
 
-  if (!(await userCanAccessPhoto(userId, photo))) {
+  if (!(await userCanAccessPhoto(userId, photo, token))) {
     const error = new Error('You do not have access to this media');
     error.statusCode = 403;
     throw error;
@@ -673,13 +685,14 @@ app.post('/developer/storage/nuke-files', adminLimiter, authenticateJWT, require
 });
 
 // --- EPHEMERAL SECURE GET URL (ZERO TRUST) ---
-app.post('/media/presign-get', mediaLimiter, authenticateJWT, requireSupabaseAdmin, async (req, res) => {
+app.post('/media/presign-get', mediaLimiter, authenticateJWT, async (req, res) => {
   try {
     const { key, type } = req.body;
     if (!key) return res.status(400).json({ error: 'Missing key' });
     if (!isSafeStorageKey(key)) return res.status(400).json({ error: 'Invalid key' });
 
-    const photo = await requirePhotoAccess(req.user?.sub, key);
+    // Validate access to the file using scoped client or admin client
+    const photo = await requirePhotoAccess(req.user?.sub, key, req.accessToken);
     
     // Generate a short-lived JWT token that grants read access to this specific file
     const streamToken = jwt.sign(
@@ -951,7 +964,7 @@ app.post('/api/download-zip', mediaLimiter, authenticateJWT, requireSupabaseAdmi
     }
 
     try {
-      const authorizedPhoto = await requirePhotoAccess(req.user?.sub, key);
+      const authorizedPhoto = await requirePhotoAccess(req.user?.sub, key, req.accessToken);
       requestedPhotos.push({
         key,
         filename: safeAttachmentFilename(photo.filename || authorizedPhoto.filename || key),
