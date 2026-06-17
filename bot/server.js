@@ -947,7 +947,7 @@ app.get('/stream/:photoId', async (req, res) => {
 });
 
 // Fallback ZIP streaming endpoint for iOS/Safari
-app.post('/api/download-zip', mediaLimiter, authenticateJWT, requireSupabaseAdmin, [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
+app.post('/api/download-zip', mediaLimiter, authenticateJWT, [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
   // If sent via form urlencoded, req.body.photos is a stringified JSON array
   let photos = req.body.photos;
   if (typeof photos === 'string') {
