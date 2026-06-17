@@ -154,9 +154,14 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
         // Wait for the backend TUS server POST_FINISH handler to complete the fs.rename
         // by polling the /upload/status endpoint instead of a fixed sleep.
         let isComplete = false;
+        const { data } = await supabase.auth.getSession();
+        const currentToken = data.session?.access_token;
+        
         for (let i = 0; i < 20; i++) {
           try {
-            const res = await fetch(`${backendBase}/upload/status/${photoId}`);
+            const res = await fetch(`${backendBase}/upload/status/${photoId}`, {
+              headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {}
+            });
             if (res.ok) {
               const status = await res.json();
               if (status.completed) {
