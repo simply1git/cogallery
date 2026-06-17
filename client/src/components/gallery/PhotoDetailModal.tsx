@@ -15,6 +15,7 @@ import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useColorExtractor } from '@/hooks/useColorExtractor'
 import { useHaptics } from '@/hooks/useHaptics'
+import { createPortal } from 'react-dom'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']
 
@@ -173,7 +174,7 @@ export function PhotoDetailModal({
     {}
   ) ?? {}
 
-  return (
+  return createPortal(
     <div 
       className="lightbox-overlay animate-fade-in transition-colors duration-1000 ease-in-out" 
       onClick={onClose}
@@ -542,7 +543,8 @@ export function PhotoDetailModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
