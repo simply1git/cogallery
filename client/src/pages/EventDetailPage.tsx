@@ -547,7 +547,7 @@ export function EventDetailPage() {
 
       {/* Floating Action Bar for Selection Mode */}
       {isSelectionMode && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 animate-slide-up pb-safe">
+        <div className="fixed bottom-[68px] md:bottom-0 left-0 right-0 z-[60] animate-slide-up pb-safe">
           <div className="mx-auto max-w-lg px-3 pb-4">
             <div className="bg-[#18181b]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-3 flex flex-col gap-3">
               {/* Top row: count + select all */}

@@ -207,7 +207,7 @@
 
 /* Lightbox overlay */
 .lightbox-overlay {
-  @apply fixed inset-0 z-50 flex items-center justify-center;
+  @apply fixed inset-0 z-[100] flex items-center justify-center;
   background: rgba(0, 0, 0, 0.96);
   backdrop-filter: blur(12px);
 }
