@@ -509,7 +509,7 @@ app.get('/developer/telemetry', adminLimiter, authenticateJWT, requireSupabaseAd
 
 // --- CLUSTER / OTA MANAGEMENT ENDPOINTS ---
 
-app.post('/developer/server/update', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
+app.post('/developer/server/update', adminLimiter, authenticateJWT, requireAdmin, async (req, res) => {
   try {
     // 1. Acknowledge the request immediately so the frontend knows it succeeded before the process dies
     res.json({ success: true, message: 'Syncing code and restarting...' });
