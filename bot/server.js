@@ -21,6 +21,11 @@ import jwksClient from 'jwks-rsa';
 import { Server, EVENTS } from '@tus/server';
 import { FileStore } from '@tus/file-store';
 import sharp from 'sharp';
+import WebSocket from 'ws';
+
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = WebSocket;
+}
 
 dotenv.config();
 
@@ -704,6 +709,7 @@ app.post('/media/presign-get', mediaLimiter, authenticateJWT, async (req, res) =
     
     res.json({ url });
   } catch (error) {
+    console.error('[PRESIGN_ERROR]', error);
     res.status(error.statusCode || 500).json({ error: error.message });
   }
 });
