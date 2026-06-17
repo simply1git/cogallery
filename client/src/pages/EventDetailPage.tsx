@@ -96,7 +96,8 @@ export function EventDetailPage() {
 
   function handleUploadSuccess() {
     // React Query handles cache update via realtime subscription automatically
-    // We just keep this handler to close modal or show toast if needed
+    // But as a fallback and to ensure the UI is fully synced, we refresh the page.
+    window.location.reload()
   }
 
   async function handleDeletePhoto(photo: Photo) {
