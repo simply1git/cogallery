@@ -310,16 +310,37 @@ export function PhotoDetailModal({
           )}
 
           {/* Counter + mobile panel toggle */}
-          <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
-            <span className="text-xs md:text-sm text-white/50">
+          <div className="absolute bottom-6 md:bottom-4 left-0 right-0 px-4 flex items-center justify-between md:justify-center gap-3">
+            {/* Mobile quick actions (left) */}
+            <div className="flex items-center gap-2 md:hidden">
+              <button onClick={handleDownload} className="btn-icon bg-black/60 backdrop-blur-sm border border-white/10 p-2 text-white shadow-lg" title="Download">
+                <Download size={18} />
+              </button>
+              {canDelete && onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(photo.id); onClose() }}
+                  className="btn-icon bg-black/60 backdrop-blur-sm border border-red-500/20 p-2 text-red-400 hover:text-red-300 shadow-lg"
+                  title="Delete"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+
+            <span className="text-xs md:text-sm text-white/50 font-medium">
               {currentIndex + 1} / {allPhotos.length}
             </span>
-            <button
-              className="md:hidden btn-icon bg-black/60 backdrop-blur-sm border border-white/10 p-1.5"
-              onClick={() => setShowMobilePanel(!showMobilePanel)}
-            >
-              {showMobilePanel ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-            </button>
+
+            {/* Mobile panel toggle (right) */}
+            <div className="flex items-center gap-2 md:hidden">
+              <button
+                className={`btn-icon backdrop-blur-sm border p-2 shadow-lg transition-colors ${showMobilePanel ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-black/60 border-white/10 text-white'}`}
+                onClick={(e) => { e.stopPropagation(); setShowMobilePanel(!showMobilePanel) }}
+                title="Info & Comments"
+              >
+                <MessageCircle size={18} />
+              </button>
+            </div>
           </div>
         </div>
 

@@ -171,7 +171,7 @@ export const PhotoCard = memo(function PhotoCard({
       )}
 
       {/* Hover overlay - clean minimalist gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out pointer-events-none">
+      <div className="absolute inset-0 z-30 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out pointer-events-none">
         <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col gap-3">
           {/* Actions */}
           <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 ease-out pointer-events-auto">

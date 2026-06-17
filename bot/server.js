@@ -5,6 +5,7 @@ import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import { pipeline } from 'stream/promises';
 import { exec } from 'child_process';
 import util from 'util';
 const execPromise = util.promisify(exec);
@@ -28,22 +29,102 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
   : null;
+const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET;
+const streamJwtSecret = process.env.STREAM_JWT_SECRET || supabaseJwtSecret;
+const streamTokenTtl = process.env.STREAM_TOKEN_TTL || '15m';
+
+if (!SUPABASE_URL) {
+  throw new Error('Missing SUPABASE_URL or VITE_SUPABASE_URL');
+}
+
+if (!streamJwtSecret || streamJwtSecret.length < 32) {
+  throw new Error('Missing STREAM_JWT_SECRET or SUPABASE_JWT_SECRET with at least 32 characters');
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'uploads');
 const TEMP_DIR = path.join(__dirname, 'uploads/temp');
 
-const supabasePublicKey = `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAES1i7lih7PQfCnIBs0bYc6YL/X0fm
-mtrchCOYjNWS0QMtuHTVB0zbjWw8OjXmtI1367dWAPbRK8oKJuVUj2avWw==
------END PUBLIC KEY-----`;
+const supabaseJwks = jwksClient({
+  jwksUri: `${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`,
+  cache: true,
+  cacheMaxEntries: 5,
+  cacheMaxAge: 10 * 60 * 1000,
+  rateLimit: true,
+  jwksRequestsPerMinute: 10,
+});
 
-function getSupabaseKey(header, callback) {
-  // Always return the static public key for ES256 tokens
-  callback(null, supabasePublicKey);
+function isSafeStorageKey(key) {
+  return typeof key === 'string'
+    && key.length > 0
+    && key.length <= 256
+    && !key.includes('/')
+    && !key.includes('\\')
+    && !key.includes('..')
+    && /^[A-Za-z0-9._~:-]+$/.test(key);
+}
+
+function storagePaths(key) {
+  if (!isSafeStorageKey(key)) {
+    const error = new Error('Invalid storage key');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    dataPath: path.join(CACHE_DIR, `${key}.data`),
+    metaPath: path.join(CACHE_DIR, `${key}.meta.json`),
+    previewPath: path.join(CACHE_DIR, `${key}.preview.webp`),
+    chunkDir: path.join(TEMP_DIR, key),
+  };
+}
+
+function safeAttachmentFilename(filename) {
+  return String(filename || 'download')
+    .replace(/[\r\n"]/g, '')
+    .replace(/[\\/]/g, '_')
+    .slice(0, 180);
+}
+
+function verifySupabaseJwt(token) {
+  return new Promise((resolve, reject) => {
+    const decoded = jwt.decode(token, { complete: true });
+    const algorithm = decoded?.header?.alg;
+
+    if (algorithm === 'HS256') {
+      if (!supabaseJwtSecret) {
+        reject(new Error('Server is missing SUPABASE_JWT_SECRET for HS256 tokens'));
+        return;
+      }
+      jwt.verify(token, supabaseJwtSecret, { algorithms: ['HS256'] }, (err, payload) => {
+        if (err) reject(err);
+        else resolve(payload);
+      });
+      return;
+    }
+
+    if (algorithm === 'RS256' || algorithm === 'ES256') {
+      supabaseJwks.getSigningKey(decoded.header.kid, (keyErr, key) => {
+        if (keyErr) {
+          reject(keyErr);
+          return;
+        }
+
+        const signingKey = key.getPublicKey();
+        jwt.verify(token, signingKey, { algorithms: ['RS256', 'ES256'] }, (err, payload) => {
+          if (err) reject(err);
+          else resolve(payload);
+        });
+      });
+      return;
+    }
+
+    reject(new Error(`Unsupported JWT algorithm: ${algorithm || 'unknown'}`));
+  });
 }
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Allow all origins (since frontend is on Cloudflare Pages)
 app.use(cors({
@@ -52,6 +133,12 @@ app.use(cors({
   allowedHeaders: ['Authorization', 'Content-Type', 'Upload-Length', 'Upload-Metadata', 'Upload-Offset', 'Tus-Resumable', 'Upload-Name', 'Upload-Concat', 'X-Requested-With', 'Range'],
   exposedHeaders: ['Upload-Offset', 'Location', 'Upload-Length', 'Tus-Version', 'Tus-Resumable', 'Tus-Max-Size', 'Tus-Extension', 'Upload-Metadata', 'Upload-Concat', 'Content-Disposition']
 }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
 
 // Ensure directories exist
@@ -145,6 +232,10 @@ setInterval(async () => {
 // Register this specific node in Supabase so the Developer Dashboard can discover it
 const startHeartbeat = () => {
   const nodeUrl = process.env.NODE_URL;
+  if (!supabaseAdmin) {
+    console.warn('[Cluster] SUPABASE_SERVICE_ROLE_KEY not set. Heartbeat disabled.');
+    return;
+  }
   if (!nodeUrl) {
     console.warn('[Cluster] NODE_URL not set. This node will not be discoverable by the Developer Dashboard.');
     return;
@@ -168,25 +259,21 @@ startHeartbeat();
 
 
 // --- ZERO-TRUST SECURITY MIDDLEWARE ---
-// Keep JWT_SECRET for internal short-lived streaming tokens
-const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
-
-const authenticateJWT = (req, res, next) => {
+const authenticateJWT = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
-  if (token) {
-    
-    // Verify using Supabase JWKS (supports both ES256 and RS256)
-    jwt.verify(token, getSupabaseKey, { algorithms: ['RS256', 'ES256'] }, (err, user) => {
-      if (err) {
-        console.error("JWT Verification failed:", err.message);
-        return res.status(403).json({ error: 'Invalid or expired token', details: err.message });
-      }
-      req.user = user;
-      next();
-    });
-  } else {
-    res.status(401).json({ error: 'Authorization header missing' });
+  if (!token) {
+    return res.status(401).json({ error: 'Authorization header missing' });
+  }
+
+  try {
+    const user = await verifySupabaseJwt(token);
+    req.user = user;
+    req.accessToken = token;
+    next();
+  } catch (err) {
+    console.error('JWT verification failed:', err.message);
+    res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
 
@@ -195,6 +282,131 @@ const uploadLimiter = rateLimit({
   max: 500, // Max 500 requests per IP
   message: { error: 'Too many requests, auto-banned for 15 minutes' }
 });
+
+const mediaLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 240,
+  message: { error: 'Too many media requests. Please slow down.' },
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: { error: 'Too many admin requests. Please slow down.' },
+});
+
+function requireSupabaseAdmin(req, res, next) {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Server admin client is not configured' });
+  }
+  next();
+}
+
+async function isAdminUser(userId) {
+  if (!supabaseAdmin || !userId) return false;
+
+  try {
+    const { data, error } = await supabaseAdmin.rpc('is_admin', { user_uid: userId });
+    if (!error && data === true) return true;
+  } catch {}
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .maybeSingle();
+    return !error && data?.is_admin === true;
+  } catch {
+    return false;
+  }
+}
+
+async function requireAdmin(req, res, next) {
+  const userId = req.user?.sub;
+  if (!(await isAdminUser(userId))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+async function findPhotoByStorageKey(key) {
+  if (!supabaseAdmin || !isSafeStorageKey(key)) return null;
+
+  const columns = 'id,event_id,room_id,uploader_id,filename,s3_key,s3_url';
+  const byS3Key = await supabaseAdmin
+    .from('photos')
+    .select(columns)
+    .eq('s3_key', key)
+    .maybeSingle();
+
+  if (byS3Key.data) return byS3Key.data;
+
+  const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+  if (uuidLike) {
+    const byId = await supabaseAdmin
+      .from('photos')
+      .select(columns)
+      .eq('id', key)
+      .maybeSingle();
+    if (byId.data) return byId.data;
+  }
+
+  return null;
+}
+
+async function userCanAccessPhoto(userId, photo) {
+  if (!supabaseAdmin || !userId || !photo) return false;
+  if (photo.uploader_id === userId) return true;
+
+  const [roomMember, eventMember] = await Promise.all([
+    supabaseAdmin
+      .from('room_members')
+      .select('id')
+      .eq('room_id', photo.room_id)
+      .eq('user_id', userId)
+      .eq('status', 'approved')
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('event_members')
+      .select('id')
+      .eq('event_id', photo.event_id)
+      .eq('user_id', userId)
+      .eq('status', 'approved')
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  return Boolean(roomMember.data || eventMember.data);
+}
+
+async function requirePhotoAccess(userId, key) {
+  const photo = await findPhotoByStorageKey(key);
+  if (!photo) {
+    const error = new Error('Media not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!(await userCanAccessPhoto(userId, photo))) {
+    const error = new Error('You do not have access to this media');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return photo;
+}
+
+function verifyStreamToken(token, key) {
+  const decoded = jwt.verify(token, streamJwtSecret);
+  if (decoded.scope !== 'media:read' || decoded.key !== key) {
+    const error = new Error('Token does not match media');
+    error.statusCode = 403;
+    throw error;
+  }
+  return decoded;
+}
 
 
 // Health Check
@@ -228,7 +440,7 @@ async function getFolderSize(dirPath) {
 }
 
 // --- GOD MODE TELEMETRY ---
-app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
+app.get('/developer/telemetry', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
@@ -285,7 +497,7 @@ app.get('/developer/telemetry', authenticateJWT, async (req, res) => {
 
 // --- CLUSTER / OTA MANAGEMENT ENDPOINTS ---
 
-app.post('/developer/server/update', authenticateJWT, async (req, res) => {
+app.post('/developer/server/update', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
     // 1. Acknowledge the request immediately so the frontend knows it succeeded before the process dies
     res.json({ success: true, message: 'Syncing code and restarting...' });
@@ -307,7 +519,7 @@ app.post('/developer/server/update', authenticateJWT, async (req, res) => {
 });
 
 // --- STORAGE MANAGEMENT ENDPOINTS ---
-app.post('/developer/storage/clear-temp', authenticateJWT, async (req, res) => {
+app.post('/developer/storage/clear-temp', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
     const dirs = await fs.readdir(TEMP_DIR);
     let deletedCount = 0;
@@ -323,7 +535,7 @@ app.post('/developer/storage/clear-temp', authenticateJWT, async (req, res) => {
   }
 });
 
-app.post('/developer/storage/clear-old', authenticateJWT, async (req, res) => {
+app.post('/developer/storage/clear-old', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
     const files = await fs.readdir(CACHE_DIR, { withFileTypes: true });
     const now = Date.now();
@@ -346,7 +558,7 @@ app.post('/developer/storage/clear-old', authenticateJWT, async (req, res) => {
   }
 });
 
-app.post('/developer/storage/wipe-all', authenticateJWT, async (req, res) => {
+app.post('/developer/storage/wipe-all', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
     // Re-create the directories after wiping
     await fs.rm(CACHE_DIR, { recursive: true, force: true }).catch(() => {});
@@ -358,7 +570,7 @@ app.post('/developer/storage/wipe-all', authenticateJWT, async (req, res) => {
   }
 });
 
-app.get('/developer/storage/backup', authenticateJWT, (req, res) => {
+app.get('/developer/storage/backup', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, (req, res) => {
   try {
     res.attachment('cogallery-backup.zip');
     const archive = archiver('zip', {
@@ -397,34 +609,34 @@ app.get('/preview/:photoId', async (req, res) => {
   }
   
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.key !== photoId) {
-      return res.status(403).json({ error: 'Token does not match file' });
-    }
+    verifyStreamToken(token, photoId);
   } catch (err) {
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 
-  const previewPath = path.join(CACHE_DIR, `${photoId}.preview.webp`);
-  const dataPath = path.join(CACHE_DIR, `${photoId}.data`);
-  const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
+  let paths;
+  try {
+    paths = storagePaths(photoId);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
+  }
   
   try {
     // Try to serve preview first
-    await fs.access(previewPath);
+    await fs.access(paths.previewPath);
     res.setHeader('Content-Type', 'image/webp');
     res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
-    const stream = fsSync.createReadStream(previewPath);
+    const stream = fsSync.createReadStream(paths.previewPath);
     stream.pipe(res);
   } catch {
     // Fallback to original
     try {
-      await fs.access(dataPath);
-      const metaRaw = await fs.readFile(metaPath, 'utf-8');
+      await fs.access(paths.dataPath);
+      const metaRaw = await fs.readFile(paths.metaPath, 'utf-8');
       const meta = JSON.parse(metaRaw);
       res.setHeader('Content-Type', meta.mimeType || 'application/octet-stream');
       res.setHeader('Cache-Control', 'public, max-age=31536000');
-      const stream = fsSync.createReadStream(dataPath);
+      const stream = fsSync.createReadStream(paths.dataPath);
       stream.pipe(res);
     } catch {
       if (!res.headersSent) res.status(404).json({ error: 'Preview/File not found' });
@@ -433,7 +645,7 @@ app.get('/preview/:photoId', async (req, res) => {
 });
 
 
-app.post('/developer/storage/nuke-files', authenticateJWT, async (req, res) => {
+app.post('/developer/storage/nuke-files', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
     const { filenames } = req.body;
     if (!filenames || !Array.isArray(filenames)) {
@@ -461,35 +673,114 @@ app.post('/developer/storage/nuke-files', authenticateJWT, async (req, res) => {
 });
 
 // --- EPHEMERAL SECURE GET URL (ZERO TRUST) ---
-app.post('/media/presign-get', authenticateJWT, async (req, res) => {
+app.post('/media/presign-get', mediaLimiter, authenticateJWT, requireSupabaseAdmin, async (req, res) => {
   try {
     const { key, type } = req.body;
     if (!key) return res.status(400).json({ error: 'Missing key' });
+    if (!isSafeStorageKey(key)) return res.status(400).json({ error: 'Invalid key' });
+
+    const photo = await requirePhotoAccess(req.user?.sub, key);
     
     // Generate a short-lived JWT token that grants read access to this specific file
-    const streamToken = jwt.sign({ key }, JWT_SECRET, { expiresIn: '12h' });
+    const streamToken = jwt.sign(
+      { key, photoId: photo.id, sub: req.user?.sub, scope: 'media:read' },
+      streamJwtSecret,
+      { expiresIn: streamTokenTtl },
+    );
     const url = type === 'preview' ? `/preview/${encodeURIComponent(key)}?t=${streamToken}` : `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
     
     res.json({ url });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
+app.post('/upload/chunk', uploadLimiter, authenticateJWT, async (req, res) => {
+  try {
+    const key = req.header('x-photo-id');
+    const chunkIndex = Number.parseInt(req.header('x-chunk-index') || '', 10);
+    const totalChunks = Number.parseInt(req.header('x-total-chunks') || '', 10);
+    const filename = safeAttachmentFilename(decodeURIComponent(req.header('x-filename') || key || 'upload'));
+    const mimeType = req.header('x-mime-type') || 'application/octet-stream';
+    const isEncrypted = req.header('x-is-encrypted') === 'true';
+
+    if (!isSafeStorageKey(key)) {
+      return res.status(400).json({ error: 'Invalid upload key' });
+    }
+    if (!Number.isInteger(chunkIndex) || !Number.isInteger(totalChunks) || chunkIndex < 0 || totalChunks < 1 || chunkIndex >= totalChunks) {
+      return res.status(400).json({ error: 'Invalid chunk headers' });
+    }
+
+    const paths = storagePaths(key);
+    await fs.mkdir(paths.chunkDir, { recursive: true });
+
+    const partPath = path.join(paths.chunkDir, `${chunkIndex}.part`);
+    await pipeline(req, fsSync.createWriteStream(partPath, { flags: 'w' }));
+
+    const partFiles = await fs.readdir(paths.chunkDir);
+    const completedParts = partFiles.filter((file) => file.endsWith('.part')).length;
+
+    if (completedParts === totalChunks) {
+      const writeStream = fsSync.createWriteStream(paths.dataPath, { flags: 'w' });
+      const finishedWriting = new Promise((resolve, reject) => {
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
+      });
+
+      try {
+        for (let index = 0; index < totalChunks; index++) {
+          const currentPart = path.join(paths.chunkDir, `${index}.part`);
+          await fs.access(currentPart);
+          await pipeline(fsSync.createReadStream(currentPart), writeStream, { end: false });
+        }
+      } finally {
+        writeStream.end();
+      }
+
+      await finishedWriting;
+
+      const stat = await fs.stat(paths.dataPath);
+      await fs.writeFile(paths.metaPath, JSON.stringify({ filename, mimeType, size: stat.size }));
+      await fs.rm(paths.chunkDir, { recursive: true, force: true }).catch(() => {});
+
+      if (mimeType.startsWith('image/') && !isEncrypted) {
+        try {
+          await sharp(paths.dataPath)
+            .resize({ width: 800, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toFile(paths.previewPath);
+        } catch (err) {
+          console.error(`[Upload] Failed to generate preview for ${key}:`, err);
+        }
+      }
+    }
+
+    res.json({ ok: true, completed: completedParts === totalChunks });
+  } catch (error) {
+    console.error('[Upload] Chunk upload failed:', error);
+    res.status(error.statusCode || 500).json({ error: error.message });
   }
 });
 
 // Check upload progress (for resuming)
-app.get('/upload/status/:photoId', async (req, res) => {
+app.get('/upload/status/:photoId', mediaLimiter, authenticateJWT, async (req, res) => {
   const { photoId } = req.params;
+  let paths;
+  try {
+    paths = storagePaths(photoId);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
+  }
   
   // Check if completely finished
   try {
-    await fs.access(path.join(CACHE_DIR, `${photoId}.data`));
+    await fs.access(paths.dataPath);
     return res.json({ completed: true });
   } catch {}
 
   // Check partial chunks
   try {
-    const chunkDir = path.join(TEMP_DIR, photoId);
-    const files = await fs.readdir(chunkDir);
+    const files = await fs.readdir(paths.chunkDir);
     const indices = files.filter(f => f.endsWith('.part')).map(f => parseInt(f.replace('.part', ''), 10));
     res.json({ completed: false, chunks: indices });
   } catch {
@@ -511,8 +802,9 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
     const isEncrypted = upload.metadata?.isEncrypted === 'true' || upload.metadata?.isEncrypted === true;
     
     if (photoId) {
-      const finalPath = path.join(CACHE_DIR, `${photoId}.data`);
-      const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
+      const paths = storagePaths(photoId);
+      const finalPath = paths.dataPath;
+      const metaPath = paths.metaPath;
       const tusFilePath = path.join(TEMP_DIR, 'tus', upload.id);
       
       // Move file to final location
@@ -552,7 +844,7 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
 });
 
 // Intercept TUS routes
-app.use('/upload/tus', authenticateJWT, (req, res) => {
+app.use('/upload/tus', uploadLimiter, authenticateJWT, (req, res) => {
   tusServer.handle(req, res);
 });
 
@@ -566,20 +858,21 @@ app.get('/stream/:photoId', async (req, res) => {
   }
   
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.key !== photoId) {
-      return res.status(403).json({ error: 'Token does not match file' });
-    }
+    verifyStreamToken(token, photoId);
   } catch (err) {
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 
-  const dataPath = path.join(CACHE_DIR, `${photoId}.data`);
-  const metaPath = path.join(CACHE_DIR, `${photoId}.meta.json`);
+  let paths;
+  try {
+    paths = storagePaths(photoId);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
+  }
   
   try {
-    const meta = JSON.parse(await fs.readFile(metaPath, 'utf-8'));
-    const stat = await fs.stat(dataPath);
+    const meta = JSON.parse(await fs.readFile(paths.metaPath, 'utf-8'));
+    const stat = await fs.stat(paths.dataPath);
     const fileSize = stat.size;
     const range = req.headers.range;
     
@@ -590,10 +883,14 @@ app.get('/stream/:photoId', async (req, res) => {
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
       const chunksize = (end - start) + 1;
       
-      const file = fsSync.createReadStream(dataPath, { start, end });
+      if (Number.isNaN(start) || Number.isNaN(end) || start < 0 || end >= fileSize || start > end) {
+        return res.status(416).json({ error: 'Invalid range' });
+      }
+      
+      const file = fsSync.createReadStream(paths.dataPath, { start, end });
       
       const download = req.query.download === '1';
-      const filename = req.query.filename || photoId;
+      const filename = safeAttachmentFilename(req.query.filename || meta.filename || photoId);
       const headers = {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
@@ -612,7 +909,7 @@ app.get('/stream/:photoId', async (req, res) => {
     } else {
       // Full download/stream
       const download = req.query.download === '1';
-      const filename = req.query.filename || photoId;
+      const filename = safeAttachmentFilename(req.query.filename || meta.filename || photoId);
       const headers = {
         'Content-Length': fileSize,
         'Content-Type': meta.mimeType,
@@ -623,7 +920,7 @@ app.get('/stream/:photoId', async (req, res) => {
         headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;
       }
       res.writeHead(200, headers);
-      fsSync.createReadStream(dataPath).pipe(res);
+      fsSync.createReadStream(paths.dataPath).pipe(res);
     }
   } catch (err) {
     res.status(404).json({ error: 'File not found' });
@@ -631,7 +928,7 @@ app.get('/stream/:photoId', async (req, res) => {
 });
 
 // Fallback ZIP streaming endpoint for iOS/Safari
-app.post('/api/download-zip', authenticateJWT, [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
+app.post('/api/download-zip', mediaLimiter, authenticateJWT, requireSupabaseAdmin, [express.json({ limit: '10mb' }), express.urlencoded({ extended: true, limit: '10mb' })], async (req, res) => {
   // If sent via form urlencoded, req.body.photos is a stringified JSON array
   let photos = req.body.photos;
   if (typeof photos === 'string') {
@@ -642,10 +939,31 @@ app.post('/api/download-zip', authenticateJWT, [express.json({ limit: '10mb' }),
   if (!photos || !Array.isArray(photos)) {
     return res.status(400).json({ error: 'Missing photos array' });
   }
+  if (photos.length > 1000) {
+    return res.status(400).json({ error: 'ZIP downloads are limited to 1000 files at a time' });
+  }
+
+  const requestedPhotos = [];
+  for (const photo of photos) {
+    const key = photo.id || photo.key || photo.s3Key;
+    if (!isSafeStorageKey(key)) {
+      return res.status(400).json({ error: 'Invalid photo key in ZIP request' });
+    }
+
+    try {
+      const authorizedPhoto = await requirePhotoAccess(req.user?.sub, key);
+      requestedPhotos.push({
+        key,
+        filename: safeAttachmentFilename(photo.filename || authorizedPhoto.filename || key),
+      });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({ error: error.message });
+    }
+  }
 
   res.writeHead(200, {
     'Content-Type': 'application/zip',
-    'Content-Disposition': `attachment; filename="${filename || 'gallery'}.zip"`,
+    'Content-Disposition': `attachment; filename="${safeAttachmentFilename(filename || 'gallery')}.zip"`,
     'Access-Control-Expose-Headers': 'Content-Disposition'
   });
 
@@ -661,18 +979,18 @@ app.post('/api/download-zip', authenticateJWT, [express.json({ limit: '10mb' }),
   archive.pipe(res);
 
   // Append each file directly from local storage to bypass network loop
-  for (const photo of photos) {
-    if (!photo.id || !photo.filename) continue;
+  for (const photo of requestedPhotos) {
+    if (!photo.key || !photo.filename) continue;
     try {
-      const dataPath = path.join(CACHE_DIR, `${photo.id}.data`);
+      const { dataPath } = storagePaths(photo.key);
       
       // Check if file exists locally
       try {
         await fs.access(dataPath);
         archive.file(dataPath, { name: photo.filename });
       } catch (err) {
-        console.error(`File missing for zip: ${photo.id}`);
-        archive.append(`File not found: ${photo.id}`, { name: `${photo.filename}.error.txt` });
+        console.error(`File missing for zip: ${photo.key}`);
+        archive.append(`File not found: ${photo.key}`, { name: `${photo.filename}.error.txt` });
       }
     } catch (e) {
       console.error('Error fetching photo for zip:', e);
