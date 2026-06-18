@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { requestToJoinEvent, updateEventMemberStatus, deleteEvent, updateEventThumbnail } from '@/services/eventService'
 import { updateRoomThumbnail } from '@/services/roomService'
+import { uploadThumbnail } from '@/services/uploadService'
 import { deletePhotoById, getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
 import { useEvent } from '@/hooks/api/useEvent'
 import { useEventPhotos } from '@/hooks/api/useEventPhotos'
@@ -619,15 +620,27 @@ export function EventDetailPage() {
               if (p) handleDeletePhoto(p)
             }}
             canDelete={selectedPhoto?.uploaderId === user?.id}
-            onSetRoomCover={isRoomOwner ? async (url) => {
+            onSetRoomCover={isRoomOwner ? async (url, file) => {
               if (!roomId) return
-              const { error } = await updateRoomThumbnail(roomId, url)
+              let finalUrl = url
+              if (file) {
+                const result = await uploadThumbnail(file, roomId)
+                if (result.success && result.url) finalUrl = result.url
+                else return toast.error('Failed to upload cover')
+              }
+              const { error } = await updateRoomThumbnail(roomId, finalUrl)
               if (error) toast.error('Failed to update room cover')
               else toast.success('Room cover updated')
             } : undefined}
-            onSetEventCover={isEventOwner ? async (url) => {
+            onSetEventCover={isEventOwner ? async (url, file) => {
               if (!eventId) return
-              const { error } = await updateEventThumbnail(eventId, url)
+              let finalUrl = url
+              if (file) {
+                const result = await uploadThumbnail(file, eventId)
+                if (result.success && result.url) finalUrl = result.url
+                else return toast.error('Failed to upload cover')
+              }
+              const { error } = await updateEventThumbnail(eventId, finalUrl)
               if (error) toast.error('Failed to update event cover')
               else toast.success('Event cover updated')
             } : undefined}

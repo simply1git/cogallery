@@ -16,6 +16,7 @@ import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useColorExtractor } from '@/hooks/useColorExtractor'
 import { useHaptics } from '@/hooks/useHaptics'
 import { createPortal } from 'react-dom'
+import { ImageCropperModal } from '../modals/ImageCropperModal'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']
 
@@ -26,8 +27,8 @@ interface PhotoDetailModalProps {
   onNavigate: (photo: Photo) => void
   onDelete?: (photoId: string) => void
   canDelete?: boolean
-  onSetRoomCover?: (url: string) => void
-  onSetEventCover?: (url: string) => void
+  onSetRoomCover?: (url: string, file?: File) => void
+  onSetEventCover?: (url: string, file?: File) => void
 }
 
 export function PhotoDetailModal({
@@ -47,6 +48,9 @@ export function PhotoDetailModal({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [activeTab, setActiveTab] = useState<'reactions' | 'comments' | 'info'>('reactions')
   const [showMobilePanel, setShowMobilePanel] = useState(false)
+  
+  // Cropper state
+  const [cropperType, setCropperType] = useState<'room' | 'event' | null>(null)
   
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
   const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
@@ -175,9 +179,10 @@ export function PhotoDetailModal({
   ) ?? {}
 
   return createPortal(
-    <div 
-      className="lightbox-overlay animate-fade-in transition-colors duration-1000 ease-in-out" 
-      onClick={onClose}
+    <>
+      <div 
+        className="lightbox-overlay animate-fade-in transition-colors duration-1000 ease-in-out" 
+        onClick={onClose}
       style={{ backgroundColor: ambientStyle || 'rgba(0, 0, 0, 0.95)' }}
     >
       {/* Close */}
@@ -362,12 +367,12 @@ export function PhotoDetailModal({
             </span>
             <div className="flex items-center gap-1">
               {onSetRoomCover && photo.s3Url && (
-                <button onClick={() => { onSetRoomCover(photo.s3Url!); onClose() }} className="btn-icon" title="Set as Room Cover">
+                <button onClick={() => setCropperType('room')} className="btn-icon" title="Set as Room Cover">
                   <Layout size={16} />
                 </button>
               )}
               {onSetEventCover && photo.s3Url && (
-                <button onClick={() => { onSetEventCover(photo.s3Url!); onClose() }} className="btn-icon" title="Set as Event Cover">
+                <button onClick={() => setCropperType('event')} className="btn-icon" title="Set as Event Cover">
                   <ImageIcon size={16} />
                 </button>
               )}
@@ -543,7 +548,25 @@ export function PhotoDetailModal({
           </div>
         </div>
       </div>
-    </div>,
+      </div>
+      
+      {cropperType && thumbUrl && (
+        <ImageCropperModal
+          isOpen={!!cropperType}
+          imageUrl={thumbUrl}
+          onClose={() => setCropperType(null)}
+          onSave={async (blob: Blob) => {
+            const extension = photo.filename.split('.').pop() || 'jpg'
+            const newFile = new File([blob], `cropped-cover.${extension}`, { type: `image/${extension === 'png' ? 'png' : 'jpeg'}` })
+            if (cropperType === 'room' && onSetRoomCover) {
+              onSetRoomCover(photo.s3Url!, newFile)
+            } else if (cropperType === 'event' && onSetEventCover) {
+              onSetEventCover(photo.s3Url!, newFile)
+            }
+          }}
+        />
+      )}
+    </>,
     document.body
   )
 }
