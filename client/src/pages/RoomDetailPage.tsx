@@ -242,8 +242,11 @@ export function RoomDetailPage() {
         {/* Background gradient */}
         {room.thumbnailUrl ? (
           <>
-            <div className="absolute inset-0">
-              <img src={room.thumbnailUrl} alt="Room Cover" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 overflow-hidden">
+              <img src={room.thumbnailUrl} alt="" className="w-full h-full object-cover blur-xl scale-110 opacity-40" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src={room.thumbnailUrl} alt="Room Cover" className="w-full h-full object-contain" />
             </div>
             <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#0a0a0a]/60 to-[#0a0a0a]/90" />
           </>
@@ -375,7 +378,7 @@ export function RoomDetailPage() {
       )}
 
       {/* Events Grid */}
-      <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 space-y-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+      <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4 animate-slide-up" style={{ animationDelay: '100ms' }}>
         {visibleEvents.map((event, i) => (
           <EventCard
             key={event.id}

@@ -102,7 +102,7 @@ export function DashboardPage() {
 
       {/* Rooms grid */}
       {!isLoading && displayRooms.length > 0 && (
-        <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 space-y-5">
+        <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
           {displayRooms.map((room, i) => (
             <RoomCard
               key={room.id}
