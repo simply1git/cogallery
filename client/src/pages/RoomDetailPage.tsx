@@ -375,7 +375,7 @@ export function RoomDetailPage() {
       )}
 
       {/* Events Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+      <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 space-y-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
         {visibleEvents.map((event, i) => (
           <EventCard
             key={event.id}
@@ -388,7 +388,7 @@ export function RoomDetailPage() {
         {hasAccess && (
           <button
             onClick={() => setShowCreateEvent(true)}
-            className="rounded-2xl border-2 border-dashed border-white/[0.08] p-8 flex flex-col items-center gap-3 text-[#71717a] hover:text-[#a1a1aa] hover:border-white/[0.15] hover:bg-white/[0.02] transition-all duration-200 group h-full justify-center min-h-[160px]"
+            className="rounded-2xl border-2 border-dashed border-white/[0.08] p-8 flex flex-col items-center gap-3 text-[#71717a] hover:text-[#a1a1aa] hover:border-white/[0.15] hover:bg-white/[0.02] transition-all duration-200 group justify-center min-h-[160px] break-inside-avoid w-full inline-flex"
           >
             <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center group-hover:border-white/[0.15] transition-colors">
               <Plus size={24} />
@@ -486,24 +486,29 @@ function EventCard({
 
   return (
     <div
-      className="card-hover cursor-pointer group animate-slide-up"
+      className="card-hover cursor-pointer group animate-slide-up break-inside-avoid w-full inline-block mb-5"
       style={{ animationDelay: `${index * 50}ms` }}
       onClick={onClick}
     >
       {/* Mini preview / gradient */}
-      <div 
-        className={`aspect-video rounded-t-xl bg-gradient-to-br ${grad} flex items-center justify-center ${event.thumbnailUrl ? 'bg-cover bg-center' : ''}`}
-        style={event.thumbnailUrl ? { backgroundImage: `url(${event.thumbnailUrl})` } : undefined}
-      >
-        {!event.thumbnailUrl && (
-          event.photoCount === 0 ? (
-            <Camera size={28} className="text-white/20" />
-          ) : (
-            <div className="flex items-center gap-2 text-white/60">
-              <Camera size={18} />
-              <span className="text-sm font-medium">{event.photoCount} files</span>
-            </div>
-          )
+      <div className="relative overflow-hidden rounded-t-xl">
+        {event.thumbnailUrl ? (
+          <img 
+            src={event.thumbnailUrl} 
+            alt={event.title} 
+            className="w-full block" 
+          />
+        ) : (
+          <div className={`h-20 bg-gradient-to-br ${grad} flex items-center justify-center`}>
+            {event.photoCount === 0 ? (
+              <Camera size={28} className="text-white/20" />
+            ) : (
+              <div className="flex items-center gap-2 text-white/60">
+                <Camera size={18} />
+                <span className="text-sm font-medium">{event.photoCount} files</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
