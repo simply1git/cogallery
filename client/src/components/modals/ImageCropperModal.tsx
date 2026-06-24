@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Crop as CropIcon } from 'lucide-react'
-import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import { getCroppedImg } from '@/utils/cropImage'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
@@ -12,22 +12,7 @@ interface ImageCropperModalProps {
   onSave: (croppedBlob: Blob) => Promise<void>
 }
 
-// Center the default crop to max width
-function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: number) {
-  return centerCrop(
-    makeAspectCrop(
-      {
-        unit: '%',
-        width: 90,
-      },
-      aspect,
-      mediaWidth,
-      mediaHeight
-    ),
-    mediaWidth,
-    mediaHeight
-  )
-}
+
 
 export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCropperModalProps) {
   const [crop, setCrop] = useState<Crop>()
@@ -47,9 +32,14 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
   if (!isOpen || !imageUrl) return null
 
   function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const { width, height } = e.currentTarget
-    // Default to a 16:9 crop that fits mostly inside, but user can freely resize and change ratio!
-    setCrop(centerAspectCrop(width, height, 16 / 9))
+    // Select the entire image by default instead of a forced 16:9 aspect ratio
+    setCrop({
+      unit: '%',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100
+    })
   }
 
   const handleSave = async () => {
