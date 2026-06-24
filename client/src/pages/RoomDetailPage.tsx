@@ -243,7 +243,10 @@ export function RoomDetailPage() {
         {room.thumbnailUrl ? (
           <>
             <div className="absolute inset-0">
-              <img src={room.thumbnailUrl} alt="Room Cover" className="w-full h-full object-contain" />
+              <img src={room.thumbnailUrl} alt="" className="w-full h-full object-cover blur-xl scale-110 opacity-40" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src={room.thumbnailUrl} alt="Room Cover" className="max-w-full max-h-full object-contain" />
             </div>
             <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#0a0a0a]/60 to-[#0a0a0a]/90" />
           </>
@@ -493,11 +496,18 @@ function EventCard({
       {/* Mini preview / gradient */}
       <div className="relative overflow-hidden rounded-t-xl">
         {event.thumbnailUrl ? (
-          <div className="aspect-[4/3] bg-[#0a0a0a]">
+          <div className="aspect-[4/3] relative">
+            {/* Blurred background fill */}
+            <img 
+              src={event.thumbnailUrl} 
+              alt="" 
+              className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-60" 
+            />
+            {/* Sharp foreground image */}
             <img 
               src={event.thumbnailUrl} 
               alt={event.title} 
-              className="w-full h-full object-contain" 
+              className="relative w-full h-full object-contain drop-shadow-lg" 
             />
           </div>
         ) : (

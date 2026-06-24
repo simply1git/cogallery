@@ -163,11 +163,18 @@ function RoomCard({ room, index, onClick }: { room: RoomWithMembers; index: numb
       {/* Cover gradient or thumbnail */}
       <div className="relative overflow-hidden rounded-t-xl">
         {room.thumbnailUrl ? (
-          <div className="aspect-[4/3] bg-[#0a0a0a]">
+          <div className="aspect-[4/3] relative">
+            {/* Blurred background fill */}
+            <img 
+              src={room.thumbnailUrl} 
+              alt="" 
+              className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-60" 
+            />
+            {/* Sharp foreground image */}
             <img 
               src={room.thumbnailUrl} 
               alt={room.name} 
-              className="w-full h-full object-contain" 
+              className="relative w-full h-full object-contain drop-shadow-lg" 
             />
           </div>
         ) : (
