@@ -31,7 +31,7 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
 
   if (!isOpen || !imageUrl) return null
 
-  function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+  function onImageLoad() {
     // Select the entire image by default instead of a forced 16:9 aspect ratio
     setCrop({
       unit: '%',
