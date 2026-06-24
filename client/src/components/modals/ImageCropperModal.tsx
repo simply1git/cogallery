@@ -73,12 +73,25 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
 
   /** Use the original image as-is without any cropping */
   const handleUseOriginal = async () => {
+    if (!imgRef.current) return
     setIsSaving(true)
     try {
-      const response = await fetch(imageUrl)
-      const blob = await response.blob()
-      await onSave(blob)
-      onClose()
+      // Draw the full image onto a canvas to produce a blob.
+      // This avoids fetch() which is blocked by CSP on cross-origin URLs.
+      const img = imgRef.current
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Could not get canvas context')
+      ctx.drawImage(img, 0, 0)
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.92)
+      )
+      if (blob) {
+        await onSave(blob)
+        onClose()
+      }
     } catch (e) {
       console.error('Use original failed', e)
     } finally {

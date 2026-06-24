@@ -126,11 +126,11 @@ export function EventSettingsModal({ isOpen, event, onClose, onUpdate }: EventSe
           <div className="mb-6 flex flex-col items-center">
             <div 
               onClick={handleAvatarClick}
-              className="group relative w-full h-40 rounded-xl bg-white/5 border border-white/10 overflow-hidden cursor-pointer flex items-center justify-center transition-all hover:border-white/20"
+              className="group relative w-full rounded-xl bg-white/5 border border-white/10 overflow-hidden cursor-pointer flex items-center justify-center transition-all hover:border-white/20"
             >
               {thumbnailUrl ? (
                 <>
-                  <img src={thumbnailUrl} alt="Event Cover" className="w-full h-full object-cover" />
+                  <img src={thumbnailUrl} alt="Event Cover" className="w-full block" />
                   <button
                     type="button"
                     onClick={handleDeleteThumbnail}
