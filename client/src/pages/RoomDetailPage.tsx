@@ -496,7 +496,7 @@ function EventCard({
           <img 
             src={event.thumbnailUrl} 
             alt={event.title} 
-            className="w-full max-h-56 object-cover block" 
+            className="w-full block" 
           />
         ) : (
           <div className={`h-28 bg-gradient-to-br ${grad} flex items-center justify-center`}>

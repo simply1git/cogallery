@@ -166,7 +166,7 @@ function RoomCard({ room, index, onClick }: { room: RoomWithMembers; index: numb
           <img 
             src={room.thumbnailUrl} 
             alt={room.name} 
-            className="w-full max-h-56 object-cover block" 
+            className="w-full block" 
           />
         ) : (
           <div className={`h-28 bg-gradient-to-br ${gradient} relative`}>
