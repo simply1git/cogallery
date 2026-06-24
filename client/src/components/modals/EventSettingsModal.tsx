@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Image as ImageIcon, Save, Camera } from 'lucide-react'
+import { X, Image as ImageIcon, Save, Camera, Trash2 } from 'lucide-react'
 import { updateEvent, updateEventThumbnail } from '@/services/eventService'
 import { uploadThumbnail } from '@/services/uploadService'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
@@ -72,6 +72,21 @@ export function EventSettingsModal({ isOpen, event, onClose, onUpdate }: EventSe
     }
   }
 
+  const handleDeleteThumbnail = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsUploading(true)
+    const { error } = await updateEventThumbnail(event.id, null)
+    setIsUploading(false)
+
+    if (!error) {
+      setThumbnailUrl('')
+      onUpdate({ thumbnailUrl: undefined })
+      toast.success('Cover removed successfully')
+    } else {
+      toast.error(error)
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
@@ -114,7 +129,17 @@ export function EventSettingsModal({ isOpen, event, onClose, onUpdate }: EventSe
               className="group relative w-full h-40 rounded-xl bg-white/5 border border-white/10 overflow-hidden cursor-pointer flex items-center justify-center transition-all hover:border-white/20"
             >
               {thumbnailUrl ? (
-                <img src={thumbnailUrl} alt="Event Cover" className="w-full h-full object-cover" />
+                <>
+                  <img src={thumbnailUrl} alt="Event Cover" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={handleDeleteThumbnail}
+                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-red-500/80 rounded-full text-white transition-colors z-10"
+                    title="Remove Cover"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </>
               ) : (
                 <div className="flex flex-col items-center text-[#71717a]">
                   <ImageIcon size={32} className="mb-2 opacity-50" />

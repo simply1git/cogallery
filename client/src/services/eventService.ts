@@ -112,7 +112,7 @@ export async function getEventsByUser(userId: string): Promise<EventWithDetails[
 }
 
 
-export async function updateEventThumbnail(eventId: string, thumbnailUrl: string): Promise<{ error: string | null }> {
+export async function updateEventThumbnail(eventId: string, thumbnailUrl: string | null): Promise<{ error: string | null }> {
   try {
     const { error } = await supabase
       .from('events')

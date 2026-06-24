@@ -199,7 +199,7 @@ export async function deleteRoom(roomId: string): Promise<{ error: string | null
   }
 }
 
-export async function updateRoomThumbnail(roomId: string, thumbnailUrl: string): Promise<{ error: string | null }> {
+export async function updateRoomThumbnail(roomId: string, thumbnailUrl: string | null): Promise<{ error: string | null }> {
   try {
     const { error } = await supabase
       .from('rooms')
