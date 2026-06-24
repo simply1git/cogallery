@@ -240,8 +240,19 @@ export function RoomDetailPage() {
       {/* Room Header */}
       <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] mb-8">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/15 via-violet-600/8 to-transparent" />
-        <div className="absolute inset-0 bg-[#0a0a0a]/50" />
+        {room.thumbnailUrl ? (
+          <>
+            <div className="absolute inset-0">
+              <img src={room.thumbnailUrl} alt="Room Cover" className="w-full h-full object-cover" />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#0a0a0a]/60 to-[#0a0a0a]/90" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/15 via-violet-600/8 to-transparent" />
+            <div className="absolute inset-0 bg-[#0a0a0a]/50" />
+          </>
+        )}
 
         <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -481,7 +492,7 @@ function EventCard({
     >
       {/* Mini preview / gradient */}
       <div 
-        className={`h-20 rounded-t-xl bg-gradient-to-br ${grad} flex items-center justify-center ${event.thumbnailUrl ? 'bg-cover bg-center' : ''}`}
+        className={`aspect-video rounded-t-xl bg-gradient-to-br ${grad} flex items-center justify-center ${event.thumbnailUrl ? 'bg-cover bg-center' : ''}`}
         style={event.thumbnailUrl ? { backgroundImage: `url(${event.thumbnailUrl})` } : undefined}
       >
         {!event.thumbnailUrl && (

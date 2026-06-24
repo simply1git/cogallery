@@ -162,7 +162,7 @@ function RoomCard({ room, index, onClick }: { room: RoomWithMembers; index: numb
     >
       {/* Cover gradient or thumbnail */}
       <div 
-        className={`h-28 rounded-t-xl bg-gradient-to-br ${gradient} relative overflow-hidden ${room.thumbnailUrl ? 'bg-cover bg-center' : ''}`}
+        className={`aspect-video rounded-t-xl bg-gradient-to-br ${gradient} relative overflow-hidden ${room.thumbnailUrl ? 'bg-cover bg-center' : ''}`}
         style={room.thumbnailUrl ? { backgroundImage: `url(${room.thumbnailUrl})` } : undefined}
       >
         {!room.thumbnailUrl && (
