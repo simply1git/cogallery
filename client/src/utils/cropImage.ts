@@ -1,7 +1,12 @@
 import { PixelCrop } from 'react-image-crop'
 
 /**
- * A utility function to crop an image based on react-image-crop PixelCrop parameters
+ * Crop an image based on react-image-crop PixelCrop parameters.
+ *
+ * ReactCrop reports pixel coordinates relative to the **rendered** <img>
+ * element, which may be scaled down from the natural image dimensions.
+ * We scale the crop rectangle up to natural dimensions so the output
+ * is full-resolution.
  */
 export async function getCroppedImg(
   imageSrc: string,
@@ -15,21 +20,31 @@ export async function getCroppedImg(
     return null
   }
 
-  // Set canvas size to match the bounding box
-  canvas.width = pixelCrop.width
-  canvas.height = pixelCrop.height
+  // Scale factor between rendered size and natural size.
+  // The PixelCrop values are in rendered-pixel space, so we need to
+  // translate them to natural-pixel space for the canvas draw.
+  const scaleX = image.naturalWidth / image.width
+  const scaleY = image.naturalHeight / image.height
 
-  // Draw the cropped area to the canvas
+  const srcX = Math.round(pixelCrop.x * scaleX)
+  const srcY = Math.round(pixelCrop.y * scaleY)
+  const srcW = Math.round(pixelCrop.width * scaleX)
+  const srcH = Math.round(pixelCrop.height * scaleY)
+
+  // Output canvas at the full-resolution crop size
+  canvas.width = srcW
+  canvas.height = srcH
+
   ctx.drawImage(
     image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
+    srcX,
+    srcY,
+    srcW,
+    srcH,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    srcW,
+    srcH
   )
 
   // As a blob

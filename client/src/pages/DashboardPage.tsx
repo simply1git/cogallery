@@ -102,7 +102,7 @@ export function DashboardPage() {
 
       {/* Rooms grid */}
       {!isLoading && displayRooms.length > 0 && (
-        <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {displayRooms.map((room, i) => (
             <RoomCard
               key={room.id}
@@ -116,7 +116,7 @@ export function DashboardPage() {
           {!showArchived && (
             <button
               onClick={() => setShowCreateRoom(true)}
-              className="rounded-xl border-2 border-dashed border-white/[0.08] p-8 flex flex-col items-center gap-3 text-[#71717a] hover:text-[#a1a1aa] hover:border-white/[0.15] transition-all duration-200 group break-inside-avoid w-full inline-block"
+              className="rounded-xl border-2 border-dashed border-white/[0.08] p-8 flex flex-col items-center gap-3 text-[#71717a] hover:text-[#a1a1aa] hover:border-white/[0.15] transition-all duration-200 group"
             >
               <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center group-hover:border-white/[0.15] transition-colors">
                 <Plus size={22} />
@@ -156,22 +156,24 @@ function RoomCard({ room, index, onClick }: { room: RoomWithMembers; index: numb
 
   return (
     <div
-      className="card-glow cursor-pointer group animate-slide-up break-inside-avoid w-full inline-block"
+      className="card-glow cursor-pointer group animate-slide-up"
       style={{ animationDelay: `${index * 60}ms` }}
       onClick={onClick}
     >
       {/* Cover gradient or thumbnail */}
       <div className="relative overflow-hidden rounded-t-xl">
         {room.thumbnailUrl ? (
-          <img 
-            src={room.thumbnailUrl} 
-            alt={room.name} 
-            className="w-full block" 
-          />
+          <div className="aspect-[4/3] bg-black">
+            <img 
+              src={room.thumbnailUrl} 
+              alt={room.name} 
+              className="w-full h-full object-cover" 
+            />
+          </div>
         ) : (
-          <div className={`h-28 bg-gradient-to-br ${gradient} relative`}>
+          <div className={`aspect-[4/3] bg-gradient-to-br ${gradient} relative`}>
             <div className="absolute inset-0 flex items-center justify-center opacity-20">
-              <FolderOpen size={64} />
+              <FolderOpen size={48} />
             </div>
           </div>
         )}

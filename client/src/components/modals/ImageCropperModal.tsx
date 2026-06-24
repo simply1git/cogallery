@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Crop as CropIcon } from 'lucide-react'
+import { X, Crop as CropIcon, ImageIcon } from 'lucide-react'
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import { getCroppedImg } from '@/utils/cropImage'
@@ -11,8 +11,6 @@ interface ImageCropperModalProps {
   onClose: () => void
   onSave: (croppedBlob: Blob) => Promise<void>
 }
-
-
 
 export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCropperModalProps) {
   const [crop, setCrop] = useState<Crop>()
@@ -31,14 +29,28 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
 
   if (!isOpen || !imageUrl) return null
 
-  function onImageLoad() {
-    // Select the entire image by default instead of a forced 16:9 aspect ratio
+  function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const { width, height } = e.currentTarget
+
+    // Set crop to select the entire image
     setCrop({
       unit: '%',
       x: 0,
       y: 0,
       width: 100,
-      height: 100
+      height: 100,
+    })
+
+    // Also set the pixel-based completedCrop so "Apply Crop" works immediately
+    // without requiring the user to drag the handles first.
+    // Use the displayed dimensions (not natural) because ReactCrop reports
+    // pixel crops relative to the rendered <img> element.
+    setCompletedCrop({
+      unit: 'px',
+      x: 0,
+      y: 0,
+      width: width,
+      height: height,
     })
   }
 
@@ -54,6 +66,21 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
       }
     } catch (e) {
       console.error('Crop failed', e)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  /** Use the original image as-is without any cropping */
+  const handleUseOriginal = async () => {
+    setIsSaving(true)
+    try {
+      const response = await fetch(imageUrl)
+      const blob = await response.blob()
+      await onSave(blob)
+      onClose()
+    } catch (e) {
+      console.error('Use original failed', e)
     } finally {
       setIsSaving(false)
     }
@@ -93,12 +120,20 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
         </div>
         
         <p className="text-[#a1a1aa] text-sm mt-3 text-center flex-shrink-0">
-          Drag the edges to set a custom crop size.
+          Drag the edges to crop, or use the full image as-is.
         </p>
 
         <div className="flex gap-3 pt-4 mt-2 border-t border-white/10 flex-shrink-0">
           <button type="button" className="btn-secondary flex-1" onClick={onClose} disabled={isSaving}>
             Cancel
+          </button>
+          <button 
+            onClick={handleUseOriginal}
+            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+            disabled={isSaving}
+          >
+            <ImageIcon size={16} />
+            Use Original
           </button>
           <button 
             onClick={handleSave} 
