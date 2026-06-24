@@ -59,7 +59,14 @@ export function ImageCropperModal({ isOpen, imageUrl, onClose, onSave }: ImageCr
     
     setIsSaving(true)
     try {
-      const blob = await getCroppedImg(imgRef.current.src, completedCrop)
+      // Pass the rendered dimensions of the <img> so getCroppedImg
+      // can correctly scale from rendered pixels to natural pixels.
+      const blob = await getCroppedImg(
+        imgRef.current.src,
+        completedCrop,
+        imgRef.current.width,
+        imgRef.current.height
+      )
       if (blob) {
         await onSave(blob)
         onClose()

@@ -4,13 +4,15 @@ import { PixelCrop } from 'react-image-crop'
  * Crop an image based on react-image-crop PixelCrop parameters.
  *
  * ReactCrop reports pixel coordinates relative to the **rendered** <img>
- * element, which may be scaled down from the natural image dimensions.
- * We scale the crop rectangle up to natural dimensions so the output
- * is full-resolution.
+ * element, which is scaled down from the natural image by CSS (max-h-[60vh]).
+ * We accept the rendered dimensions so we can scale the crop rectangle
+ * up to natural dimensions, producing a full-resolution output.
  */
 export async function getCroppedImg(
   imageSrc: string,
-  pixelCrop: PixelCrop
+  pixelCrop: PixelCrop,
+  renderedWidth: number,
+  renderedHeight: number
 ): Promise<Blob | null> {
   const image = await createImage(imageSrc)
   const canvas = document.createElement('canvas')
@@ -20,11 +22,9 @@ export async function getCroppedImg(
     return null
   }
 
-  // Scale factor between rendered size and natural size.
-  // The PixelCrop values are in rendered-pixel space, so we need to
-  // translate them to natural-pixel space for the canvas draw.
-  const scaleX = image.naturalWidth / image.width
-  const scaleY = image.naturalHeight / image.height
+  // Scale factor: rendered <img> → natural image dimensions.
+  const scaleX = image.naturalWidth / renderedWidth
+  const scaleY = image.naturalHeight / renderedHeight
 
   const srcX = Math.round(pixelCrop.x * scaleX)
   const srcY = Math.round(pixelCrop.y * scaleY)
@@ -47,7 +47,6 @@ export async function getCroppedImg(
     srcH
   )
 
-  // As a blob
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -58,7 +57,7 @@ export async function getCroppedImg(
         resolve(blob)
       },
       'image/jpeg',
-      0.9
+      0.92
     )
   })
 }
@@ -71,7 +70,6 @@ function createImage(url: string): Promise<HTMLImageElement> {
     const image = new Image()
     image.addEventListener('load', () => resolve(image))
     image.addEventListener('error', (error) => reject(error))
-    // Needed to avoid cross-origin issues on some remote images
     image.setAttribute('crossOrigin', 'anonymous')
     image.src = url
   })
