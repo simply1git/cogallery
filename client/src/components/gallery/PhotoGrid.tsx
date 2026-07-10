@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useDeferredValue, startTransition } from 'react'
 import { PhotoCard } from './PhotoCard'
+import { VirtualPhotoGrid } from './VirtualPhotoGrid'
 import type { Photo } from '@/types'
 import { useHaptics } from '@/hooks/useHaptics'
-
+import { useFeatureFlag } from '@/hooks/useFeatureFlag'
 
 
 interface PhotoGridProps {
@@ -31,6 +32,28 @@ export function PhotoGrid({
   isLoadingMore,
   onLoadMore,
 }: PhotoGridProps) {
+  // Use feature flag for virtualized grid
+  const useVirtualGrid = useFeatureFlag('enhancedPhotoGrid')
+
+  // If virtual grid is enabled and we have enough items to benefit from it, use it
+  if (useVirtualGrid && photos.length > 20) {
+    return (
+      <VirtualPhotoGrid
+        photos={photos}
+        onPhotoClick={onPhotoClick ? (photo: Photo) => onPhotoClick(photo, 0) : undefined}
+        onPhotoDelete={onPhotoDelete}
+        canDelete={canDelete}
+        isLoading={isLoading}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={onLoadMore}
+      />
+    )
+  }
+
+  // Original implementation for smaller grids or when feature is disabled
   const [colWidth, setColWidth] = useState(200)
   const containerRef = useRef<HTMLDivElement>(null)
   const initialDistance = useRef<number | null>(null)
@@ -59,16 +82,16 @@ export function PhotoGrid({
         e.preventDefault() // prevent scrolling while pinching
         const currentDistance = getDistance(e.touches)
         const scale = currentDistance / initialDistance.current
-        
+
         let newWidth = initialWidth.current * scale
         // Clamp width between 100 (dense grid) and 400 (large photos)
         newWidth = Math.max(100, Math.min(newWidth, 400))
-        
+
         // Add haptic feedback if we hit boundaries
         if ((newWidth === 100 && colWidth > 100) || (newWidth === 400 && colWidth < 400)) {
           haptic('light')
         }
-        
+
         startTransition(() => {
           setColWidth(newWidth)
         })
@@ -98,7 +121,7 @@ export function PhotoGrid({
   // Intersection Observer for Infinite Scroll
   // IMPORTANT: These hooks MUST be above any early returns to satisfy React's Rules of Hooks.
   const observerTarget = useRef<HTMLDivElement>(null)
-  
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -108,11 +131,11 @@ export function PhotoGrid({
       },
       { threshold: 0.1, rootMargin: '400px' } // Pre-fetch before scrolling completely to bottom
     )
-    
+
     if (observerTarget.current) {
       observer.observe(observerTarget.current)
     }
-    
+
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, onLoadMore])
 
@@ -135,12 +158,12 @@ export function PhotoGrid({
 
   return (
     <div className="w-full">
-      <div 
-        ref={containerRef} 
-        className="w-full touch-pan-y grid gap-4" 
-        style={{ 
+      <div
+        ref={containerRef}
+        className="w-full touch-pan-y grid gap-4"
+        style={{
           willChange: 'transform',
-          gridTemplateColumns: `repeat(auto-fill, minmax(${deferredColWidth}px, 1fr))` 
+          gridTemplateColumns: `repeat(auto-fill, minmax(${deferredColWidth}px, 1fr))`
         }}
       >
         {photos.map((data, index) => (
@@ -156,7 +179,7 @@ export function PhotoGrid({
           />
         ))}
       </div>
-      
+
       {/* Infinite Scroll Sentinel */}
       {hasMore && (
         <div ref={observerTarget} className="w-full py-8 flex justify-center">

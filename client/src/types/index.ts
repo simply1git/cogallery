@@ -34,6 +34,19 @@ export interface Room {
   isVault?: boolean
   vaultSalt?: string
   vaultHash?: string
+  // Recovery fields for vault password recovery
+  recoverySalt?: string
+  recoveryVerifier?: string
+  // Permission settings for member roles
+  permissions?: {
+    canUpload: boolean
+    canDeleteOwn: boolean
+    canDeleteOthers: boolean
+    canInvite: boolean
+    canManageEvents: boolean
+    canChangeSettings: boolean
+    canViewAnalytics: boolean
+  }
 }
 
 export interface RoomMember {
@@ -68,6 +81,16 @@ export interface Event {
   thumbnailUrl?: string
   createdAt: string
   updatedAt: string
+  // Permission settings for member roles
+  permissions?: {
+    canUpload: boolean
+    canDeleteOwn: boolean
+    canDeleteOthers: boolean
+    canInvite: boolean
+    canManageEvent: boolean
+    canChangeSettings: boolean
+    canViewAttendance: boolean
+  }
 }
 
 export interface EventMember {
@@ -123,6 +146,9 @@ export interface Photo {
   longitude?: number
   
   description?: string
+
+  // AI-generated tags (when aiTagging feature is enabled)
+  aiTags?: string[]
 }
 
 export interface PhotoWithReactions extends Photo {

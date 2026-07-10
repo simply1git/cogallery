@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Activity, Users, Shield, Server, Terminal, HardDrive, Settings, Ban, Trash2, Edit2, Database, Network } from 'lucide-react'
 import { AdminUser, TelemetryData, GlobalConfig, SupabaseDbSize, SupabaseTableCounts, StorageNode, getAllUsers, getTelemetry, getActiveStorageNodes, checkIsAdmin, updateUserQuota, toggleUserBan, nukeUser, getGlobalConfig, updateGlobalConfig, clearTempStorage, clearOldStorage, wipeAllStorage, getSupabaseDbSize, getSupabaseTableCounts, updateServerCode } from '@/services/adminService'
 import { formatFileSize } from '@/services/uploadService'
-import { toast } from 'sonner'
+import { toastError, toastSuccess, toastLoading } from '@/lib/toast'
 import { useNavigate } from 'react-router-dom'
 import { QuotaModal } from '@/components/modals/QuotaModal'
 
@@ -20,14 +20,14 @@ export function DeveloperDashboard() {
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig | null>(null)
   const [quotaModalUser, setQuotaModalUser] = useState<AdminUser | null>(null)
 
-  const refreshUsers = () => getAllUsers().then(setUsers).catch(err => toast.error(err.message))
+  const refreshUsers = () => getAllUsers().then(setUsers).catch(err => toastError(err.message))
   const refreshConfig = () => getGlobalConfig().then(setGlobalConfig).catch(console.error)
 
   useEffect(() => {
     checkIsAdmin().then(admin => {
       setIsAdmin(admin)
       if (!admin) {
-        toast.error('Access Denied. You are not a platform admin.')
+        toastError('Access Denied. You are not a platform admin.')
         navigate('/')
       }
     })
@@ -82,10 +82,10 @@ export function DeveloperDashboard() {
     try {
       setIsProcessing(true)
       await updateUserQuota(quotaModalUser.id, bytes)
-      toast.success('Quota updated')
+      toastSuccess('Quota updated')
       setQuotaModalUser(null)
       refreshUsers()
-    } catch(e: any) { toast.error(e.message) }
+    } catch(e: any) { toastError(e.message) }
     finally { setIsProcessing(false) }
   }
 

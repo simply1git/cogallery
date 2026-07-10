@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { updateEvent } from '@/services/eventService'
-import { toast } from 'sonner'
+import { toastError } from '@/lib/toast'
 import { Users, FileText, Loader2 } from 'lucide-react'
 
 interface LiveNotesProps {
@@ -22,7 +22,7 @@ export function LiveNotes({ eventId, initialNotes }: LiveNotesProps) {
     setIsSaving(true)
     const { error } = await updateEvent(eventId, { notes: text })
     if (error) {
-      toast.error('Failed to save notes')
+      toastError('Failed to save notes')
     }
     setIsSaving(false)
   }, [eventId])

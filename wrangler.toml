@@ -1,0 +1,19 @@
+name = "cogallery-media-proxy"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+BUCKET_NAME = "cogallery-media"
+
+[vars]
+ACCOUNT_ID = "your-cloudflare-account-id"
+
+[[kv_namespaces]]
+binding = "COGALLERY_MEDIA"
+id = "your-kv-namespace-id"
+
+[upload]
+format = "modules"
+
+[traffic]
+percentage = 100

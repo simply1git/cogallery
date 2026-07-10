@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Room, RoomMember, RoomWithMembers, UserRole } from '@/types'
+import { logRoomEvent } from '@/services/activityService'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,10 @@ function mapRoom(data: any): Room {
     isVault: data.is_vault ?? false,
     vaultSalt: data.vault_salt,
     vaultHash: data.vault_hash,
+    // Recovery fields
+    recoverySalt: data.recovery_salt,
+    recoveryVerifier: data.recovery_verifier,
+    permissions: data.permissions
   }
 }
 
@@ -66,10 +71,13 @@ export async function createRoom(
       role: 'owner',
       status: 'approved',
     })
-    
+
     if (memberError && memberError.code !== '23505') {
       console.warn('Failed to auto-add creator to room:', memberError)
     }
+
+    // Audit log room creation
+    await logRoomEvent('create', data.id, userId, data.name, isVault ?? false)
 
     return { data: mapRoom(data), error: null }
   } catch (err: any) {
@@ -168,17 +176,36 @@ export async function getRoomById(
 
 export async function updateRoom(
   roomId: string,
-  updates: { name?: string; description?: string }
+  updates: { name?: string; description?: string; permissions?: {
+    canUpload?: boolean
+    canDeleteOwn?: boolean
+    canDeleteOthers?: boolean
+    canInvite?: boolean
+    canManageEvents?: boolean
+    canChangeSettings?: boolean
+    canViewAnalytics?: boolean
+  } }
 ): Promise<{ data: Room | null; error: string | null }> {
   try {
     const { data, error } = await supabase
       .from('rooms')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', roomId)
       .select()
       .single()
 
     if (error) throw error
+
+    // Audit log room update
+    // Note: We don't have the userId here, so we'll need to get it from context
+    // For now, we'll log without userId and it can be enhanced later
+    await logRoomEvent('update', roomId, null, undefined, undefined, {
+      ...updates
+    })
+
     return { data: mapRoom(data), error: null }
   } catch (err: any) {
     return { data: null, error: err.message }
@@ -193,6 +220,12 @@ export async function deleteRoom(roomId: string): Promise<{ error: string | null
       .eq('id', roomId)
 
     if (error) throw error
+
+    // Audit log room deletion
+    // Note: We don't have the userId here, so we'll need to get it from context
+    // For now, we'll log without userId and it can be enhanced later
+    await logRoomEvent('delete', roomId, null)
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
@@ -207,6 +240,14 @@ export async function updateRoomThumbnail(roomId: string, thumbnailUrl: string |
       .eq('id', roomId)
 
     if (error) throw error
+
+    // Audit log room thumbnail update
+    // Note: We don't have the userId here, so we'll need to get it from context
+    // For now, we'll log without userId and it can be enhanced later
+    await logRoomEvent('update_thumbnail', roomId, null, undefined, undefined, {
+      thumbnailUrl: thumbnailUrl !== null
+    })
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
@@ -223,6 +264,12 @@ export async function archiveRoom(
       .eq('id', roomId)
 
     if (error) throw error
+
+    // Audit log room archival
+    // Note: We don't have the userId here, so we'll need to get it from context
+    // For now, we'll log without userId and it can be enhanced later
+    await logRoomEvent('archive', roomId, null)
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
@@ -264,6 +311,10 @@ export async function addMemberByEmail(
     if (userErr) throw userErr
 
     if (!userRow) {
+      await logMemberEvent('add', roomId, invitedById, null, null, role, null, {
+        email,
+        error: 'User not found'
+      })
       return { error: `No user found with email: ${email}. They must sign up first.` }
     }
 
@@ -275,9 +326,22 @@ export async function addMemberByEmail(
       invited_by_id: invitedById,
     })
 
-    if (error && error.code !== '23505') throw error
+    if (error && error.code !== '23505') {
+      await logMemberEvent('add', roomId, invitedById, userRow.id, null, role, null, {
+        error: error.message
+      })
+      throw error
+    }
+
+    // Audit log member addition
+    await logMemberEvent('add', roomId, invitedById, userRow.id, role, null, null)
+
     return { error: null }
   } catch (err: any) {
+    await logMemberEvent('add', roomId, invitedById, null, null, role, null, {
+      email,
+      error: err.message
+    })
     return { error: err.message }
   }
 }
@@ -294,6 +358,12 @@ export async function removeMember(
       .eq('user_id', userId)
 
     if (error) throw error
+
+    // Audit log member removal
+    // We don't have the remover's userId here, so we'll need to pass it from context
+    // For now, we'll log with null for userId who performed the action
+    await logMemberEvent('remove', roomId, null, userId)
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
@@ -313,6 +383,12 @@ export async function updateMemberRole(
       .eq('user_id', userId)
 
     if (error) throw error
+
+    // Audit log member role update
+    // We don't have the updater's userId here, so we'll need to pass it from context
+    // For now, we'll log with null for userId who performed the action
+    await logMemberEvent('role_update', roomId, null, userId, role)
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }
@@ -350,9 +426,21 @@ export async function requestToJoinRoom(
       status: 'pending',
     })
 
-    if (error && error.code !== '23505') throw error
+    if (error && error.code !== '23505') {
+      await logMemberEvent('request', roomId, userId, userId, null, 'pending', null, {
+        error: error.message
+      })
+      throw error
+    }
+
+    // Audit log join request
+    await logMemberEvent('request', roomId, userId, userId, null, 'viewer', 'pending')
+
     return { error: null }
   } catch (err: any) {
+    await logMemberEvent('request', roomId, userId, userId, null, null, null, {
+      error: err.message
+    })
     return { error: err.message }
   }
 }
@@ -365,7 +453,12 @@ export async function updateMemberStatus(
   try {
     if (status === 'rejected') {
       // Just delete the request
-      return removeMember(roomId, userId)
+      const result = await removeMember(roomId, userId)
+
+      // Audit log member status update to rejected
+      await logMemberEvent('status_update', roomId, null, userId, null, null, 'rejected')
+
+      return result
     }
 
     const { error } = await supabase
@@ -375,6 +468,10 @@ export async function updateMemberStatus(
       .eq('user_id', userId)
 
     if (error) throw error
+
+    // Audit log member status update to approved
+    await logMemberEvent('status_update', roomId, null, userId, null, null, 'approved')
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }

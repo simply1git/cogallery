@@ -14,6 +14,7 @@ function mapEvent(data: any): Event {
     thumbnailUrl: data.thumbnail_url,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
+    permissions: data.permissions
   }
 }
 
@@ -161,7 +162,15 @@ export async function getEventById(
 
 export async function updateEvent(
   eventId: string,
-  updates: { title?: string; description?: string; notes?: string }
+  updates: { title?: string; description?: string; notes?: string; permissions?: {
+    canUpload?: boolean
+    canDeleteOwn?: boolean
+    canDeleteOthers?: boolean
+    canInvite?: boolean
+    canManageEvent?: boolean
+    canChangeSettings?: boolean
+    canViewAttendance?: boolean
+  } }
 ): Promise<{ data: Event | null; error: string | null }> {
   try {
     const { data, error } = await supabase

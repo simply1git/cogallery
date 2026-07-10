@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { User } from '@/types'
+import { logAuthEvent } from '@/services/activityService'
 
 export async function signUpWithEmail(email: string, password: string, displayName: string) {
   try {
@@ -13,7 +14,10 @@ export async function signUpWithEmail(email: string, password: string, displayNa
       },
     })
 
-    if (error) throw error
+    if (error) {
+      await logAuthEvent('sign_up', null, email, false, error.message)
+      return { data: null, error: error.message }
+    }
 
     // Manually create the profile if the trigger failed or was dropped
     if (data?.user) {
@@ -25,10 +29,13 @@ export async function signUpWithEmail(email: string, password: string, displayNa
       if (profileError) {
         console.warn('Failed to create profile row manually:', profileError)
       }
+
+      await logAuthEvent('sign_up', data.user.id, email, true)
     }
 
     return { data, error: null }
   } catch (error: any) {
+    await logAuthEvent('sign_up', null, email, false, error.message)
     return { data: null, error: error.message }
   }
 }
@@ -42,9 +49,18 @@ export async function signInWithEmail(email: string, password: string) {
       password,
     })
 
-    if (error) throw error
+    if (error) {
+      await logAuthEvent('sign_in', null, email, false, error.message)
+      return { data: null, error: error.message }
+    }
+
+    if (data.user) {
+      await logAuthEvent('sign_in', data.user.id, email, true)
+    }
+
     return { data, error: null }
   } catch (error: any) {
+    await logAuthEvent('sign_in', null, email, false, error.message)
     return { data: null, error: error.message }
   }
 }
@@ -52,10 +68,17 @@ export async function signInWithEmail(email: string, password: string) {
 
 export async function signOut() {
   try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || null
+    const email = user?.email || null
+
+    await logAuthEvent('sign_out', userId, email, true)
+
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     return { error: null }
   } catch (error: any) {
+    await logAuthEvent('sign_out', null, null, false, error.message)
     return { error: error.message }
   }
 }
@@ -94,26 +117,45 @@ export async function updateProfile(updates: { displayName?: string; avatarUrl?:
 
 export async function updatePassword(password: string) {
   try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || null
+
+    await logAuthEvent('password_update', userId, null, true)
+
     const { data, error } = await supabase.auth.updateUser({
       password,
     })
 
-    if (error) throw error
+    if (error) {
+      await logAuthEvent('password_update', userId, null, false, error.message)
+      throw error
+    }
+
     return { data, error: null }
   } catch (error: any) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || null
+    await logAuthEvent('password_update', userId, null, false, error.message)
     return { data: null, error: error.message }
   }
 }
 
 export async function resetPassword(email: string) {
   try {
+    await logAuthEvent('password_reset', null, email, true)
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${import.meta.env.VITE_APP_URL || 'http://localhost:5173'}/reset-password`,
     })
 
-    if (error) throw error
+    if (error) {
+      await logAuthEvent('password_reset', null, email, false, error.message)
+      throw error
+    }
+
     return { error: null }
   } catch (error: any) {
+    await logAuthEvent('password_reset', null, email, false, error.message)
     return { error: error.message }
   }
 }

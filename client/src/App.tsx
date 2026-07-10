@@ -10,6 +10,8 @@ import { supabase } from '@/lib/supabase'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { queryClient } from '@/lib/queryClient'
+import { useOnboardingStore } from '@/store/onboardingStore'
+import { OnboardingTutorial } from '@/components/onboarding'
 
 // ─── Lazy-loaded pages (each becomes its own chunk) ─────────────────────────
 const HomePage = lazy(() => import('@/pages/HomePage').then(m => ({ default: m.HomePage })))
@@ -116,9 +118,10 @@ function AppRoutes() {
 }
 
 function App() {
-  const { isLoading: isAuthLoading } = useAuth()
+  const { isLoading: isAuthLoading, isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false)
+  const { hasCompletedOnboarding } = useOnboardingStore()
 
   // Start processing the upload queue when the app loads
   useEffect(() => {
@@ -132,7 +135,7 @@ function App() {
       const { data } = await supabase.from('global_config').select('maintenance_mode').single()
       if (data) setMaintenanceMode(data.maintenance_mode)
     }
-    
+
     fetchConfig()
 
     const channel = supabase.channel('global_config_changes')
@@ -190,6 +193,7 @@ function App() {
             },
           }}
         />
+        {!hasCompletedOnboarding && isAuthenticated && <OnboardingTutorial />}
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

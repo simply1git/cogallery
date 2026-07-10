@@ -15,7 +15,7 @@ import { RoomAnalyticsModal } from '@/components/modals/RoomAnalyticsModal'
 import { ActivityFeedModal } from '@/components/modals/ActivityFeedModal'
 import { PresenceAvatars } from '@/components/shared/PresenceAvatars'
 import { usePresence } from '@/hooks/realtime/usePresence'
-import { toast } from 'sonner'
+import { toastSuccess, toastError } from '@/lib/toast'
 import type { EventWithDetails } from '@/types'
 import { CardSkeleton, PageHeaderSkeleton } from '@/components/shared/Skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -108,7 +108,7 @@ export function RoomDetailPage() {
     if (error) {
       setError(error)
     } else {
-      toast.success('Join request sent')
+      toastSuccess('Join request sent')
       const res = await getRoomById(roomId)
       if (res.data) setCurrentRoom(res.data)
     }
@@ -120,9 +120,9 @@ export function RoomDetailPage() {
 
     const { error } = await deleteRoom(room.id)
     if (error) {
-      toast.error('Failed to delete room')
+      toastError('Failed to delete room')
     } else {
-      toast.success('Room deleted successfully')
+      toastSuccess('Room deleted successfully')
       navigate('/dashboard')
     }
   }

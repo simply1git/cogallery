@@ -3,7 +3,7 @@ import { X, Camera, Save, User as UserIcon } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { updateProfile, updatePassword } from '@/services/authService'
 import { uploadAvatar } from '@/services/uploadService'
-import { toast } from 'sonner'
+import { toastSuccess, toastError } from '@/lib/toast'
 import { Button, Input } from '@/components/ui/FormInputs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -40,20 +40,20 @@ export function ProfileSettingsModal({ isOpen, onClose }: ProfileSettingsModalPr
 
     if (result.success && result.url) {
       setAvatarUrl(result.url)
-      toast.success('Avatar uploaded successfully')
+      toastSuccess('Avatar uploaded successfully')
     } else {
-      toast.error(result.error || 'Failed to upload avatar')
+      toastError(result.error || 'Failed to upload avatar')
     }
   }
 
   const handleSave = async () => {
     if (!displayName.trim()) {
-      toast.error('Display name cannot be empty')
+      toastError('Display name cannot be empty')
       return
     }
 
     if (newPassword && newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters')
+      toastError('Password must be at least 6 characters')
       return
     }
 
@@ -66,7 +66,7 @@ export function ProfileSettingsModal({ isOpen, onClose }: ProfileSettingsModalPr
     if (newPassword) {
       const { error: passErr } = await updatePassword(newPassword)
       if (passErr) {
-        toast.error(`Failed to update password: ${passErr}`)
+        toastError(`Failed to update password: ${passErr}`)
         setIsSaving(false)
         return
       }
@@ -74,10 +74,10 @@ export function ProfileSettingsModal({ isOpen, onClose }: ProfileSettingsModalPr
     setIsSaving(false)
 
     if (error) {
-      toast.error(error)
+      toastError(error)
     } else {
       haptic('success')
-      toast.success('Profile updated successfully! (Refresh to see changes globally)')
+      toastSuccess('Profile updated successfully! (Refresh to see changes globally)')
       onClose()
     }
   }

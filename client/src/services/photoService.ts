@@ -3,6 +3,9 @@ import type { Photo, PhotoWithReactions, Reaction, Comment, MediaType } from '@/
 import { generateThumbnail } from './thumbnailService'
 import { getMediaType } from './uploadService'
 import { decryptBuffer } from './cryptoService'
+import { isFeatureEnabled } from '@/lib/featureFlags'
+import { processPhotoWithAITags } from './aiTaggingService'
+import { logPhotoEvent } from '@/services/activityService'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -43,6 +46,8 @@ function mapPhoto(data: any): Photo {
     createdAt: data.created_at,
     updatedAt: data.updated_at || data.created_at,
     isEncrypted: data.is_encrypted ?? false,
+    metadata: data.metadata,
+    aiTags: data.metadata?.aiTags
   }
 }
 
@@ -135,6 +140,19 @@ export async function uploadPhotoWithMetadata(
       console.warn('Thumbnail generation failed, continuing without:', e)
     }
 
+    // 2. Generate AI tags if feature is enabled
+    let aiTags: string[] = []
+    if (isFeatureEnabled('aiTagging')) {
+      try {
+        aiTags = await generateAITags(file)
+        if (aiTags.length > 0) {
+          console.log(`AI generated tags for ${file.name}:`, aiTags)
+        }
+      } catch (e) {
+        console.warn('AI tagging failed, continuing without tags:', e)
+      }
+    }
+
     onProgress?.(15)
 
     // Save metadata to Supabase DB to get a unique photo ID
@@ -157,6 +175,10 @@ export async function uploadPhotoWithMetadata(
         thumbnail_base64: thumbnailBase64,
         blurhash: blurhash,
         is_encrypted: isEncrypted ?? false,
+        metadata: {
+          ...(metadata || {}),
+          aiTags: aiTags.length > 0 ? aiTags : undefined
+        }
       })
       .select()
       .single()
@@ -302,6 +324,9 @@ export async function uploadPhotoWithMetadata(
 
     onProgress?.(100)
 
+    // Audit log photo upload
+    await logPhotoEvent('upload', roomId, userId, photoId, isEncrypted ?? false, mediaType)
+
     return { data: mapPhoto(photoRow), error: null }
   } catch (err: any) {
     if (photoId) {
@@ -361,7 +386,7 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
 }
 
 export async function downloadAndDecryptMedia(
-  photo: Photo, 
+  photo: Photo,
   vaultKey: CryptoKey,
   onProgress?: (loaded: number, total: number) => void
 ): Promise<string> {
@@ -375,6 +400,10 @@ export async function downloadAndDecryptMedia(
   if (!response.body) {
     const encryptedBuffer = await response.arrayBuffer();
     const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType);
+
+    // Audit log photo decryption (access)
+    await logPhotoEvent('decrypt', photo.room_id, null, photo.id, photo.is_encrypted ?? false, photo.media_type)
+
     return URL.createObjectURL(decryptedBlob);
   }
 
@@ -389,7 +418,7 @@ export async function downloadAndDecryptMedia(
       isDone = true;
       break;
     }
-    
+
     if (value) {
       chunks.push(value);
       receivedBytes += value.length;
@@ -405,6 +434,10 @@ export async function downloadAndDecryptMedia(
   }
 
   const decryptedBlob = await decryptBuffer(concatenated.buffer, vaultKey, mimeType);
+
+  // Audit log photo decryption (access)
+  await logPhotoEvent('decrypt', photo.room_id, null, photo.id, photo.is_encrypted ?? false, photo.media_type)
+
   return URL.createObjectURL(decryptedBlob);
 }
 
@@ -500,9 +533,17 @@ export async function deletePhotoById(
     if (error) throw error
     if (!data || data.length === 0) throw new Error("Permission denied or photo already deleted")
 
-    // We should also delete the file from the distributed storage cluster here, but 
+    // We should also delete the file from the distributed storage cluster here, but
     // for now we rely on the nuke-user or cleanup jobs to handle dangling files,
     // or we can implement an RPC/fetch to the active nodes later.
+
+    // Audit log photo deletion
+    // We need to get the roomId, userId, and isEncrypted from the photo data
+    // Since we deleted it, we need to get this info before deletion or from the data parameter
+    if (data && data.length > 0) {
+      const photo = data[0];
+      await logPhotoEvent('delete', photo.room_id, photo.uploader_id, photoId, photo.is_encrypted ?? false, photo.media_type)
+    }
 
     return { error: null }
   } catch (err: any) {
@@ -529,6 +570,20 @@ export async function addReaction(
 
     if (existing) {
       await supabase.from('reactions').delete().eq('id', existing.id)
+      // Audit log reaction removal (toggle off)
+      // Need to get photo info to determine roomId
+      const { data: photoData } = await supabase
+        .from('photos')
+        .select('room_id')
+        .eq('id', photoId)
+        .single()
+
+      if (photoData) {
+        await logPhotoEvent('reaction_removed', photoData.room_id, null, photoId, false, null, {
+          emoji
+        })
+      }
+
       return { data: null, error: null } // toggled off
     }
 
@@ -539,6 +594,21 @@ export async function addReaction(
       .single()
 
     if (error) throw error
+
+    // Audit log reaction addition
+    // Need to get photo info to determine roomId
+    const { data: photoData } = await supabase
+      .from('photos')
+      .select('room_id')
+      .eq('id', photoId)
+      .single()
+
+    if (photoData) {
+      await logPhotoEvent('reaction_added', photoData.room_id, userId, photoId, false, null, {
+        emoji
+      })
+    }
+
     return { data: mapReaction(data), error: null }
   } catch (err: any) {
     return { data: null, error: err.message }
@@ -575,6 +645,21 @@ export async function addComment(
       .single()
 
     if (error) throw error
+
+    // Audit log comment addition
+    // Need to get photo info to determine roomId
+    const { data: photoData } = await supabase
+      .from('photos')
+      .select('room_id')
+      .eq('id', photoId)
+      .single()
+
+    if (photoData) {
+      await logPhotoEvent('comment_added', photoData.room_id, userId, photoId, false, null, {
+        body: body.substring(0, Math.min(body.length, 100)) // Truncate for privacy/storage
+      })
+    }
+
     return { data: mapComment(data), error: null }
   } catch (err: any) {
     return { data: null, error: err.message }
@@ -604,7 +689,30 @@ export async function deleteComment(
       .from('comments')
       .delete()
       .eq('id', commentId)
+
     if (error) throw error
+
+    // Audit log comment deletion
+    // Need to get comment info to determine photoId and then roomId
+    const { data: commentData } = await supabase
+      .from('comments')
+      .select('photo_id')
+      .eq('id', commentId)
+      .single()
+
+    if (commentData) {
+      // Get photo info to get roomId
+      const { data: photoData } = await supabase
+        .from('photos')
+        .select('room_id')
+        .eq('id', commentData.photo_id)
+        .single()
+
+      if (photoData) {
+        await logPhotoEvent('comment_deleted', photoData.room_id, null, commentData.photo_id, false, null, {})
+      }
+    }
+
     return { error: null }
   } catch (err: any) {
     return { error: err.message }

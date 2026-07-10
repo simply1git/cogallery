@@ -3,12 +3,12 @@ import { X, UserPlus, Copy, Check, QrCode } from 'lucide-react'
 import { addMemberByEmail } from '@/services/roomService'
 import { useAuth } from '@/hooks/useAuth'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
-import { toast } from 'sonner'
+import { toastError, toastSuccess } from '@/lib/toast'
 import type { UserRole } from '@/types'
 import { QRCodeSVG } from 'qrcode.react'
-import { addEventMemberByEmail } from '@/services/eventService'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useHaptics } from '@/hooks/useHaptics'
+import { PermissionSelector } from '@/components/permissions'
 
 interface InviteMemberModalProps {
   isOpen: boolean
@@ -17,11 +17,6 @@ interface InviteMemberModalProps {
   roomName: string
   onClose: () => void
 }
-
-const ROLE_OPTIONS: { value: UserRole; label: string; desc: string }[] = [
-  { value: 'editor', label: 'Editor', desc: 'Can upload photos & videos' },
-  { value: 'viewer', label: 'Viewer', desc: 'Can view only, cannot upload' },
-]
 
 export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }: InviteMemberModalProps) {
   const { user } = useAuth()
@@ -32,7 +27,7 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
   const [showQR, setShowQR] = useState(false)
   const { haptic } = useHaptics()
 
-  const shareUrl = eventId 
+  const shareUrl = eventId
     ? `${window.location.origin}/room/${roomId}/event/${eventId}`
     : `${window.location.origin}/room/${roomId}`
 
@@ -54,11 +49,11 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
     setIsLoading(false)
 
     if (error) {
-      toast.error(error)
+      toastError(error)
       return
     }
 
-    toast.success(`Invited ${email} as ${role}`)
+    toastSuccess(`Invited ${email} as ${role}`)
     setEmail('')
   }
 
@@ -66,7 +61,7 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
     await navigator.clipboard.writeText(shareUrl)
     setCopied(true)
     haptic('success')
-    toast.success('Link copied!')
+    toastSuccess('Link copied!')
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -181,24 +176,11 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
 
               <div>
                 <label className="input-label">Role</label>
-                <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
-                  {ROLE_OPTIONS.map((opt) => (
-                    <motion.button
-                      key={opt.value}
-                      type="button"
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => { haptic('light'); setRole(opt.value) }}
-                      className={`p-3 rounded-lg border text-left transition-all duration-150 ${
-                        role === opt.value
-                          ? 'border-blue-500/50 bg-blue-500/10 text-[#f4f4f5]'
-                          : 'border-white/8 bg-white/3 text-[#a1a1aa] hover:border-white/15'
-                      }`}
-                    >
-                      <div className="font-medium text-sm">{opt.label}</div>
-                      <div className="text-xs text-[#71717a] mt-0.5">{opt.desc}</div>
-                    </motion.button>
-                  ))}
-                </div>
+                <PermissionSelector
+                  value={role}
+                  onChange={setRole}
+                  showDetails={true}
+                />
               </div>
 
               <div className="flex gap-3 pt-1">

@@ -28,7 +28,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import type { Photo } from '@/types'
 import { downloadFilesAsZip } from '@/services/downloadService'
 import { downloadFile } from '@/utils/download'
-import { toast } from 'sonner'
+import { toastError, toastSuccess, toastLoading } from '@/lib/toast'
 
 // Lazy-load the heavy Canvas component (tldraw is ~400KB)
 const MoodboardCanvas = lazy(() => 
@@ -103,8 +103,8 @@ export function EventDetailPage() {
 
   async function handleDeletePhoto(photo: Photo) {
     const { error } = await deletePhotoById(photo.id, photo.s3Key!)
-    if (error) { toast.error(error); return }
-    toast.success('Deleted')
+    if (error) { toastError(error); return }
+    toastSuccess('Deleted')
   }
 
   const handleDeleteEvent = async () => {
@@ -113,9 +113,9 @@ export function EventDetailPage() {
 
     const { error } = await deleteEvent(event.id)
     if (error) {
-      toast.error('Failed to delete event')
+      toastError('Failed to delete event')
     } else {
-      toast.success('Event deleted successfully')
+      toastSuccess('Event deleted successfully')
       navigate(`/room/${roomId}`)
     }
   }
@@ -148,9 +148,9 @@ export function EventDetailPage() {
     )
 
     if (!result.success) {
-      toast.error(result.error)
+      toastError(result.error)
     } else {
-      toast.success('Download started in your browser!')
+      toastSuccess('Download started in your browser!')
       setIsSelectionMode(false)
       setSelectedIds(new Set())
     }
@@ -162,11 +162,11 @@ export function EventDetailPage() {
     
     // Download them individually sequentially to not crash the browser
     let count = 0;
-    const loadingToast = toast.loading(`Downloading ${selectedPhotos.length} files...`);
+    const loadingToast = toastLoading(`Downloading ${selectedPhotos.length} files...`);
 
     for (const p of selectedPhotos) {
       count++;
-      toast.loading(`Downloading ${count} of ${selectedPhotos.length}: ${p.filename}`, { id: loadingToast });
+      toastLoading(`Downloading ${count} of ${selectedPhotos.length}: ${p.filename}`, { id: loadingToast });
 
       if (p.s3Url) {
          let targetUrl = p.s3Url;
@@ -176,11 +176,11 @@ export function EventDetailPage() {
                targetUrl = await downloadAndDecryptMedia(p, vaultKey) 
             } catch (e) {
                console.error('Decryption failed for', p.filename, e)
-               toast.error(`Failed to decrypt ${p.filename}`)
+               toastError(`Failed to decrypt ${p.filename}`)
                continue
             }
          } else if (p.isEncrypted && !vaultKey) {
-            toast.error(`No vault key available for ${p.filename}`)
+            toastError(`No vault key available for ${p.filename}`)
             continue
          } else if (!p.isEncrypted && targetUrl?.includes('pending')) {
             try { targetUrl = await getSecureMediaUrl(p) } catch(e) {}
@@ -196,7 +196,7 @@ export function EventDetailPage() {
       await new Promise(res => setTimeout(res, 500))
     }
     
-    toast.success(`Successfully downloaded ${count} files`, { id: loadingToast })
+    toastSuccess(`Successfully downloaded ${count} files`, { id: loadingToast })
     setIsSelectionMode(false)
     setSelectedIds(new Set())
   }
@@ -213,7 +213,7 @@ export function EventDetailPage() {
     const toDelete = selectedPhotos.filter(p => p.uploaderId === user?.id)
     
     if (toDelete.length !== selectedPhotos.length) {
-      toast.error('You can only delete your own photos.')
+      toastError('You can only delete your own photos.')
     }
 
     for (const photo of toDelete) {
@@ -223,9 +223,9 @@ export function EventDetailPage() {
     }
 
     if (deletedCount > 0) {
-      toast.success(`Deleted ${deletedCount} items`)
+      toastSuccess(`Deleted ${deletedCount} items`)
     }
-    if (errCount > 0) toast.error(`Failed to delete ${errCount} items`)
+    if (errCount > 0) toastError(`Failed to delete ${errCount} items`)
     
     setIsSelectionMode(false)
     setSelectedIds(new Set())
@@ -253,9 +253,9 @@ export function EventDetailPage() {
     const { error } = await requestToJoinEvent(eventId, user.id)
     setIsRequestingJoin(false)
     if (error) {
-      toast.error(error)
+      toastError(error)
     } else {
-      toast.success('Request sent!')
+      toastSuccess('Request sent!')
       window.location.reload() // Or refetch via react-query
     }
   }
@@ -264,7 +264,7 @@ export function EventDetailPage() {
     if (!eventId) return
     const { error } = await updateEventMemberStatus(eventId, userId, status)
     if (!error) {
-      toast.success(`User ${status}`)
+      toastSuccess(`User ${status}`)
     }
   }
 
@@ -626,11 +626,11 @@ export function EventDetailPage() {
               if (file) {
                 const result = await uploadThumbnail(file, roomId)
                 if (result.success && result.url) finalUrl = result.url
-                else return toast.error('Failed to upload cover')
+                else return toastError('Failed to upload cover')
               }
               const { error } = await updateRoomThumbnail(roomId, finalUrl)
-              if (error) toast.error('Failed to update room cover')
-              else toast.success('Room cover updated')
+              if (error) toastError('Failed to update room cover')
+              else toastSuccess('Room cover updated')
             } : undefined}
             onSetEventCover={isEventOwner ? async (url, file) => {
               if (!eventId) return
@@ -638,11 +638,11 @@ export function EventDetailPage() {
               if (file) {
                 const result = await uploadThumbnail(file, eventId)
                 if (result.success && result.url) finalUrl = result.url
-                else return toast.error('Failed to upload cover')
+                else return toastError('Failed to upload cover')
               }
               const { error } = await updateEventThumbnail(eventId, finalUrl)
-              if (error) toast.error('Failed to update event cover')
-              else toast.success('Event cover updated')
+              if (error) toastError('Failed to update event cover')
+              else toastSuccess('Event cover updated')
             } : undefined}
           />
         </>

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 import path from 'path'
 
 // https://vitejs.dev/config/
@@ -54,8 +55,7 @@ export default defineConfig({
             }
           },
           {
-            // Cache Media Streams from the Oracle Node (assuming it might match an IP or domain)
-            // For now, we will cache any /stream/ URL
+            // Cache Media Streams from the Oracle Node
             urlPattern: /\/stream\//i,
             handler: 'CacheFirst',
             options: {
@@ -68,11 +68,56 @@ export default defineConfig({
                 statuses: [0, 200, 206]
               }
             }
+          },
+          {
+            // Cache static assets (CSS, JS, images, media) with stale-while-revalidate
+            urlPattern: /\.(?:js|css|png|jpg|jpeg|svg|gif|webp|mp4|webm|ogg|mp3|wav|woff2?|ttf|eot)(\?.*|$)/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'static-asset-cache',
+              expiration: {
+                maxEntries: 1000,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              },
+              plugin: typeof workbox !== 'undefined' ?
+                new workbox.expiration.Plugin({
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                  purgeOnQuotaError: true
+                }) : undefined
+            }
+          },
+          {
+            // Cache thumbnails and user-generated content with cache-first
+            urlPattern: /\/(thumbnails?|uploads?|avatars?)\/.*\.(?:jpg|jpeg|png|gif|webp|mp4|webm)(\?.*|$)/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'user-content-cache',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
-      }
+      },
+      // Use our custom service worker
+      srcDir: 'src',
+      filename: 'custom-service-worker.js',
+      strategies: 'injectManifest'
+    }),
+    // Enable bundle visualizer in build mode
+    process.env.NODE_ENV === 'production' && visualizer({
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
     })
-  ],
+  ].filter(Boolean),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -101,7 +146,7 @@ export default defineConfig({
           'gallery': ['masonic', 'framer-motion'],
           'canvas': ['tldraw'],
         }
-      }
+      },
     }
   }
 })

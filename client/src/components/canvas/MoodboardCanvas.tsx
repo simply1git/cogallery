@@ -4,7 +4,7 @@ import 'tldraw/tldraw.css'
 import { useYjsStore } from '@/hooks/useYjsStore'
 import type { Photo } from '@/types'
 import { ImagePlus } from 'lucide-react'
-import { toast } from 'sonner'
+import { toastError, toastSuccess } from '@/lib/toast'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { Loader2 } from 'lucide-react'
@@ -22,7 +22,7 @@ const assetUrlCache = new Map<string, string>()
 
 const customAssetStore: TLAssetStore = {
   async upload(_asset: any, _file: File) {
-    toast.error('Please upload photos using the Gallery interface first.')
+    toastError('Please upload photos using the Gallery interface first.')
     throw new Error('Direct upload to canvas is disabled.')
   },
   async resolve(asset: any, _ctx: any) {
@@ -30,13 +30,13 @@ const customAssetStore: TLAssetStore = {
     if (!src || !src.startsWith('encrypted-photo://')) {
       return src
     }
-    
+
     const photoId = src.replace('encrypted-photo://', '')
     const photo = useCanvasStore.getState().photos.find((p) => p.id === photoId)
     if (!photo) return null
-    
-    const vaultKey = useRoomStore.getState().vaultKeys[photo.roomId]
-    
+
+    const vaultKey = useRoomStore.getState().vaultKeys[roomId]
+
     try {
       // 1. Unencrypted handling
       if (!photo.isEncrypted) {
@@ -59,11 +59,11 @@ const customAssetStore: TLAssetStore = {
       const secureUrl = await getSecureMediaUrl(photo)
       const response = await fetch(secureUrl)
       if (!response.ok) throw new Error('Failed to fetch')
-      
+
       const encryptedBuffer = await response.arrayBuffer()
       const mimeType = photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
       const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType)
-      
+
       const blobUrl = URL.createObjectURL(decryptedBlob)
       assetUrlCache.set(photoId, blobUrl)
       return blobUrl
@@ -76,7 +76,7 @@ const customAssetStore: TLAssetStore = {
 export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProps) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [showPhotoDrawer, setShowPhotoDrawer] = useState(false)
-  
+
   const setStorePhotos = useCanvasStore((s) => s.setPhotos)
 
   // Sync photos to store so shapes can render them
@@ -127,9 +127,9 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
           assetId,
         },
       })
-      toast.success('Photo added to canvas')
+      toastSuccess('Photo added to canvas')
     } catch (error) {
-      toast.error('Failed to add photo')
+      toastError('Failed to add photo')
       console.error(error)
     }
   }, [editor])
@@ -173,10 +173,10 @@ export function MoodboardCanvas({ eventId, userId, photos }: MoodboardCanvasProp
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {photos.map((photo) => (
-                <CanvasDrawerItem 
-                  key={photo.id} 
-                  photo={photo} 
-                  onClick={() => addPhotoToCanvas(photo)} 
+                <CanvasDrawerItem
+                  key={photo.id}
+                  photo={photo}
+                  onClick={() => addPhotoToCanvas(photo)}
                 />
               ))}
             </div>

@@ -10,7 +10,6 @@ import { exec } from 'child_process';
 import util from 'util';
 const execPromise = util.promisify(exec);
 import jwt from 'jsonwebtoken';
-import rateLimit from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -22,6 +21,17 @@ import { Server, EVENTS } from '@tus/server';
 import { FileStore } from '@tus/file-store';
 import sharp from 'sharp';
 import WebSocket from 'ws';
+
+// Import our logger service
+const logger = require('./lib/logger');
+
+// Import our rate limiter service
+const RateLimiter = require('./lib/rateLimiter');
+const rateLimiter = new RateLimiter();
+
+// Import our health and metrics services
+const healthService = require('./lib/health');
+const metricsService = require('./lib/metrics');
 
 if (!globalThis.WebSocket) {
   globalThis.WebSocket = WebSocket;
@@ -207,12 +217,13 @@ setInterval(async () => {
       }
     }
   } catch (err) {
-    console.error('Health monitor error', err);
+    logger.error({ error: err.message }, 'Health monitor error');
   }
 }, 5 * 60 * 1000); // Check every 5 minutes
 
 // Send startup alert
-sendEmailAlert(`Node Online: ${os.hostname()}`, `A new CoGallery storage node has successfully booted up and is running PM2.`);
+sendEmailAlert(`Node Online: ${os.hostname()}`, `A new CoGallery storage node has successfully booted up and is running PM2.`)
+  .catch(err => logger.error({ error: err.message }, 'Failed to send startup alert'));
 
 // --- DISK JANITOR ---
 // Clean up temp chunks older than 24 hours every day
@@ -225,11 +236,11 @@ setInterval(async () => {
       const stat = await fs.stat(dirPath);
       if (now - stat.mtimeMs > 24 * 60 * 60 * 1000) {
         await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
-        console.log(`[Janitor] Cleaned abandoned upload: ${dir}`);
+        logger.info({ dir: dir }, 'Cleaned abandoned upload');
       }
     }
   } catch (err) {
-    console.error('[Janitor] Cleanup error:', err);
+    logger.error({ error: err.message }, '[Janitor] Cleanup error');
   }
 }, 24 * 60 * 60 * 1000);
 
@@ -238,14 +249,14 @@ setInterval(async () => {
 const startHeartbeat = () => {
   const nodeUrl = process.env.NODE_URL;
   if (!supabaseAdmin) {
-    console.warn('[Cluster] SUPABASE_SERVICE_ROLE_KEY not set. Heartbeat disabled.');
+    logger.warn('SUPABASE_SERVICE_ROLE_KEY not set. Heartbeat disabled.');
     return;
   }
   if (!nodeUrl) {
-    console.warn('[Cluster] NODE_URL not set. This node will not be discoverable by the Developer Dashboard.');
+    logger.warn('NODE_URL not set. This node will not be discoverable by the Developer Dashboard.');
     return;
   }
-  
+
   const ping = async () => {
     try {
       await supabaseAdmin.from('storage_nodes').upsert(
@@ -253,10 +264,10 @@ const startHeartbeat = () => {
         { onConflict: 'node_url' }
       );
     } catch (e) {
-      console.error('[Cluster] Heartbeat failed:', e.message);
+      logger.error({ error: e.message }, 'Heartbeat failed');
     }
   };
-  
+
   ping(); // Initial ping
   setInterval(ping, 60000); // Ping every 60 seconds
 };
@@ -265,6 +276,23 @@ startHeartbeat();
 
 // --- ZERO-TRUST SECURITY MIDDLEWARE ---
 const authenticateJWT = async (req, res, next) => {
+  // Apply rate limiting for authentication attempts
+  const authLimitResult = rateLimiter.checkRateLimit(req, 'auth', { identifierType: 'ip' });
+  if (!authLimitResult.allowed) {
+    // Log the rate limit violation
+    logger.warn({
+      ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      reason: authLimitResult.reason,
+      message: authLimitResult.message
+    }, 'Authentication rate limit exceeded');
+
+    return res.status(429).json({
+      error: 'Too many authentication attempts',
+      message: authLimitResult.message,
+      retryAfter: authLimitResult.retryAfter
+    });
+  }
+
   const authHeader = req.headers.authorization;
   const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
   if (!token) {
@@ -277,28 +305,21 @@ const authenticateJWT = async (req, res, next) => {
     req.accessToken = token;
     next();
   } catch (err) {
-    console.error('JWT verification failed:', err.message);
+    // Record failed authentication attempt for abuse detection
+    rateLimiter.recordFailure(req, 'invalid_token');
+
+    logger.warn({ error: err.message, token: token.substring(0, 20) + '...' }, 'JWT verification failed');
     res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
 
-const uploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Max 500 requests per IP
-  message: { error: 'Too many requests, auto-banned for 15 minutes' }
-});
-
-const mediaLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 240,
-  message: { error: 'Too many media requests. Please slow down.' },
-});
-
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  message: { error: 'Too many admin requests. Please slow down.' },
-});
+// Rate limiters are now handled by the rateLimiter service
+// We'll create middleware functions for different endpoint types
+const uploadLimiter = rateLimiter.middleware('upload');
+const mediaLimiter = rateLimiter.middleware('media');
+const adminLimiter = rateLimiter.middleware('admin');
+const authLimiter = rateLimiter.middleware('auth');
+const globalLimiter = rateLimiter.middleware('global');
 
 function requireSupabaseAdmin(req, res, next) {
   if (!supabaseAdmin) {
@@ -426,9 +447,12 @@ function verifyStreamToken(token, key) {
 }
 
 
-// Health Check
-app.get('/status', (req, res) => {
-  res.json({ status: 'online', service: 'CoGallery Oracle Backend' });
+// --- METRICS ENDPOINT ---
+// Prometheus metrics endpoint
+app.get('/metrics', globalLimiter, (req, res) => {
+  const metricsText = metricsService.generateMetrics();
+  res.set('Content-Type', 'text/plain');
+  res.send(metricsText);
 });
 
 // --- DEVELOPER STORAGE UTILS ---
@@ -1134,9 +1158,76 @@ app.get('/events/:eventId/archive-status', authenticateJWT, async (req, res) => 
   });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`===========================================`);
-  console.log(`🚀 CoGallery Oracle Backend running on port ${PORT}`);
-  console.log(`===========================================`);
+// Metrics endpoint for Prometheus
+app.get('/metrics', globalLimiter, async (req, res) => {
+  try {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+
+    let diskUsage = { total: 0, free: 0, used: 0 };
+    try {
+      const stats = await fs.statfs(__dirname);
+      diskUsage.total = stats.blocks * stats.bsize;
+      diskUsage.free = stats.bfree * stats.bsize;
+      diskUsage.used = diskUsage.total - diskUsage.free;
+    } catch (e) {
+      logger.warn({ error: e.message }, 'Failed to get disk usage');
+    }
+
+    // Basic metrics in Prometheus format
+    const metrics = [
+      `# HELP cogallery_memory_bytes Memory usage in bytes`,
+      `# TYPE cogallery_memory_bytes gauge`,
+      `cogallery_memory_bytes{type="total"} ${totalMem}`,
+      `cogallery_memory_bytes{type="used"} ${usedMem}`,
+      `cogallery_memory_bytes{type="free"} ${freeMem}`,
+      `# HELP cogallery_disk_bytes Disk usage in bytes`,
+      `# TYPE cogallery_disk_bytes gauge`,
+      `cogallery_disk_bytes{type="total"} ${diskUsage.total}`,
+      `cogallery_disk_bytes{type="used"} ${diskUsage.used}`,
+      `cogallery_disk_bytes{type="free"} ${diskUsage.free}`,
+      `# HELP cogallery_uptime_seconds Uptime in seconds`,
+      `# TYPE cogallery_uptime_seconds gauge`,
+      `cogallery_uptime_seconds ${os.uptime()}`
+    ].join('\n');
+
+    res.set('Content-Type', 'text/plain');
+    res.send(metrics);
+  } catch (error) {
+    logger.error({ error: error.message }, 'Failed to generate metrics');
+    res.status(500).send('Error generating metrics');
+  }
 });
+
+// Health Check
+app.get('/status', globalLimiter, (req, res) => {
+  logger.info({ endpoint: '/status', method: req.method }, 'Health check requested');
+  const healthStatus = healthService.getHealthStatus();
+  res.json(healthStatus);
+});
+
+// Logger already updated above
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  logger.info({ port: PORT }, 'CoGallery Oracle Backend started');
+});
+
+// Graceful shutdown
+const cleanup = () => {
+  logger.info({ signal: 'SIGINT or SIGTERM received' }, 'Shutting down gracefully');
+
+  // Close rate limiter
+  if (rateLimiter && typeof rateLimiter.shutdown === 'function') {
+    rateLimiter.shutdown();
+  }
+
+  // Close server
+  server.close(() => {
+    logger.info({}, 'HTTP server closed');
+    process.exit(0);
+  });
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);

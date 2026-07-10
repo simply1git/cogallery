@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import type { Photo, PhotoWithReactions, Comment } from '@/types'
 import { formatFileSize } from '@/services/uploadService'
 import { downloadFile } from '@/utils/download'
-import { toast } from 'sonner'
+import { toastError, toastInfo, toastSuccess, toastLoading } from '@/lib/toast'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useColorExtractor } from '@/hooks/useColorExtractor'
@@ -99,7 +99,7 @@ export function PhotoDetailModal({
   const isVideo = photo.mediaType === 'video'
 
   async function handleReaction(emoji: string) {
-    if (!user || !photo) { toast.error('Sign in to react'); return }
+    if (!user || !photo) { toastError('Sign in to react'); return }
     haptic('light')
     await addReaction(photo.id, emoji, user.id)
     loadDetails(photo)
@@ -111,14 +111,14 @@ export function PhotoDetailModal({
     setIsSubmittingComment(true)
     const { error } = await addComment(photo.id, commentText.trim(), user.id)
     setIsSubmittingComment(false)
-    if (error) { toast.error(error); return }
+    if (error) { toastError(error); return }
     setCommentText('')
     loadDetails(photo)
   }
 
   async function handleDeleteComment(comment: Comment) {
     const { error } = await deleteComment(comment.id)
-    if (error) { toast.error(error); return }
+    if (error) { toastError(error); return }
     loadDetails(photo!)
   }
 
@@ -131,7 +131,7 @@ export function PhotoDetailModal({
         return
       }
 
-      const toastId = toast.loading(`Preparing ${photo.filename}...`)
+      const toastId = toastLoading(`Preparing ${photo.filename}...`)
       
       try {
         let url: string;
@@ -141,10 +141,10 @@ export function PhotoDetailModal({
               const percent = Math.round((loaded / total) * 100);
               const mbLoaded = (loaded / (1024 * 1024)).toFixed(1);
               const mbTotal = (total / (1024 * 1024)).toFixed(1);
-              toast.loading(`Decrypting: ${percent}% (${mbLoaded}MB / ${mbTotal}MB)`, { id: toastId });
+              toastLoading(`Decrypting: ${percent}% (${mbLoaded}MB / ${mbTotal}MB)`, { id: toastId })
             } else {
               const mbLoaded = (loaded / (1024 * 1024)).toFixed(1);
-              toast.loading(`Decrypting: ${mbLoaded}MB...`, { id: toastId });
+              toastLoading(`Decrypting: ${mbLoaded}MB...`, { id: toastId })
             }
           })
         } else if (photo.isEncrypted && !vaultKey) {
@@ -153,17 +153,17 @@ export function PhotoDetailModal({
           url = await getSecureMediaUrl(photo)
         }
         
-        toast.success('Download started', { id: toastId })
+        toastSuccess('Download started', { id: toastId })
         downloadFile(url, photo.filename)
         if (url.startsWith('blob:')) {
           setTimeout(() => URL.revokeObjectURL(url), 1000)
         }
       } catch (err) {
-        toast.error('Failed to generate download link', { id: toastId })
+        toastError('Failed to generate download link', { id: toastId })
         console.error(err);
       }
     } catch (err) {
-      toast.error('Failed to generate download link')
+      toastError('Failed to generate download link')
     }
   }
 

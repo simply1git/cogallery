@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Play, Trash2, Download, Film, Image as ImageIcon 
 import type { Photo } from '@/types'
 import { downloadFile } from '@/utils/download'
 import { getSecureMediaUrl, downloadAndDecryptMedia } from '@/services/photoService'
+import { toastError } from '@/lib/toast'
 import { toast } from 'sonner'
 import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
@@ -81,7 +82,7 @@ export const PhotoCard = memo(function PhotoCard({
         }
       )
     } catch (err) {
-      toast.error('Failed to generate download link')
+      toastError('Failed to generate download link')
     }
   }
 

@@ -4,8 +4,9 @@ import { createRoom } from '@/services/roomService'
 import { useAuth } from '@/hooks/useAuth'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useRoomStore } from '@/store/roomStore'
-import { toast } from 'sonner'
+import { toastError, toastSuccess } from '@/lib'
 import { generateSaltHex, hashPasswordForVerification, deriveKeyFromPassword } from '@/services/cryptoService'
+import { generateRecoveryCode, storeVaultRecoveryInfo } from '@/services/vaultRecoveryService'
 
 interface CreateRoomModalProps {
   isOpen: boolean
@@ -15,13 +16,12 @@ interface CreateRoomModalProps {
 
 export function CreateRoomModal({ isOpen, onClose, onCreated }: CreateRoomModalProps) {
   const { user } = useAuth()
-  const addRoom = useRoomStore((s) => s.addRoom)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isVault, setIsVault] = useState(false)
   const [vaultPassword, setVaultPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const setVaultKey = useRoomStore((s) => s.setVaultKey)
+  const { setVaultKey, addRoom } = useRoomStore()
 
   useEscapeKey(isOpen, onClose)
 
@@ -31,7 +31,7 @@ export function CreateRoomModal({ isOpen, onClose, onCreated }: CreateRoomModalP
     e.preventDefault()
     if (!user || !name.trim()) return
     if (isVault && vaultPassword.length < 6) {
-      toast.error('Vault password must be at least 6 characters')
+      toastError('Vault password must be at least 6 characters')
       return
     }
 
@@ -57,16 +57,26 @@ export function CreateRoomModal({ isOpen, onClose, onCreated }: CreateRoomModalP
     setIsLoading(false)
 
     if (error || !data) {
-      toast.error(error ?? 'Failed to create room')
+      toastError(error ?? 'Failed to create room')
       return
     }
 
     if (isVault && derivedKey && data) {
       setVaultKey(data.id, derivedKey)
-    }
 
+      // Generate and save recovery code for vault
+      const recoveryCode = generateRecoveryCode()
+      await storeVaultRecoveryInfo(data.id, recoveryCode)
+
+      // Show the recovery code to the user (they need to save it!)
+      toastSuccess(`Room "${data.name}" created! **VAULT RECOVERY CODE: ${recoveryCode}** - Save this code to recover your vault if you forget your password.`, {
+        duration: 15000 // Show for 15 seconds so user can copy it
+      })
+    } else {
+      toastSuccess(`Room "${data.name}" created!`)
+    }
+    // Add room to the store
     addRoom(data)
-    toast.success(`Room "${data.name}" created!`)
     setName('')
     setDescription('')
     setIsVault(false)

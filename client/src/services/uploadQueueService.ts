@@ -44,26 +44,56 @@ let memoryItems: UploadItem[] = []; // In-memory cache for UI reactivity
 
 // ─── Content Hash for Deduplication ──────────────────────────────────────────
 
+// Initialize the Web Worker (only once)
+let hashWorker: Worker | null = null;
+let hashJobIdCounter = 0;
+const hashWorkerPromises = new Map<
+  number,
+  {
+    resolve: (value: string) => void;
+    reject: (reason?: any) => void;
+  }
+>();
+
+function getHashWorker(): Worker {
+  if (typeof window === 'undefined') {
+    // Fallback for server-side rendering
+    throw new Error('Cannot create Web Worker outside of browser environment');
+  }
+  if (!hashWorker) {
+    // @ts-ignore: Ignoring import.meta error for compatibility
+    hashWorker = new Worker(new URL('./lib/workers/hashWorker.ts', import.meta.url), {
+      type: 'module'
+    });
+    hashWorker.onmessage = (e) => {
+      const { id, success, hash, error } = e.data;
+      const promise = hashWorkerPromises.get(id);
+      if (promise) {
+        if (success) {
+          promise.resolve(hash);
+        } else {
+          promise.reject(new Error(error));
+        }
+        hashWorkerPromises.delete(id);
+      }
+    };
+  }
+  return hashWorker;
+}
+
 async function computeFileHash(file: File | Blob): Promise<string> {
   // For large files, hash only the first 1MB + last 1MB + size for speed
   const HASH_CHUNK = 1024 * 1024; // 1MB
-  let buffer: ArrayBuffer;
 
-  if (file.size <= HASH_CHUNK * 2) {
-    buffer = await file.arrayBuffer();
-  } else {
-    const first = await file.slice(0, HASH_CHUNK).arrayBuffer();
-    const last = await file.slice(-HASH_CHUNK).arrayBuffer();
-    const sizeBytes = new TextEncoder().encode(file.size.toString());
-    const combined = new Uint8Array(first.byteLength + last.byteLength + sizeBytes.byteLength);
-    combined.set(new Uint8Array(first), 0);
-    combined.set(new Uint8Array(last), first.byteLength);
-    combined.set(sizeBytes, first.byteLength + last.byteLength);
-    buffer = combined.buffer;
-  }
+  // Offload to Web Worker
+  return new Promise((resolve, reject) => {
+    const worker = getHashWorker();
+    const id = ++hashJobIdCounter;
 
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    hashWorkerPromises.set(id, { resolve, reject });
+
+    worker.postMessage({ id, file, chunkSize: HASH_CHUNK });
+  });
 }
 
 export const uploadQueueService = {
@@ -95,8 +125,12 @@ export const uploadQueueService = {
     window.addEventListener('online', () => {
       toast.success('Back online! Resuming uploads...');
       this.processQueue();
+      // Also request background sync in case processing gets interrupted
+      this.registerBackgroundSync().catch(() => {
+        // Background sync is optional - don't let failures stop the app
+      });
     });
-    
+
     window.addEventListener('offline', () => {
       // Cancel all active uploads gracefully
       activeAbortControllers.forEach((controller) => controller.abort());
@@ -104,9 +138,42 @@ export const uploadQueueService = {
       toast.error('Offline. Uploads paused safely in the background.');
     });
 
+    // Register background sync for upload queue
+    this.registerBackgroundSync().catch(() => {
+      // Background sync is optional - don't let failures stop the app
+    });
+
     if (navigator.onLine) {
       this.processQueue();
     }
+  },
+
+  /**
+   * Clean up resources to prevent memory leaks
+   * Should be called when the application is unloading
+   */
+  async destroy() {
+    // Terminate hash worker if it exists
+    if (hashWorker) {
+      hashWorker.terminate();
+      hashWorker = null;
+    }
+
+    // Clear pending hash job promises
+    hashWorkerPromises.clear();
+
+    // Clear IndexedDB connection
+    dbPromise = null;
+
+    // Clear listeners
+    listeners.clear();
+
+    // Clear memory items
+    memoryItems = [];
+
+    // Clear abort controllers
+    activeAbortControllers.forEach(controller => controller.abort());
+    activeAbortControllers.clear();
   },
 
   notify() {
@@ -171,6 +238,12 @@ export const uploadQueueService = {
       memoryItems.push(item);
     }
     this.notify();
+
+    // Request background sync for uploaded files
+    this.registerBackgroundSync().catch(() => {
+      // Background sync is optional - don't let failures stop the app
+    });
+
     this.processQueue();
   },
 
@@ -267,14 +340,14 @@ export const uploadQueueService = {
               // User-initiated cancellation — remove from queue
               await this.removeItem(item.id);
             } else {
-              // Actual failure — apply exponential backoff retry
+              // Actual failure — apply exponential backoff retry with jitter
               const currentRetries = item.retryCount || 0;
               if (currentRetries < MAX_RETRIES) {
-                const delay = BASE_RETRY_DELAY_MS * Math.pow(2, currentRetries);
+                const delay = BASE_RETRY_DELAY_MS * Math.pow(2, currentRetries) + Math.floor(Math.random() * 1000); // Add 0-1s jitter
                 console.warn(`[UploadQueue] Retry ${currentRetries + 1}/${MAX_RETRIES} for ${item.file.name} in ${delay}ms`);
-                await this.updateItem(item.id, { 
-                  status: 'queued', 
-                  progress: 0, 
+                await this.updateItem(item.id, {
+                  status: 'queued',
+                  progress: 0,
                   retryCount: currentRetries + 1,
                   error: err.message || 'Upload failed'
                 });
@@ -339,10 +412,48 @@ export const uploadQueueService = {
 
     const db = await dbPromise;
     if (!db) return;
-    
+
     // Clear everything from the db
     await db.clear('uploads');
     memoryItems = [];
     this.notify();
-  }
+  },
+
+  // Background Sync Functions
+  async isBackgroundSyncAvailable(): Promise<boolean> {
+    return ('serviceWorker' in navigator &&
+            'SyncManager' in window &&
+            navigator.serviceWorker.ready !== undefined);
+  },
+
+  async registerBackgroundSync(): Promise<void> {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      // Check if background sync is supported
+      if ('sync' in registration) {
+        await (registration as any).sync.register('sync-uploads');
+      } else {
+        console.warn('Background Sync API not supported in this browser');
+      }
+    } catch (error) {
+      console.warn('Background sync registration failed:', error);
+      // Don't throw error as background sync is enhancement
+    }
+  },
+
+  async triggerBackgroundSync(): Promise<void> {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      // Check if background sync is supported
+      if ('sync' in registration) {
+        await (registration as any).sync.trigger('sync-uploads');
+      } else {
+        console.warn('Background Sync API not supported in this browser');
+      }
+    } catch (error) {
+      console.warn('Background sync trigger failed:', error);
+      // Don't throw error as background sync is enhancement
+    }
+  },
+
 };
