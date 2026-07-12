@@ -17,6 +17,7 @@ import { useRoomStore } from '@/store/roomStore'
 import { startSeeding } from '@/services/p2pService'
 import { PhotoGrid } from '@/components/gallery/PhotoGrid'
 import { PhotoDetailModal } from '@/components/gallery/PhotoDetailModal'
+import { useQueryClient } from '@tanstack/react-query'
 import { UploadZone } from '@/components/gallery/UploadZone'
 import { usePresence } from '@/hooks/realtime/usePresence'
 import { InviteMemberModal } from '@/components/modals/InviteMemberModal'
@@ -47,6 +48,8 @@ export function EventDetailPage() {
   const { roomId, eventId } = useParams<{ roomId: string; eventId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+
+  const queryClient = useQueryClient()
 
   const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all')
   const [uploaderFilter, setUploaderFilter] = useState<string>('all')
@@ -291,7 +294,11 @@ export function EventDetailPage() {
             Go to Dashboard
           </button>
           <button
-            onClick={() => window.location.reload()}
+            type="button"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['event', eventId] })
+              queryClient.invalidateQueries({ queryKey: ['room', roomId] })
+            }}
             className="btn-primary"
           >
             <RefreshCw size={16} />
@@ -360,7 +367,10 @@ export function EventDetailPage() {
           setIsSelectionMode(!isSelectionMode)
           if (!isSelectionMode) setSelectedIds(new Set())
         }}
-        onRefresh={() => { /* React Query handles cache invalidation on manual refresh */ }}
+        onRefresh={() => {
+          queryClient.invalidateQueries({ queryKey: ['photos', eventId] })
+          queryClient.invalidateQueries({ queryKey: ['event', eventId] })
+        }}
         onToggleUpload={() => setShowUpload(s => !s)}
         onShowInvite={() => setShowInvite(true)}
         onShowSettings={() => setShowSettings(true)}

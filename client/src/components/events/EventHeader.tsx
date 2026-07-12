@@ -52,6 +52,7 @@ export function EventHeader({
       {/* Breadcrumb */}
       {room && (
         <button
+          type="button"
           onClick={() => navigate(`/room/${roomId}`)}
           className="flex items-center gap-2 text-[#71717a] hover:text-[#a1a1aa] mb-6 text-sm transition-colors"
         >
@@ -96,6 +97,7 @@ export function EventHeader({
         <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto pb-1 -mb-1">
           {canManageEvent && (
             <button
+              type="button"
               onClick={onShowInvite}
               className="btn-secondary"
             >
@@ -107,6 +109,7 @@ export function EventHeader({
           {isEventOwner && (
             <>
               <button
+                type="button"
                 onClick={onShowSettings}
                 className="btn-secondary"
               >
@@ -114,6 +117,7 @@ export function EventHeader({
                 <span className="hidden sm:inline">Settings</span>
               </button>
               <button
+                type="button"
                 onClick={onDeleteEvent}
                 className="p-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors"
                 title="Delete Event"
@@ -124,6 +128,7 @@ export function EventHeader({
           )}
 
           <button
+            type="button"
             onClick={onToggleSelectionMode}
             className={isSelectionMode ? 'btn-blue' : 'btn-secondary'}
           >
@@ -132,6 +137,7 @@ export function EventHeader({
           </button>
           
           <button
+            type="button"
             onClick={onRefresh}
             className="btn-icon"
             title="Refresh"
@@ -140,12 +146,13 @@ export function EventHeader({
           </button>
           {user && !isSelectionMode && (
             <button
+              type="button"
               id="toggle-upload-btn"
               onClick={onToggleUpload}
               className={showUpload ? 'btn-secondary' : 'btn-blue'}
             >
               <UploadCloud size={16} />
-              {showUpload ? 'Hide Upload' : 'Upload'}
+              {showUpload ? 'Close Upload Panel' : 'Upload Photos'}
             </button>
           )}
         </div>

@@ -375,6 +375,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
 
         {!isOnline && queueItems.some(item => item.status === 'queued') && (
           <button
+            type="button"
             onClick={handleRetry}
             className="mt-2 px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded hover:text-white"
           >
@@ -464,6 +465,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                 )}
                 {item.status === 'error' && (
                   <button
+                    type="button"
                     onClick={() => {
                         uploadQueueService.retryItem(item.id)
                         // Trigger retry via uppy if possible
