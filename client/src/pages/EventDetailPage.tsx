@@ -106,6 +106,7 @@ export function EventDetailPage() {
   async function handleDeletePhoto(photo: Photo) {
     const { error } = await deletePhotoById(photo.id, photo.s3Key!)
     if (error) { toastError(error); return }
+    queryClient.invalidateQueries({ queryKey: ['photos', eventId] })
     toastSuccess('Deleted')
   }
 

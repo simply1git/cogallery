@@ -60,7 +60,7 @@ export async function logAuthEvent(
         user_id: userId,
         action: `auth_${action}`,
         object_type: 'user',
-        objectId: userId,
+        object_id: userId,
         details: {
           email,
           success,
@@ -93,7 +93,7 @@ export async function logRoomEvent(
         user_id: userId,
         action: `room_${action}`,
         object_type: 'room',
-        objectId: roomId,
+        object_id: roomId,
         details: {
           room_name: roomName,
           is_vault: isVault,
@@ -125,7 +125,7 @@ export async function logMemberEvent(
         user_id: userId,
         action: `member_${action}`,
         object_type: 'room_member',
-        objectId: targetUserId ?? roomId, // For member-specific actions, use user ID; otherwise room ID
+        object_id: targetUserId ?? roomId, // For member-specific actions, use user ID; otherwise room ID
         details: {
           target_user_id: targetUserId,
           role,
@@ -157,7 +157,7 @@ export async function logVaultEvent(
         user_id: userId,
         action: `vault_${action}`,
         object_type: 'vault',
-        objectId: roomId,
+        object_id: roomId,
         details: {
           success,
           ...(errorMessage && { error: errorMessage }),
@@ -189,7 +189,7 @@ export async function logPhotoEvent(
         user_id: userId,
         action: `photo_${action}`,
         object_type: 'photo',
-        objectId: photoId,
+        object_id: photoId,
         details: {
           is_encrypted: isEncrypted,
           media_type: mediaType,

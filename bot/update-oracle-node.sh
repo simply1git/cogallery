@@ -17,9 +17,8 @@ git pull origin main
 echo "📦 Installing dependencies..."
 npm ci --production
 
-# 3. Build the application
-echo "🏗️ Building application..."
-npm run build
+# 3. Skip build (using raw js files)
+echo "🏗️ Skipping build step..."
 
 # 4. Update configuration if needed
 echo "⚙️ Updating configuration..."
@@ -53,13 +52,12 @@ pm2 delete "cogallery-oracle-$NODE_NAME" || true
 # Start with appropriate environment file
 if [ -f ".env.$ENVIRONMENT" ]; then
   echo "   Using environment file: .env.$ENVIRONMENT"
-  pm2 start "dist/server.js" \
+  pm2 start bot_server_oracle.js \
     --name "cogallery-oracle-$NODE_NAME" \
-    --env "$ENVIRONMENT" \
-    -- node src/server.js
+    --env "$ENVIRONMENT"
 else
   echo "   Using default environment"
-  pm2 start "dist/server.js" \
+  pm2 start bot_server_oracle.js \
     --name "cogallery-oracle-$NODE_NAME" \
     --env "$ENVIRONMENT"
 fi
