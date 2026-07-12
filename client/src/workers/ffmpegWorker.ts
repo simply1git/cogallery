@@ -18,7 +18,7 @@ async function loadFFmpeg() {
   isLoading = true;
   loadPromise = (async () => {
     try {
-      ffmpeg = new FFmpeg({ log: true });
+      ffmpeg = new FFmpeg();
 
       // Load the core and wasm files
       await ffmpeg.load({
@@ -57,7 +57,7 @@ async function generateThumbnailWithFFmpeg(
   const inputName = 'input.mp4';
   const outputName = 'thumbnail.png';
 
-  await ffmpeg.writeFile(inputName, await file.arrayBuffer());
+  await ffmpeg.writeFile(inputName, new Uint8Array(await file.arrayBuffer()));
 
   // FFmpeg command to extract a frame at seekTime and output as a PNG image
   await ffmpeg.exec([
@@ -70,11 +70,11 @@ async function generateThumbnailWithFFmpeg(
   ]);
 
   // Read the output file
-  const data = await ffmpeg.readFile(outputName);
-  const blob = new Blob([data.buffer], { type: 'image/png' });
+  const data = (await ffmpeg.readFile(outputName)) as Uint8Array;
+  const blob = new Blob([data.buffer as ArrayBuffer], { type: 'image/png' });
 
   // Convert to base64 to match existing format
-  return await arrayBufferToBase64(data.buffer);
+  return await arrayBufferToBase64(data.buffer as ArrayBuffer);
 }
 
 /**

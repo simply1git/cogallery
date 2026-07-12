@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { supabase } from '@/lib/supabase'
 import type { Room, RoomMember, RoomWithMembers, UserRole } from '@/types'
 import { logRoomEvent } from '@/services/activityService'

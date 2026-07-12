@@ -97,8 +97,7 @@ export function EventDetailPage() {
 
   function handleUploadSuccess() {
     // React Query handles cache update via realtime subscription automatically
-    // But as a fallback and to ensure the UI is fully synced, we refresh the page.
-    window.location.reload()
+    toastSuccess('Upload completed');
   }
 
   async function handleDeletePhoto(photo: Photo) {
@@ -148,7 +147,7 @@ export function EventDetailPage() {
     )
 
     if (!result.success) {
-      toastError(result.error)
+      toastError(result.error || 'Download failed')
     } else {
       toastSuccess('Download started in your browser!')
       setIsSelectionMode(false)
@@ -256,7 +255,7 @@ export function EventDetailPage() {
       toastError(error)
     } else {
       toastSuccess('Request sent!')
-      window.location.reload() // Or refetch via react-query
+      // Reloading is unnecessary; the UI will update via other means if needed.
     }
   }
 

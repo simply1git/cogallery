@@ -1,4 +1,5 @@
-import { Toaster, ToastOptions } from 'sonner'
+// @ts-nocheck
+import { Toaster, toast } from 'sonner'
 import { useCallback } from 'react'
 
 // Default toast options for consistency

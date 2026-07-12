@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, UserPlus, Copy, Check, QrCode } from 'lucide-react'
 import { addMemberByEmail } from '@/services/roomService'
+import { addEventMemberByEmail } from '@/services/eventService'
 import { useAuth } from '@/hooks/useAuth'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -178,7 +179,7 @@ export function InviteMemberModal({ isOpen, roomId, eventId, roomName, onClose }
                 <label className="input-label">Role</label>
                 <PermissionSelector
                   value={role}
-                  onChange={setRole}
+                  onChange={(newRole) => { if (newRole) setRole(newRole) }}
                   showDetails={true}
                 />
               </div>

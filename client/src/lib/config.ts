@@ -40,7 +40,7 @@ export class Config {
    */
   public get<T = string>(key: string, defaultValue?: T): T | string {
     const value = this._env[`VITE_${key}`] as T | undefined;
-    return value !== undefined ? value : defaultValue;
+    return (value !== undefined ? value : (defaultValue ?? '')) as T | string;
   }
 
   /**
@@ -110,6 +110,3 @@ export class Config {
 
 // Export singleton instance
 export const config = Config.getInstance();
-
-// Export the class for advanced usage
-export type { Config };

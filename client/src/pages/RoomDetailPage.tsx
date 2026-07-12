@@ -187,7 +187,7 @@ export function RoomDetailPage() {
       setVaultKey(roomId, key)
       setVaultPassword('')
     } catch (err) {
-      toast.error('Invalid password or crypto error')
+      toastError('Invalid password or crypto error')
     } finally {
       setIsUnlocking(false)
     }

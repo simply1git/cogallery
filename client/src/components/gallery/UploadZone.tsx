@@ -23,7 +23,7 @@ interface UploadZoneProps {
 
 export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZoneProps) {
   const [uppy, setUppy] = useState<Uppy | null>(null)
-  const [isOnline] = useNetworkStatus()
+  const isOnline = useNetworkStatus()
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState<number>(0)
   const [queueItems, setQueueItems] = useState<UploadItem[]>([])
@@ -317,8 +317,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
   const retryFailedUploads = useCallback(async () => {
     const failedItems = queueItems.filter(item =>
       item.status === 'error' &&
-      item.retryCount < 5 && // Match MAX_RETRIES from uploadQueueService
-      !item.isProcessing
+      (item.retryCount ?? 0) < 5 // Match MAX_RETRIES from uploadQueueService
     )
 
     for (const item of failedItems) {
@@ -330,7 +329,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
           await uploadQueueService.updateItem(item.id, {
             error: undefined,
             status: 'queued',
-            retryCount: item.retryCount + 1
+            retryCount: (item.retryCount ?? 0) + 1
           })
         } catch (err) {
           console.error('Failed to re-add file to uppy:', err)
@@ -444,12 +443,7 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
             {queueItems.map((item) => (
               <div key={item.id} className="flex items-center justify-between py-1 px-2 border-b last:border-b-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full
-                    {item.status === 'queued' ? 'bg-yellow-500' :
-                     item.status === 'uploading' ? 'bg-blue-500' :
-                     item.status === 'done' ? 'bg-green-500' :
-                     'bg-red-500'}
-                  </div>
+                  <div className={`w-3 h-3 rounded-full ${item.status === 'queued' ? 'bg-yellow-500' : item.status === 'uploading' ? 'bg-blue-500' : item.status === 'done' ? 'bg-green-500' : 'bg-red-500'}`} />
                   <div className="flex-1 text-sm truncate">
                     {item.file.name}
                   </div>
@@ -470,13 +464,13 @@ export function UploadZone({ eventId, roomId, userId, onUploadSuccess }: UploadZ
                 )}
                 {item.status === 'error' && (
                   <button
-                    onClick={() =>
-                      uploadQueueService.retryItem(item.id).then(() => {
+                    onClick={() => {
+                        uploadQueueService.retryItem(item.id)
                         // Trigger retry via uppy if possible
                         if (uppyInstanceRef.current && item.file) {
-                          uppyInstanceRef.current.addFile(item.file).catch(console.error)
+                          try { uppyInstanceRef.current.addFile(item.file) } catch(e) { console.error(e) }
                         }
-                      })
+                      }
                     }
                     className="px-2 py-0.5 text-xs bg-red-500/20 hover:bg-red-500/30 rounded"
                   >

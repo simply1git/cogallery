@@ -172,9 +172,9 @@ function ErrorBoundaryWithFallback({
     ErrorBoundary,
     {
       name: name,
-      fallback: fallbackComponent || DefaultFallback
-    },
-    children
+      fallback: (fallbackComponent || DefaultFallback) as any,
+      children
+    }
   );
 }
 

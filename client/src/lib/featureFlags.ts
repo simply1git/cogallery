@@ -126,7 +126,7 @@ const loadSavedFlags = () => {
 // Save flags to localStorage when they change (for development persistence)
 const setupSaveListener = () => {
   window.addEventListener('feature:change', (e) => {
-    const { featureKey, enabled } = e.detail as { featureKey: string; enabled: boolean };
+    const { featureKey, enabled } = (e as CustomEvent).detail as { featureKey: string; enabled: boolean };
     try {
       const current = localStorage.getItem('featureFlags');
       const flags = current ? JSON.parse(current) : {};

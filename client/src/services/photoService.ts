@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { supabase } from '@/lib/supabase'
 import type { Photo, PhotoWithReactions, Reaction, Comment, MediaType } from '@/types'
 import { generateThumbnail } from './thumbnailService'

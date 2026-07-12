@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Image as ImageIcon, Save, Camera, Trash2, Check, Settings, Upload, UserPlus } from 'lucide-react'
 import { updateEvent, updateEventThumbnail } from '@/services/eventService'
 import { uploadThumbnail } from '@/services/uploadService'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { supabase } from '@/lib/supabase'
 import type { EventWithDetails } from '@/types'
 
 interface EventSettingsModalProps {

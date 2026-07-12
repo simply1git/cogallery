@@ -62,7 +62,7 @@ function getHashWorker(): Worker {
   }
   if (!hashWorker) {
     // @ts-ignore: Ignoring import.meta error for compatibility
-    hashWorker = new Worker(new URL('./lib/workers/hashWorker.ts', import.meta.url), {
+    hashWorker = new Worker(new URL('../lib/workers/hashWorker.ts', import.meta.url), {
       type: 'module'
     });
     hashWorker.onmessage = (e) => {

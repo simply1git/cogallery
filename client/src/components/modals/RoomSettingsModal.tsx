@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Image as ImageIcon, Save, Camera, Trash2, Check, Settings, UserPlus, Sliders, BarChart3, Upload } from 'lucide-react'
 import { updateRoom, updateRoomThumbnail } from '@/services/roomService'
 import { uploadThumbnail } from '@/services/uploadService'

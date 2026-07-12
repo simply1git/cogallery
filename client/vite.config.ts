@@ -81,12 +81,7 @@ export default defineConfig({
               },
               cacheableResponse: {
                 statuses: [0, 200]
-              },
-              plugin: typeof workbox !== 'undefined' ?
-                new workbox.expiration.Plugin({
-                  maxAgeSeconds: 60 * 60 * 24 * 365,
-                  purgeOnQuotaError: true
-                }) : undefined
+              }
             }
           },
           {

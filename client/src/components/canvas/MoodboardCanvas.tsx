@@ -35,7 +35,7 @@ const customAssetStore: TLAssetStore = {
     const photo = useCanvasStore.getState().photos.find((p) => p.id === photoId)
     if (!photo) return null
 
-    const vaultKey = useRoomStore.getState().vaultKeys[roomId]
+    const vaultKey = useRoomStore.getState().vaultKeys[photo.roomId]
 
     try {
       // 1. Unencrypted handling
