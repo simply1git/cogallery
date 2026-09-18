@@ -207,12 +207,25 @@ curl -X POST -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
 
 ### Updating Software
 To update to latest version:
-```bash
-# In both client and bot directories:
-git pull origin main
-npm install
-# Restart services
-```
+
+**Updating the Frontend (Vercel/Cloudflare Pages)**
+- Commit and push your changes to the `main` branch on GitHub. The CI/CD pipeline (`production.yml`) will handle the automated deployment of the frontend automatically.
+
+**Updating the Oracle Storage Nodes**
+The system uses two remote Oracle backend nodes for storage and WebRTC seeding. The deployment script (`bot/update-oracle-node.sh`) MUST be run directly on those servers, not locally. 
+The repository contains the SSH keys (`oracleinstance/`) and config (`bot/node-config.json`) needed to trigger the remote deployments.
+
+Run the following SSH commands from your local repository root to deploy updates:
+
+1. **Update Node 1 (Primary: `api.25012004.xyz`)**
+   ```bash
+   ssh -o StrictHostKeyChecking=no -i oracleinstance/cogallery-seedbox/ssh-key-2026-05-29.key ubuntu@68.233.106.173 "cd cogallery && git reset --hard && git pull origin main && chmod +x bot/update-oracle-node.sh && ./bot/update-oracle-node.sh oracle-node-01 production"
+   ```
+
+2. **Update Node 2 (Secondary: `node1.25012004.xyz`)**
+   ```bash
+   ssh -o StrictHostKeyChecking=no -i oracleinstance/cogallerynode1/ssh-key-2026-06-11.key ubuntu@68.233.107.22 "cd cogallery && git reset --hard && git pull origin main && chmod +x bot/update-oracle-node.sh && ./bot/update-oracle-node.sh oracle-node-02 production"
+   ```
 
 ### Database Migrations
 Supabase migrations should be applied through the Supabase Dashboard SQL Editor.

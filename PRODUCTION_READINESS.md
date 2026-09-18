@@ -26,6 +26,11 @@
 - Handles: code pull, dependency install, build, config update, PM2 restart
 - Includes health checks and logging
 
+### 5. Architectural Improvements (Phase 6)
+- **Frontend**: Transitioned `PhotoGrid.tsx` to use `@tanstack/react-virtual` for highly performant timeline-grouped rendering of infinite galleries.
+- **State & Offline capabilities**: Replaced ephemeral Zustand/React Query configuration with `@tanstack/query-sync-storage-persister` in `App.tsx` for robust offline-first PWA caching and persistence via IndexedDB.
+- **Backend (Bot)**: Transitioned bot environment to full ESM (`"type": "module"`) architecture, refactoring legacy CommonJS files (e.g. `bot/lib/transcode.js`, `server.js`) to support modern module resolution and avoid `require is not defined` errors.
+
 ## 🚀 Next Steps for You
 
 ### Immediate Actions:

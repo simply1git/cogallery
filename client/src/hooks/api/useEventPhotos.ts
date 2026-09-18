@@ -82,6 +82,9 @@ export function useEventPhotos({ eventId, filter, uploaderFilter }: UseEventPhot
         }
       })
     },
+    onReconnect: () => {
+      queryClient.invalidateQueries({ queryKey })
+    },
   })
 
   const imageCount = photos.filter((p) => p.mediaType === 'image').length

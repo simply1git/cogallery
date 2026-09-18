@@ -35,7 +35,59 @@ export async function generateSaltHex(): Promise<string> {
   return Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+const MAGIC_HEADER = new TextEncoder().encode('CHUNKED_V1');
+
 export async function encryptFile(file: File | Blob, key: CryptoKey): Promise<Blob> {
+  const isOPFS = !!(navigator.storage && navigator.storage.getDirectory);
+  
+  if (isOPFS) {
+    try {
+      const root = await navigator.storage.getDirectory();
+      const filename = `enc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const fileHandle = await root.getFileHandle(filename, { create: true });
+      // OPFS write
+      // The typings for createWritable might be missing in some TS configs, using any
+      const writable = await (fileHandle as any).createWritable();
+      
+      await writable.write(MAGIC_HEADER);
+      
+      const masterIv = window.crypto.getRandomValues(new Uint8Array(12));
+      await writable.write(masterIv);
+      
+      let offset = 0;
+      let chunkIndex = 0;
+      
+      while (offset < file.size) {
+        const chunk = file.slice(offset, offset + CHUNK_SIZE);
+        const buffer = await chunk.arrayBuffer();
+        
+        const chunkIv = new Uint8Array(12);
+        for (let i = 0; i < 12; i++) {
+          chunkIv[i] = masterIv[i] ^ ((chunkIndex >> (i * 8)) & 0xff);
+        }
+        
+        const encryptedChunk = await window.crypto.subtle.encrypt(
+          { name: ALGO, iv: chunkIv },
+          key,
+          buffer
+        );
+        
+        await writable.write(encryptedChunk);
+        
+        offset += CHUNK_SIZE;
+        chunkIndex++;
+      }
+      
+      await writable.close();
+      const encryptedFile = await fileHandle.getFile();
+      return encryptedFile;
+    } catch (e) {
+      console.warn("OPFS encryption failed, falling back to RAM", e);
+    }
+  }
+
+  // Fallback to RAM (Warning: OOM risk on large files)
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const buffer = await file.arrayBuffer();
   
@@ -48,7 +100,6 @@ export async function encryptFile(file: File | Blob, key: CryptoKey): Promise<Bl
     buffer
   );
 
-  // Prepend IV to the encrypted data
   const finalBuffer = new Uint8Array(iv.length + encryptedBuffer.byteLength);
   finalBuffer.set(iv, 0);
   finalBuffer.set(new Uint8Array(encryptedBuffer), iv.length);
@@ -56,21 +107,49 @@ export async function encryptFile(file: File | Blob, key: CryptoKey): Promise<Bl
   return new Blob([finalBuffer], { type: 'application/octet-stream' });
 }
 
-// Stream-based encryption for massive files (Zero Memory Bloat)
+// Keep this around if any part expects stream
 export async function encryptStream(file: File | Blob, key: CryptoKey): Promise<{ stream: ReadableStream, size: number }> {
-  // We encrypt the entire file as one continuous block but stream it out.
-  // Wait, WebCrypto AES-GCM does not support streaming encryption natively in the browser!
-  // To avoid breaking backward compatibility with existing files, we'll use a chunked blob approach
-  // that yields pieces of the already encrypted buffer, or if it's too large, we must warn the user.
-  // Real streaming AES-GCM requires a WASM library (like libsodium) or chunked protocol.
-  // For now, we will wrap the existing encryptFile in a stream interface so TUS can consume it natively.
-  
   const encryptedBlob = await encryptFile(file, key);
   return { stream: encryptedBlob.stream(), size: encryptedBlob.size };
 }
 
 export async function decryptBuffer(encryptedBuffer: ArrayBuffer, key: CryptoKey, originalType: string): Promise<Blob> {
   const bytes = new Uint8Array(encryptedBuffer);
+  
+  // Check for MAGIC_HEADER (CHUNKED_V1)
+  const headerText = new TextDecoder().decode(bytes.slice(0, 10));
+  if (headerText === 'CHUNKED_V1') {
+    const masterIv = bytes.slice(10, 22);
+    let offset = 22;
+    let chunkIndex = 0;
+    const decryptedChunks: Uint8Array[] = [];
+    
+    // Auth tag adds 16 bytes per chunk
+    const ENCRYPTED_CHUNK_SIZE = CHUNK_SIZE + 16;
+    
+    while (offset < bytes.length) {
+      const chunk = bytes.slice(offset, offset + ENCRYPTED_CHUNK_SIZE);
+      
+      const chunkIv = new Uint8Array(12);
+      for (let i = 0; i < 12; i++) {
+        chunkIv[i] = masterIv[i] ^ ((chunkIndex >> (i * 8)) & 0xff);
+      }
+      
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: ALGO, iv: chunkIv },
+        key,
+        chunk
+      );
+      
+      decryptedChunks.push(new Uint8Array(decryptedBuffer));
+      offset += ENCRYPTED_CHUNK_SIZE;
+      chunkIndex++;
+    }
+    
+    return new Blob(decryptedChunks as any[], { type: originalType });
+  }
+
+  // Legacy Non-Chunked Format
   const iv = bytes.slice(0, 12);
   const data = bytes.slice(12);
 
@@ -84,6 +163,100 @@ export async function decryptBuffer(encryptedBuffer: ArrayBuffer, key: CryptoKey
   );
 
   return new Blob([decryptedBuffer], { type: originalType });
+}
+
+export async function decryptResponseToBlob(response: Response, key: CryptoKey, originalType: string): Promise<Blob> {
+  const isOPFS = !!(navigator.storage && navigator.storage.getDirectory);
+  
+  if (isOPFS && response.body) {
+    try {
+      const root = await navigator.storage.getDirectory();
+      const filename = `dec_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const fileHandle = await root.getFileHandle(filename, { create: true });
+      const writable = await (fileHandle as any).createWritable();
+      
+      const reader = response.body.getReader();
+      
+      // Read header (10 bytes) + master IV (12 bytes) = 22 bytes
+      let isChunked = false;
+      let masterIv = new Uint8Array(12);
+      let isHeaderParsed = false;
+      
+      let chunkIndex = 0;
+      let pendingBuffer = new Uint8Array(0);
+      const ENCRYPTED_CHUNK_SIZE = CHUNK_SIZE + 16;
+      
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (value) {
+          const merged = new Uint8Array(pendingBuffer.length + value.length);
+          merged.set(pendingBuffer);
+          merged.set(value, pendingBuffer.length);
+          pendingBuffer = merged;
+        }
+        
+        if (!isHeaderParsed && pendingBuffer.length >= 22) {
+          const headerText = new TextDecoder().decode(pendingBuffer.slice(0, 10));
+          if (headerText === 'CHUNKED_V1') {
+            isChunked = true;
+            masterIv = pendingBuffer.slice(10, 22);
+            pendingBuffer = pendingBuffer.slice(22); // Consume header
+          }
+          isHeaderParsed = true;
+        }
+        
+        if (isHeaderParsed) {
+          if (!isChunked) {
+             // Abort OPFS streaming if it's a legacy file (easier to just dump to RAM)
+             break;
+          }
+          
+          while (pendingBuffer.length >= ENCRYPTED_CHUNK_SIZE || (done && pendingBuffer.length > 0)) {
+             const bytesToRead = done ? pendingBuffer.length : ENCRYPTED_CHUNK_SIZE;
+             const chunk = pendingBuffer.slice(0, bytesToRead);
+             
+             const chunkIv = new Uint8Array(12);
+             for (let i = 0; i < 12; i++) {
+               chunkIv[i] = masterIv[i] ^ ((chunkIndex >> (i * 8)) & 0xff);
+             }
+             
+             const decryptedBuffer = await window.crypto.subtle.decrypt(
+               { name: ALGO, iv: chunkIv },
+               key,
+               chunk
+             );
+             
+             await writable.write(decryptedBuffer);
+             
+             pendingBuffer = pendingBuffer.slice(bytesToRead);
+             chunkIndex++;
+          }
+        }
+        
+        if (done) break;
+      }
+      
+      if (isChunked) {
+        await writable.close();
+        const decryptedFile = await fileHandle.getFile();
+        // Spoof type
+        return new File([decryptedFile], 'decrypted', { type: originalType });
+      } else {
+        // Cleanup OPFS file and fallback to RAM
+        await writable.close();
+        await root.removeEntry(filename);
+      }
+      
+    } catch (e) {
+      console.warn("OPFS decryption failed, falling back to RAM", e);
+    }
+  }
+
+  // Fallback to memory
+  const encryptedBuffer = await response.arrayBuffer();
+  return decryptBuffer(encryptedBuffer, key, originalType);
 }
 
 // Generates a hash to verify the password later without storing the password

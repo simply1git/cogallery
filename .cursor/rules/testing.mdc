@@ -1,0 +1,16 @@
+---
+description: Automated testing standards, unit testing, test fixtures, and edge cases
+globs: ["**/test*/**", "**/*test*", "**/*spec*"]
+alwaysApply: false
+---
+
+# Testing & Verification Standards
+
+## 1. Test Architecture
+- Write tests alongside new feature code (TDD / Test-first approach).
+- Use `pytest` for Python projects and `vitest` / `jest` for TypeScript/JavaScript.
+- Isolate external dependencies using mocks, fixtures, or local test doubles. Never call live production APIs in unit tests.
+
+## 2. Test Coverage & Edge Cases
+- Test the happy path AND critical edge cases (empty inputs, null values, network timeouts, invalid formats).
+- Assert specific expected behaviors and error messages, not just generic boolean flags.

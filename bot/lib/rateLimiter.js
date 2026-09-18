@@ -1,7 +1,8 @@
 // Advanced Rate Limiting and Abuse Prevention Service
 // Provides sophisticated rate limiting with abuse detection and automatic banning
 
-const crypto = require('crypto');
+import crypto from 'crypto';
+import loggerService from './logger.js';
 
 class RateLimiterService {
   constructor(options = {}) {
@@ -65,12 +66,14 @@ class RateLimiterService {
 
     // Import logger if available
     try {
-      this.logger = require('./logger');
+      this.logger = loggerService;
     } catch (err) {
       this.logger = {
-        info: () => {},
-        warn: () => {},
-        error: () => {}
+        info: console.log,
+        warn: console.warn,
+        error: console.error,
+        trace: console.log,
+        debug: console.log
       };
     }
   }
@@ -345,7 +348,7 @@ class RateLimiterService {
 
 // Export singleton instance
 const rateLimiterService = new RateLimiterService();
-module.exports = rateLimiterService;
+export default rateLimiterService;
 
 // Also export class for creating additional instances
-module.exports.RateLimiterService = RateLimiterService;
+export { RateLimiterService };

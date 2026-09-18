@@ -97,252 +97,12 @@ async function withRetry<T>(
 
 // ─── Photo Upload (P2P Mode) ─────────────────────────────────────────────────
 
-export interface PhotoUploadOptions {
-  file: File
-  eventId: string
-  roomId: string
-  userId: string
-  isEncrypted?: boolean
-  onProgress?: (progress: number) => void
-  metadata?: any
-  /** Pass an AbortSignal to support upload cancellation */
-  signal?: AbortSignal
-}
 
-export async function uploadPhotoWithMetadata(
-  opts: PhotoUploadOptions
-): Promise<{ data: Photo | null; error: string | null }> {
-  const { file, eventId, roomId, userId, isEncrypted, onProgress, metadata, signal } = opts
-  let photoId: string | null = null;
-
-  try {
-    // Check if already cancelled before starting
-    if (signal?.aborted) {
-      return { data: null, error: 'Upload cancelled' }
-    }
-
-    onProgress?.(5)
-
-    const mediaType = getMediaType(file)
-    if (!mediaType) {
-      return { data: null, error: `Unsupported file type: ${file.type}` }
-    }
-
-    onProgress?.(10)
-
-    // 1. Generate thumbnail and blurhash (Web Worker handles it off-thread)
-    let thumbnailBase64 = ''
-    let blurhash = ''
-    try {
-      const thumbResult = await generateThumbnail(file)
-      thumbnailBase64 = thumbResult.base64
-      blurhash = thumbResult.blurhash || ''
-    } catch (e) {
-      console.warn('Thumbnail generation failed, continuing without:', e)
-    }
-
-    // 2. Generate AI tags if feature is enabled
-    let aiTags: string[] = []
-    if (isFeatureEnabled('aiTagging')) {
-      try {
-        aiTags = await generateAITags(file)
-        if (aiTags.length > 0) {
-          console.log(`AI generated tags for ${file.name}:`, aiTags)
-        }
-      } catch (e) {
-        console.warn('AI tagging failed, continuing without tags:', e)
-      }
-    }
-
-    onProgress?.(15)
-
-    // Save metadata to Supabase DB to get a unique photo ID
-    const { data: photoRow, error: dbError } = await supabase
-      .from('photos')
-      .insert({
-        event_id: eventId,
-        room_id: roomId,
-        uploader_id: userId,
-        filename: file.name,
-        file_size_bytes: file.size,
-        media_type: mediaType,
-        s3_key: `oracle:pending:${Date.now()}-${crypto.randomUUID()}`,
-        s3_url: 'https://pending', // will update after upload
-        taken_at: metadata?.takenAt?.toISOString() || null,
-        camera_make: metadata?.cameraMake || null,
-        camera_model: metadata?.cameraModel || null,
-        iso: metadata?.iso || null,
-        aperture: metadata?.aperture || null,
-        thumbnail_base64: thumbnailBase64,
-        blurhash: blurhash,
-        is_encrypted: isEncrypted ?? false,
-        metadata: {
-          ...(metadata || {}),
-          aiTags: aiTags.length > 0 ? aiTags : undefined
-        }
-      })
-      .select()
-      .single()
-
-    if (dbError) throw dbError
-    photoId = photoRow.id
-    onProgress?.(20)
-
-    // 1. Determine Upload Strategy
-    const r2Key = `${photoId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-    
-    // Fetch a live node URL from the Distributed Control Plane (DB)
-    let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-    try {
-      const { data: activeNode, error: nodeError } = await supabase.rpc('get_active_node')
-      if (!nodeError && activeNode) {
-        targetNodeUrl = activeNode
-        console.log(`[P2P Routing] Uploading directly to active node: ${targetNodeUrl}`)
-      }
-    } catch (e) {
-      console.warn("Could not fetch active node, falling back to default.", e)
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession()
-    const token = sessionData.session?.access_token
-
-    // --- LOCAL ORACLE CHUNKED UPLOAD STRATEGY ---
-    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    
-    const chunkProgress = new Array(totalChunks).fill(0);
-    let hasError = false;
-    
-    const uploadChunk = async (chunkIndex: number) => {
-      if (hasError || signal?.aborted) return;
-
-      // Wrap the actual XHR call in withRetry for exponential backoff
-      await withRetry(async () => {
-        if (signal?.aborted) throw new Error('Upload cancelled');
-
-        const start = chunkIndex * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const blob = file.slice(start, end);
-        
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', `${targetNodeUrl}/upload/chunk`, true);
-          
-          xhr.setRequestHeader('x-photo-id', r2Key);
-          xhr.setRequestHeader('x-chunk-index', chunkIndex.toString());
-          xhr.setRequestHeader('x-total-chunks', totalChunks.toString());
-          xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
-          xhr.setRequestHeader('x-mime-type', file.type || 'application/octet-stream');
-          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-          // Wire up AbortSignal to XHR
-          if (signal) {
-            signal.addEventListener('abort', () => {
-              xhr.abort();
-              reject(new Error('Upload cancelled'));
-            }, { once: true });
-          }
-
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              chunkProgress[chunkIndex] = e.loaded;
-              const totalLoaded = chunkProgress.reduce((a, b) => a + b, 0);
-              const percent = 20 + Math.round((totalLoaded / file.size) * 80);
-              onProgress?.(Math.min(percent, 99));
-            }
-          };
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve();
-            else {
-              reject(new Error(`Chunk ${chunkIndex} failed with status ${xhr.status}`));
-            }
-          };
-
-          xhr.onerror = () => {
-            reject(new Error('Network error on chunk upload'));
-          };
-
-          xhr.ontimeout = () => {
-            reject(new Error('Chunk upload timed out'));
-          };
-
-          xhr.timeout = 120000; // 2 minute timeout per chunk
-          xhr.send(blob);
-        });
-      }, 3, 1000); // 3 retries, 1s base delay
-    };
-    
-    // Upload with concurrency of 2 — using atomic index via mutex pattern
-    const concurrency = 2;
-    let nextChunkIndex = 0;
-    const getNextIndex = (): number => {
-      // Atomic: JS is single-threaded, so this is safe as long as we
-      // always read+increment before the next await yields control.
-      return nextChunkIndex++;
-    };
-
-    const workers = Array.from({ length: concurrency }, async () => {
-      while (!hasError && !signal?.aborted) {
-        const index = getNextIndex();
-        if (index >= totalChunks) break;
-        try {
-          await uploadChunk(index);
-        } catch (err) {
-          hasError = true;
-          throw err;
-        }
-      }
-    });
-
-    const results = await Promise.allSettled(workers);
-    const firstError = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
-    
-    if (signal?.aborted) {
-      throw new Error('Upload cancelled');
-    }
-    
-    if (firstError) {
-      throw firstError.reason;
-    }
-
-    // Finalize URL in database
-    // Note: Since we are using zero-trust streams, the s3_url stored here is just a placeholder.
-    // The actual viewing URL is generated dynamically via getSecureMediaUrl.
-    const finalUrl = `${targetNodeUrl}/stream/${r2Key}`
-    const { error: updateError } = await supabase.from('photos').update({
-      s3_key: r2Key,
-      s3_url: finalUrl
-    }).eq('id', photoId)
-
-    if (updateError) {
-      console.error('Failed to update URL in DB:', updateError)
-    }
-
-    photoRow.s3_url = finalUrl
-    photoRow.s3_key = r2Key
-
-    onProgress?.(100)
-
-    // Audit log photo upload
-    await logPhotoEvent('upload', roomId, userId, photoId, isEncrypted ?? false, mediaType)
-
-    return { data: mapPhoto(photoRow), error: null }
-  } catch (err: any) {
-    if (photoId) {
-      // Rollback the ghost preview from Supabase if the upload failed!
-      try {
-        await supabase.from('photos').delete().eq('id', photoId);
-      } catch (deleteError) {
-        console.error('Failed to rollback ghost preview:', deleteError);
-      }
-    }
-    return { data: null, error: err.message }
-  }
-}
-
-export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & Partial<Pick<Photo, 'filename'>>, type: 'stream' | 'preview' = 'stream'): Promise<string> {
+export async function getSecureMediaUrl(
+  photo: Pick<Photo, 's3Key' | 's3Url'> & Partial<Pick<Photo, 'filename'>>,
+  type: 'stream' | 'preview' | 'resize' = 'stream',
+  options?: { width?: number; height?: number; quality?: number }
+): Promise<{url: string, hlsUrl?: string}> {
   let targetNodeUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
   
   const p = photo as any;
@@ -363,14 +123,16 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
   if (!s3Key || s3Key.includes('pending')) {
     if (actualS3Url?.includes('.r2.dev/')) s3Key = actualS3Url.split('.r2.dev/')[1];
     else if (actualS3Url?.includes('/stream/')) s3Key = actualS3Url.split('/stream/')[1];
-    else if (actualS3Url?.includes('/proxy/')) s3Key = actualS3Url.split('/proxy/')[1];
-    else s3Key = p.id || photo.filename || '';
+    else if (actualS3Url?.includes('/preview/')) s3Key = actualS3Url.split('/preview/')[1];
+    else if (actualS3Url?.includes('/resize/')) s3Key = actualS3Url.split('/resize/')[1];
   }
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  const token = sessionData.session?.access_token
+  if (!s3Key) throw new Error('Missing S3 key');
 
-  if (!token) throw new Error('Not authenticated')
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+
+  if (!token) throw new Error('Not authenticated');
 
   const res = await fetch(`${targetNodeUrl}/media/presign-get`, {
     method: 'POST',
@@ -378,12 +140,15 @@ export async function getSecureMediaUrl(photo: Pick<Photo, 's3Key' | 's3Url'> & 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ key: s3Key, type })
+    body: JSON.stringify({ key: s3Key, type, ...options })
   });
 
   if (!res.ok) throw new Error('Failed to get secure media url');
-  const { url } = await res.json();
-  return url.startsWith('http') ? url : `${targetNodeUrl}${url}`;
+  const { url, hlsUrl } = await res.json();
+  return { 
+    url: url.startsWith('http') ? url : `${targetNodeUrl}${url}`,
+    hlsUrl: hlsUrl ? (hlsUrl.startsWith('http') ? hlsUrl : `${targetNodeUrl}${hlsUrl}`) : undefined
+  };
 }
 
 export async function downloadAndDecryptMedia(
@@ -391,7 +156,7 @@ export async function downloadAndDecryptMedia(
   vaultKey: CryptoKey,
   onProgress?: (loaded: number, total: number) => void
 ): Promise<string> {
-  const secureUrl = await getSecureMediaUrl(photo);
+  const { url: secureUrl } = await getSecureMediaUrl(photo);
   const response = await fetch(secureUrl);
   if (!response.ok) throw new Error('Failed to fetch encrypted media');
 

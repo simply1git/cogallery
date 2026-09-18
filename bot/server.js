@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import fs from 'fs/promises';
 import fsSync from 'fs';
@@ -21,17 +22,19 @@ import { Server, EVENTS } from '@tus/server';
 import { FileStore } from '@tus/file-store';
 import sharp from 'sharp';
 import WebSocket from 'ws';
+import exifr from 'exifr';
+import { transcodeToHLS } from './lib/transcode.js';
 
 // Import our logger service
-const logger = require('./lib/logger');
+import logger from './lib/logger.js';
 
 // Import our rate limiter service
-const RateLimiter = require('./lib/rateLimiter');
-const rateLimiter = new RateLimiter();
+import { RateLimiterService } from './lib/rateLimiter.js';
+const rateLimiter = new RateLimiterService();
 
 // Import our health and metrics services
-const healthService = require('./lib/health');
-const metricsService = require('./lib/metrics');
+import * as healthService from './lib/health.js';
+import * as metricsService from './lib/metrics.js';
 
 if (!globalThis.WebSocket) {
   globalThis.WebSocket = WebSocket;
@@ -140,6 +143,9 @@ function verifySupabaseJwt(token) {
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Secure HTTP headers (allow cross-origin for media)
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Allow all origins (since frontend is on Cloudflare Pages)
 app.use(cors({
@@ -685,6 +691,89 @@ app.get('/preview/:photoId', async (req, res) => {
   }
 });
 
+// Dynamic Image CDN Route (Google Photos Gap)
+app.get('/resize/:photoId', async (req, res) => {
+  const { photoId } = req.params;
+  const token = req.query.t;
+  const width = parseInt(req.query.w, 10) || 800;
+  const height = parseInt(req.query.h, 10) || null;
+  const quality = parseInt(req.query.q, 10) || 80;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Missing access token (Zero Trust)' });
+  }
+  
+  try {
+    verifyStreamToken(token, photoId);
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+
+  let paths;
+  try {
+    paths = storagePaths(photoId);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message });
+  }
+  
+  try {
+    // Basic disk cache using dimension string
+    const cacheDir = path.join(process.env.STORAGE_PATH || path.join(process.cwd(), 'uploads'), 'cache');
+    await fs.mkdir(cacheDir, { recursive: true });
+    
+    const cacheFilename = `${photoId}_${width}x${height || 'auto'}_q${quality}.webp`;
+    const cachePath = path.join(cacheDir, cacheFilename);
+    
+    // Serve cached version if exists
+    try {
+      await fs.access(cachePath);
+      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      const stream = fsSync.createReadStream(cachePath);
+      return stream.pipe(res);
+    } catch (e) {
+      // Cache miss
+    }
+
+    let sourcePath = paths.dataPath;
+    try {
+      // Try preview first as base if it exists to save memory during resize
+      await fs.access(paths.previewPath);
+      sourcePath = paths.previewPath;
+    } catch {}
+
+    // Verify source exists
+    await fs.access(sourcePath);
+    const metaRaw = await fs.readFile(paths.metaPath, 'utf-8');
+    const meta = JSON.parse(metaRaw);
+    
+    // Do not attempt to resize videos directly via sharp
+    if (meta.mimeType?.startsWith('video/')) {
+       return res.status(400).json({ error: 'Cannot resize video with sharp' });
+    }
+
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    
+    // Generate dynamically and save to cache
+    const transformer = sharp(sourcePath)
+      .resize(width, height, {
+        fit: height ? 'cover' : 'inside',
+        withoutEnlargement: true
+      })
+      .webp({ quality });
+
+    // Save to cache for future requests
+    transformer.clone().toFile(cachePath).catch(err => logger.error({ err }, 'Failed to cache resized image'));
+    
+    // Stream back to client
+    transformer.pipe(res);
+    
+  } catch (err) {
+    logger.error({ err, photoId }, 'Resize failed');
+    if (!res.headersSent) res.status(404).json({ error: 'Source file not found or resize failed' });
+  }
+});
 
 app.post('/developer/storage/nuke-files', adminLimiter, authenticateJWT, requireSupabaseAdmin, requireAdmin, async (req, res) => {
   try {
@@ -716,7 +805,7 @@ app.post('/developer/storage/nuke-files', adminLimiter, authenticateJWT, require
 // --- EPHEMERAL SECURE GET URL (ZERO TRUST) ---
 app.post('/media/presign-get', mediaLimiter, authenticateJWT, async (req, res) => {
   try {
-    const { key, type } = req.body;
+    const { key, type, width, height, quality } = req.body;
     if (!key) return res.status(400).json({ error: 'Missing key' });
     if (!isSafeStorageKey(key)) return res.status(400).json({ error: 'Invalid key' });
 
@@ -729,78 +818,35 @@ app.post('/media/presign-get', mediaLimiter, authenticateJWT, async (req, res) =
       streamJwtSecret,
       { expiresIn: streamTokenTtl },
     );
-    const url = type === 'preview' ? `/preview/${encodeURIComponent(key)}?t=${streamToken}` : `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
+
+    let url = '';
+    if (type === 'resize' || (type === 'preview' && width)) {
+      const qParams = new URLSearchParams();
+      qParams.append('t', streamToken);
+      if (width) qParams.append('w', width.toString());
+      if (height) qParams.append('h', height.toString());
+      if (quality) qParams.append('q', quality.toString());
+      url = `/resize/${encodeURIComponent(key)}?${qParams.toString()}`;
+    } else if (type === 'preview') {
+      url = `/preview/${encodeURIComponent(key)}?t=${streamToken}`;
+    } else {
+      url = `/stream/${encodeURIComponent(key)}?t=${streamToken}`;
+    }
     
-    res.json({ url });
+    let hlsUrl = null;
+    if (type !== 'preview') {
+      const hlsDir = path.join(CACHE_DIR, `${key}_hls`);
+      try {
+        await fs.access(path.join(hlsDir, 'playlist.m3u8'));
+        hlsUrl = `/hls/${encodeURIComponent(key)}/playlist.m3u8?t=${streamToken}`;
+      } catch (e) {
+        // HLS not available
+      }
+    }
+    
+    res.json({ url, hlsUrl });
   } catch (error) {
     console.error('[PRESIGN_ERROR]', error);
-    res.status(error.statusCode || 500).json({ error: error.message });
-  }
-});
-
-app.post('/upload/chunk', uploadLimiter, authenticateJWT, async (req, res) => {
-  try {
-    const key = req.header('x-photo-id');
-    const chunkIndex = Number.parseInt(req.header('x-chunk-index') || '', 10);
-    const totalChunks = Number.parseInt(req.header('x-total-chunks') || '', 10);
-    const filename = safeAttachmentFilename(decodeURIComponent(req.header('x-filename') || key || 'upload'));
-    const mimeType = req.header('x-mime-type') || 'application/octet-stream';
-    const isEncrypted = req.header('x-is-encrypted') === 'true';
-
-    if (!isSafeStorageKey(key)) {
-      return res.status(400).json({ error: 'Invalid upload key' });
-    }
-    if (!Number.isInteger(chunkIndex) || !Number.isInteger(totalChunks) || chunkIndex < 0 || totalChunks < 1 || chunkIndex >= totalChunks) {
-      return res.status(400).json({ error: 'Invalid chunk headers' });
-    }
-
-    const paths = storagePaths(key);
-    await fs.mkdir(paths.chunkDir, { recursive: true });
-
-    const partPath = path.join(paths.chunkDir, `${chunkIndex}.part`);
-    await pipeline(req, fsSync.createWriteStream(partPath, { flags: 'w' }));
-
-    const partFiles = await fs.readdir(paths.chunkDir);
-    const completedParts = partFiles.filter((file) => file.endsWith('.part')).length;
-
-    if (completedParts === totalChunks) {
-      const writeStream = fsSync.createWriteStream(paths.dataPath, { flags: 'w' });
-      const finishedWriting = new Promise((resolve, reject) => {
-        writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
-      });
-
-      try {
-        for (let index = 0; index < totalChunks; index++) {
-          const currentPart = path.join(paths.chunkDir, `${index}.part`);
-          await fs.access(currentPart);
-          await pipeline(fsSync.createReadStream(currentPart), writeStream, { end: false });
-        }
-      } finally {
-        writeStream.end();
-      }
-
-      await finishedWriting;
-
-      const stat = await fs.stat(paths.dataPath);
-      await fs.writeFile(paths.metaPath, JSON.stringify({ filename, mimeType, size: stat.size }));
-      await fs.rm(paths.chunkDir, { recursive: true, force: true }).catch(() => {});
-
-      if (mimeType.startsWith('image/') && !isEncrypted) {
-        try {
-          await sharp(paths.dataPath)
-            .resize({ width: 800, withoutEnlargement: true })
-            .webp({ quality: 80 })
-            .toFile(paths.previewPath);
-        } catch (err) {
-          console.error(`[Upload] Failed to generate preview for ${key}:`, err);
-        }
-      }
-    }
-
-    res.json({ ok: true, completed: completedParts === totalChunks });
-  } catch (error) {
-    console.error('[Upload] Chunk upload failed:', error);
     res.status(error.statusCode || 500).json({ error: error.message });
   }
 });
@@ -870,12 +916,48 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
         } catch (err) {
           console.error(`[Upload] Failed to generate preview for ${photoId}:`, err);
         }
+      } else if (mimeType.startsWith('video/') && !isEncrypted) {
+        // Kick off HLS Transcoding in the background so it doesn't block TUS response
+        transcodeToHLS(finalPath, CACHE_DIR, photoId)
+          .then((hlsDir) => {
+            console.log(`[Upload] HLS streaming ready at ${hlsDir}`);
+            // Optionally, mark database record as 'hls_ready = true'
+          })
+          .catch((err) => {
+            console.error(`[Upload] HLS conversion failed for ${photoId}:`, err);
+          });
       }
       
+
       const nodeUrl = process.env.NODE_URL || process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
       const finalUrl = `${nodeUrl}/stream/${photoId}`;
       if (supabaseAdmin) {
-        await supabaseAdmin.from('photos').update({ s3_url: finalUrl }).eq('id', photoId);
+        let updateData = { s3_url: finalUrl };
+        
+        // Extract EXIF if it's an unencrypted image
+        if (mimeType.startsWith('image/') && !isEncrypted) {
+          try {
+            const exif = await exifr.parse(finalPath, {
+              tiff: true,
+              exif: true,
+              gps: true
+            });
+            if (exif) {
+              if (exif.DateTimeOriginal) updateData.taken_at = exif.DateTimeOriginal.toISOString();
+              if (exif.Make) updateData.camera_make = String(exif.Make);
+              if (exif.Model) updateData.camera_model = String(exif.Model);
+              if (exif.ISO) updateData.iso = Number(exif.ISO);
+              if (exif.latitude && exif.longitude) {
+                updateData.latitude = exif.latitude;
+                updateData.longitude = exif.longitude;
+              }
+            }
+          } catch (exifErr) {
+            console.error(`[Upload] Failed to parse EXIF for ${photoId}:`, exifErr);
+          }
+        }
+        
+        await supabaseAdmin.from('photos').update(updateData).eq('id', photoId);
         console.log(`[Upload] TUS upload completed and Sharded Storage Node URL stamped: ${finalUrl}`);
       } else {
         console.log(`[Upload] TUS upload completed for photoId: ${photoId} (No Supabase Admin - URL not stamped)`);
@@ -889,6 +971,45 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
 // Intercept TUS routes
 app.use('/upload/tus', uploadLimiter, authenticateJWT, (req, res) => {
   tusServer.handle(req, res);
+});
+
+// HLS Stream serving
+app.get('/hls/:photoId/:file', async (req, res) => {
+  const { photoId, file } = req.params;
+  const token = req.query.t;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Missing access token' });
+  }
+  
+  try {
+    verifyStreamToken(token, photoId);
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    const hlsDir = path.join(CACHE_DIR, `${photoId}_hls`);
+    const filePath = path.join(hlsDir, file);
+    
+    // Basic directory traversal protection
+    if (!filePath.startsWith(hlsDir)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    await fs.access(filePath);
+    
+    if (file.endsWith('.m3u8')) {
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    } else if (file.endsWith('.ts')) {
+      res.setHeader('Content-Type', 'video/MP2T');
+    }
+    
+    const stream = fsSync.createReadStream(filePath);
+    stream.pipe(res);
+  } catch (err) {
+    res.status(404).json({ error: 'HLS segment not found' });
+  }
 });
 
 // Stream Media (Video/Image) with HTTP 206 Partial Content support

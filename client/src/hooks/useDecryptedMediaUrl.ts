@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Photo } from '@/types';
 import { getSecureMediaUrl } from '@/services/photoService';
-import { decryptBuffer, decryptString } from '@/services/cryptoService';
+import { decryptResponseToBlob, decryptString } from '@/services/cryptoService';
 import { supabase } from '@/lib/supabase';
+import localforage from 'localforage';
 
 // Module-level cache to prevent re-decrypting the same photo if unmounted/remounted in the virtual grid
 const urlCache = new Map<string, string>();
@@ -25,14 +26,14 @@ function setCachedUrl(key: string, url: string) {
 
 // Inflight request deduplication — prevents the same photo from being fetched N times
 // when Masonic unmounts/remounts cards rapidly during scroll
-const inflightRequests = new Map<string, Promise<string>>();
-
-export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?: CryptoKey, preferFullRes: boolean = false) {
-  // Synchronous cache hit — no flicker on re-mount
+const inflightRequests = new Map<string, Promise<string>>();export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?: CryptoKey, preferFullRes: boolean = false) {
+  // Synchronous cache hit ?" no flicker on re-mount
   const cacheKey = photo ? `${photo.id}:${preferFullRes ? 'full' : 'thumb'}` : '';
   const cachedUrl = cacheKey ? urlCache.get(cacheKey) : undefined;
+  const cachedHlsUrl = cacheKey ? urlCache.get(`${cacheKey}_hls`) : undefined;
 
   const [url, setUrl] = useState<string>(cachedUrl || '');
+  const [hlsUrl, setHlsUrl] = useState<string | undefined>(cachedHlsUrl);
   const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [tokenVersion, setTokenVersion] = useState(0);
@@ -56,6 +57,7 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
   if (photo?.id !== prevPhotoIdRef.current) {
     prevPhotoIdRef.current = photo?.id;
     setUrl(cachedUrl || '');
+    setHlsUrl(cachedHlsUrl);
     setIsDecrypting(false);
     setError(null);
   }
@@ -73,6 +75,7 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
     // If we already have a cached URL, use it immediately
     if (cachedUrl) {
       setUrl(cachedUrl);
+      if (cachedHlsUrl) setHlsUrl(cachedHlsUrl);
       return;
     }
 
@@ -83,7 +86,10 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
       const s3Key = photo.s3Key || photo.filename;
 
       if (s3Key?.includes('pending') || photo.s3Url?.includes('pending')) {
-        if (isActive) setUrl('');
+        if (isActive) {
+           setUrl('');
+           setHlsUrl(undefined);
+        }
         return;
       }
 
@@ -123,22 +129,22 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
 
       // 2. Full-Res Mode: Fetch and potentially decrypt the full media file
       if (!photo.isEncrypted) {
-        let fetchPromise = inflightRequests.get(cacheKey);
-        if (!fetchPromise) {
-          fetchPromise = getSecureMediaUrl(photo, preferFullRes ? 'stream' : 'preview');
-          inflightRequests.set(cacheKey, fetchPromise);
-        }
-
         try {
-          const secureUrl = await fetchPromise;
-          setCachedUrl(cacheKey, secureUrl);
+          const res = await getSecureMediaUrl(
+            photo, 
+            preferFullRes ? 'stream' : 'preview',
+            !preferFullRes ? { width: 800, quality: 75 } : undefined
+          );
+          setCachedUrl(cacheKey, res.url);
+          if (res.hlsUrl) {
+            setCachedUrl(`${cacheKey}_hls`, res.hlsUrl);
+          }
           if (isActive && photoIdRef.current === photo.id) {
-            setUrl(secureUrl);
+            setUrl(res.url);
+            setHlsUrl(res.hlsUrl);
           }
         } catch (err) {
           if (isActive) setError('Failed to load media');
-        } finally {
-          inflightRequests.delete(cacheKey);
         }
         return;
       }
@@ -154,13 +160,33 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
       let fetchPromise = inflightRequests.get(cacheKey);
       if (!fetchPromise) {
         fetchPromise = (async () => {
-          const secureUrl = await getSecureMediaUrl(photo, preferFullRes ? 'stream' : 'preview');
-          const response = await fetch(secureUrl);
+          // Check localforage first for offline-first support
+          try {
+            const cachedBlob = await localforage.getItem<Blob>(`enc_${cacheKey}`);
+            if (cachedBlob) {
+              return URL.createObjectURL(cachedBlob);
+            }
+          } catch (e) {
+            console.warn('Failed to read from localforage cache', e);
+          }
+
+          const secureUrl = await getSecureMediaUrl(
+            photo, 
+            preferFullRes ? 'stream' : 'preview',
+            !preferFullRes ? { width: 800, quality: 75 } : undefined
+          );
+          const response = await fetch(secureUrl.url);
           if (!response.ok) throw new Error('Failed to fetch encrypted media');
 
-          const encryptedBuffer = await response.arrayBuffer();
           const mimeType = photo.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
-          const decryptedBlob = await decryptBuffer(encryptedBuffer, vaultKey, mimeType);
+          const decryptedBlob = await decryptResponseToBlob(response, vaultKey, mimeType);
+          
+          try {
+            // Cache for offline access
+            await localforage.setItem(`enc_${cacheKey}`, decryptedBlob);
+          } catch (e) {
+            console.warn('Failed to save to localforage cache', e);
+          }
 
           return URL.createObjectURL(decryptedBlob);
         })();
@@ -187,8 +213,8 @@ export function useDecryptedMediaUrl(photo: Photo | undefined | null, vaultKey?:
     return () => {
       isActive = false;
     };
-  // Stable primitive dependencies — no object reference churn
+  // Stable primitive dependencies - no object reference churn
   }, [photo?.id, photo?.s3Key, photo?.isEncrypted, photo?.thumbnailBase64, preferFullRes, vaultKey, tokenVersion]);
 
-  return { url, isDecrypting, error };
+  return { url, hlsUrl, isDecrypting, error };
 }

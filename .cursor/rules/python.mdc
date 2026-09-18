@@ -1,0 +1,22 @@
+---
+description: Python standards, modern 3.10+ syntax, FastAPI, Pydantic, and async best practices
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# Python Engineering Standards
+
+## 1. Syntax & Typing
+- Target Python 3.10+ (modern union syntax `X | Y` instead of `Union[X, Y]`, `list[str]` instead of `List[str]`).
+- Include `from __future__ import annotations` at the top of files when forward references or deferred evaluation is needed.
+- Type annotate all function arguments, return types, and class attributes.
+
+## 2. Async & Networking
+- Prefer `httpx` or `aiohttp` for async HTTP operations with explicit timeout configurations (never use unbound requests).
+- Use `asyncio.gather` or `TaskGroup` for parallel I/O.
+- Handle `asyncio.CancelledError` gracefully when writing long-running streams or tasks.
+
+## 3. Data Validation & Config
+- Use **Pydantic v2** (`pydantic.BaseModel`, `Field`) for request/response schemas and data validation.
+- Load environment variables with `python-dotenv` and structured config classes.
+- Use `loguru` or Python's `logging` module with structured formats instead of bare `print()` statements in production code.

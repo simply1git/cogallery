@@ -1,0 +1,18 @@
+---
+description: TypeScript, JavaScript, React, Next.js, and modern frontend standards
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+alwaysApply: false
+---
+
+# TypeScript & Web Standards
+
+## 1. Type Safety & Quality
+- Strict TypeScript: Never use `any`. Use `unknown` with type guards or generic constraints where types are dynamic.
+- Prefer `interface` for object shapes and public APIs; use `type` for unions, intersections, and primitives.
+- Avoid non-null assertions (`!`). Use optional chaining (`?.`) and nullish coalescing (`??`).
+
+## 2. React & Modern Frontend
+- Use functional components with hooks.
+- Keep state local where possible; avoid unnecessary global state or bloated contexts.
+- Memoize expensive calculations with `useMemo` and callbacks with `useCallback` when passed to optimized children.
+- Write accessible, semantic HTML with descriptive ARIA attributes and unique IDs for interactive elements.

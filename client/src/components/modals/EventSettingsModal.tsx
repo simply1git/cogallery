@@ -6,6 +6,7 @@ import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { supabase } from '@/lib/supabase'
 import type { EventWithDetails } from '@/types'
+import { isValidImageSrc } from '@/utils/image'
 
 interface EventSettingsModalProps {
   isOpen: boolean
@@ -228,7 +229,7 @@ export function EventSettingsModal({ isOpen, event, onClose, onUpdate }: EventSe
                   onClick={handleAvatarClick}
                   className="group relative w-full h-40 rounded-xl bg-white/5 border border-white/10 overflow-hidden cursor-pointer flex items-center justify-center transition-all hover:border-white/20"
                 >
-                  {thumbnailUrl ? (
+                  {isValidImageSrc(thumbnailUrl) ? (
                     <>
                       <img src={thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-60" />
                       <img src={thumbnailUrl} alt="Event Cover" className="relative w-full h-full object-contain drop-shadow-lg" />

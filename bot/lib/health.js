@@ -1,15 +1,19 @@
 // Health check utilities for CoGallery Bot Nodes
 // Provides functions for monitoring node health and dependencies
 
-const os = require('os');
-const fs = require('fs');
-const path = require('path');
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Get comprehensive health status of the bot node
  * @returns {Object} Health status object
  */
-function getHealthStatus() {
+export function getHealthStatus() {
   return {
     timestamp: new Date().toISOString(),
     service: 'CoGallery Oracle Backend',
@@ -25,7 +29,7 @@ function getHealthStatus() {
  * Get system information
  * @returns {Object} System info
  */
-function getSystemInfo() {
+export function getSystemInfo() {
   return {
     hostname: os.hostname(),
     platform: os.platform(),
@@ -41,7 +45,7 @@ function getSystemInfo() {
  * Check critical dependencies
  * @returns {Object} Dependency status
  */
-function checkDependencies() {
+export function checkDependencies() {
   const status = {
     database: false,
     storage: false,
@@ -74,7 +78,7 @@ function checkDependencies() {
  * Get resource usage statistics
  * @returns {Object} Resource usage
  */
-function getResourceUsage() {
+export function getResourceUsage() {
   const usage = process.memoryUsage();
 
   return {
@@ -98,7 +102,7 @@ function getResourceUsage() {
  * Get disk usage for the uploads directory
  * @returns {Object} Disk usage info
  */
-function getDiskUsage() {
+export function getDiskUsage() {
   try {
     const uploadsDir = path.join(__dirname, '..', 'uploads');
     const stats = fs.statfsSync(uploadsDir);
@@ -129,7 +133,7 @@ function getDiskUsage() {
  * Perform a quick health check (lighter version)
  * @returns {Object} Basic health status
  */
-function getQuickHealth() {
+export function getQuickHealth() {
   return {
     timestamp: new Date().toISOString(),
     status: 'online',
@@ -139,11 +143,3 @@ function getQuickHealth() {
     }
   };
 }
-
-module.exports = {
-  getHealthStatus,
-  getQuickHealth,
-  getSystemInfo,
-  checkDependencies,
-  getResourceUsage
-};

@@ -5,13 +5,19 @@ import { ThemeProvider } from '@/components/shared/ThemeProvider'
 import { Layout } from '@/components/shared/Layout'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { useAuth } from '@/hooks/useAuth'
-import { uploadQueueService } from '@/services/uploadQueueService'
+
 import { supabase } from '@/lib/supabase'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { queryClient } from '@/lib/queryClient'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { useOnboardingStore } from '@/store/onboardingStore'
 import { OnboardingTutorial } from '@/components/onboarding'
+
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+})
 
 // ─── Lazy-loaded pages (each becomes its own chunk) ─────────────────────────
 const HomePage = lazy(() => import('@/pages/HomePage').then(m => ({ default: m.HomePage })))
@@ -123,9 +129,7 @@ function App() {
   const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false)
   const { hasCompletedOnboarding } = useOnboardingStore()
 
-  // Start processing the upload queue when the app loads
   useEffect(() => {
-    uploadQueueService.init()
     setIsLoading(false)
   }, [])
 
@@ -172,7 +176,7 @@ function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
       <ThemeProvider>
         <Router>
           <Layout>
@@ -196,7 +200,7 @@ function App() {
         {!hasCompletedOnboarding && isAuthenticated && <OnboardingTutorial />}
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   )
 }
 

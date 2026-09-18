@@ -8,6 +8,7 @@ import { CardSkeleton } from '@/components/shared/Skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { RoomWithMembers } from '@/types'
 import { useQuery } from '@tanstack/react-query'
+import { isValidImageSrc } from '@/utils/image'
 
 export function DashboardPage() {
   const { user } = useAuth()
@@ -162,17 +163,17 @@ function RoomCard({ room, index, onClick }: { room: RoomWithMembers; index: numb
     >
       {/* Cover gradient or thumbnail */}
       <div className="relative overflow-hidden rounded-t-xl">
-        {room.thumbnailUrl ? (
+        {isValidImageSrc(room.thumbnailUrl) ? (
           <div className="aspect-[4/3] relative">
             {/* Blurred background fill */}
             <img 
-              src={room.thumbnailUrl} 
+              src={room.thumbnailUrl!} 
               alt="" 
               className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-60" 
             />
             {/* Sharp foreground image */}
             <img 
-              src={room.thumbnailUrl} 
+              src={room.thumbnailUrl!} 
               alt={room.name} 
               className="relative w-full h-full object-contain drop-shadow-lg" 
             />

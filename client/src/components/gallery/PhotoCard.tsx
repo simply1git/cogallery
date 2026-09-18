@@ -9,6 +9,7 @@ import { useRoomStore } from '@/store/roomStore'
 import { useDecryptedMediaUrl } from '@/hooks/useDecryptedMediaUrl'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
+import { isValidImageSrc } from '@/utils/image'
 interface PhotoCardProps {
   photo: Photo
   onClick?: () => void
@@ -68,7 +69,7 @@ export const PhotoCard = memo(function PhotoCard({
           } else if (photo.isEncrypted && !vaultKey) {
             throw new Error('Vault key missing')
           }
-          return await getSecureMediaUrl(photo)
+          return (await getSecureMediaUrl(photo)).url
         })().then(url => {
           downloadFile(url, photo.filename)
           if (url.startsWith('blob:')) {
@@ -112,7 +113,7 @@ export const PhotoCard = memo(function PhotoCard({
           </div>
         ) : (
           <>
-            {photo.thumbnailBase64 && (!isLoaded || !mediaUrl) && (
+            {isValidImageSrc(photo.thumbnailBase64) && (!isLoaded || !mediaUrl) && (
               <div className="absolute inset-0 z-0 overflow-hidden">
                 <img 
                   src={photo.thumbnailBase64} 
@@ -121,7 +122,7 @@ export const PhotoCard = memo(function PhotoCard({
                 />
               </div>
             )}
-            {inView && mediaUrl && (
+            {inView && isValidImageSrc(mediaUrl) && (
               <img
                 src={mediaUrl}
                 alt={photo.filename}

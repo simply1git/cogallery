@@ -1,0 +1,54 @@
+# Version control
+.git/
+.svn/
+.hg/
+
+# Dependencies & Package Managers
+node_modules/
+vendor/
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Build outputs & Bundles
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+target/
+bin/
+obj/
+
+# Large binaries & data assets
+*.zip
+*.tar.gz
+*.iso
+*.exe
+*.dll
+*.so
+*.dylib
+*.pkl
+*.parquet
+*.sqlite
+*.db
+
+# Package lock files (Too large, wastes indexing tokens)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+uv.lock
+poetry.lock
+
+# Logs & temporary files
+logs/
+*.log
+*.tmp
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/

@@ -17,6 +17,7 @@ import { useColorExtractor } from '@/hooks/useColorExtractor'
 import { useHaptics } from '@/hooks/useHaptics'
 import { createPortal } from 'react-dom'
 import { ImageCropperModal } from '../modals/ImageCropperModal'
+import { HlsVideoPlayer } from './HlsVideoPlayer'
 
 const EMOJI_LIST = ['❤️', '😍', '🔥', '😂', '😮', '👏', '🎉', '😢']
 
@@ -53,17 +54,20 @@ export function PhotoDetailModal({
   const [cropperType, setCropperType] = useState<'room' | 'event' | null>(null)
   
   const vaultKey = useRoomStore((s) => s.vaultKeys[photo?.roomId || ''])
-  const { url: secureUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
+
+  const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
+  
+  // Pre-load adjacent photos' URLs to make swiping instant
+  const prevPhoto = currentIndex > 0 ? allPhotos[currentIndex - 1] : null
+  const nextPhoto = currentIndex < allPhotos.length - 1 ? allPhotos[currentIndex + 1] : null
+  
+  const { url: secureUrl, hlsUrl, isDecrypting } = useDecryptedMediaUrl(photo!, vaultKey, true)
   const { url: thumbUrl } = useDecryptedMediaUrl(photo!, vaultKey, false)
   const { ambientStyle } = useColorExtractor(!photo?.mediaType?.startsWith('video') ? secureUrl : undefined)
   const { haptic } = useHaptics()
 
-  const currentIndex = allPhotos.findIndex((p) => p.id === photo?.id)
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < allPhotos.length - 1
-
-  const prevPhoto = hasPrev ? allPhotos[currentIndex - 1] : undefined;
-  const nextPhoto = hasNext ? allPhotos[currentIndex + 1] : undefined;
 
   // Prefetch adjacent media
   // Images get pre-fetched at full resolution for instant swiping.
@@ -150,7 +154,7 @@ export function PhotoDetailModal({
         } else if (photo.isEncrypted && !vaultKey) {
           throw new Error('Vault key missing')
         } else {
-          url = await getSecureMediaUrl(photo)
+          url = (await getSecureMediaUrl(photo)).url
         }
         
         toastSuccess('Download started', { id: toastId })
@@ -230,13 +234,11 @@ export function PhotoDetailModal({
               }}
               className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
             >
-              {secureUrl ? (
-                <video
+              {secureUrl || hlsUrl ? (
+                <HlsVideoPlayer
                   key={photo.id}
                   src={secureUrl}
-                  controls
-                  playsInline
-                  autoPlay
+                  hlsUrl={hlsUrl}
                   poster={thumbUrl || ''}
                   className="max-w-full max-h-[85vh] md:max-h-full object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}

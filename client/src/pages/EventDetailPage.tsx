@@ -186,7 +186,7 @@ export function EventDetailPage() {
             toastError(`No vault key available for ${p.filename}`)
             continue
          } else if (!p.isEncrypted && targetUrl?.includes('pending')) {
-            try { targetUrl = await getSecureMediaUrl(p) } catch(e) {}
+            try { targetUrl = (await getSecureMediaUrl(p)).url } catch(e) {}
          }
          await downloadFile(targetUrl, p.filename)
          

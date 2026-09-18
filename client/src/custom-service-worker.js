@@ -1,26 +1,15 @@
 // Custom service worker for handling background sync
-// This works alongside the Workbox-generated service worker
+// Uses local Workbox modules bundled by vite-plugin-pwa (no CDN, no CSP issues)
 
-// Import the Workbox-generated service worker
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
+import { precacheAndRoute } from 'workbox-precaching';
+import { clientsClaim } from 'workbox-core';
 
-// Wait for the service worker to activate
-self.addEventListener('install', (event) => {
-  // Precache the assets listed in the manifest (injected by VitePWA)
-  const manifest = self.__WB_MANIFEST || [];
-  workbox.precaching.precacheAndRoute(manifest, {
-    ignoreURLParametersMatching: [/.*/],
-    directoryIndex: '/',
-    cleanUrls: true,
-  });
-  // Force the waiting service worker to become active
-  self.skipWaiting();
-});
+// Precache the assets listed in the manifest (injected by VitePWA's injectManifest)
+precacheAndRoute(self.__WB_MANIFEST || []);
 
-self.addEventListener('activate', (event) => {
-  // Immediately claim control of clients
-  event.waitUntil(self.clients.claim());
-});
+// Force the waiting service worker to become active immediately
+self.skipWaiting();
+clientsClaim();
 
 // Handle background sync events
 self.addEventListener('sync', (event) => {

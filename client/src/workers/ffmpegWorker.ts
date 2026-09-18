@@ -96,10 +96,11 @@ self.onmessage = async (e: MessageEvent) => {
     let result: any = null;
 
     switch (operation) {
-      case 'generateThumbnail':
+      case 'generateThumbnail': {
         const base64 = await generateThumbnailWithFFmpeg(file, seekTime);
         result = { base64, success: true };
         break;
+      }
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }

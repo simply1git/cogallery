@@ -6,22 +6,24 @@ interface UsePhotoSubscriptionOptions {
   eventId: string
   onNewPhoto?: (photo: Photo) => void
   onPhotoDeleted?: (photoId: string) => void
+  onReconnect?: () => void
 }
 
 export function usePhotoSubscription({
   eventId,
   onNewPhoto,
   onPhotoDeleted,
+  onReconnect,
 }: UsePhotoSubscriptionOptions) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const callbacksRef = useRef({ onNewPhoto, onPhotoDeleted })
+  const callbacksRef = useRef({ onNewPhoto, onPhotoDeleted, onReconnect })
   
   const [isReconnecting, setIsReconnecting] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    callbacksRef.current = { onNewPhoto, onPhotoDeleted }
-  }, [onNewPhoto, onPhotoDeleted])
+    callbacksRef.current = { onNewPhoto, onPhotoDeleted, onReconnect }
+  }, [onNewPhoto, onPhotoDeleted, onReconnect])
 
   useEffect(() => {
     if (!eventId) return
@@ -112,11 +114,32 @@ export function usePhotoSubscription({
 
     channelRef.current = channel
 
+    // -------------------------------------------------------------
+    // ELITE FEATURE: Stale-While-Revalidate Sync Recovery
+    // -------------------------------------------------------------
+    const handleReconnect = () => {
+      // If the user's browser comes back online or they switch tabs back,
+      // we immediately fetch any data they might have missed while disconnected.
+      if (callbacksRef.current.onReconnect) {
+        callbacksRef.current.onReconnect()
+      }
+    }
+
+    window.addEventListener('online', handleReconnect)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        handleReconnect()
+      }
+    })
+
     return () => {
+      window.removeEventListener('online', handleReconnect)
+      document.removeEventListener('visibilitychange', handleReconnect)
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
       }
     }
   }, [eventId])
+  
   return { isConnected, isReconnecting }
 }

@@ -22,8 +22,8 @@ Room (trip) → Event (day/theme) → Photos & Videos
 
 | Feature | Status |
 |---------|--------|
-| Real-time gallery with masonry grid | ✅ |
-| Offline upload queue (IndexedDB) | ✅ |
+| Real-time virtualized gallery with timeline-grouping | ✅ |
+| Offline-first React Query state & robust upload queue (IndexedDB) | ✅ |
 | Chunked + TUS resumable uploads | ✅ |
 | E2E encrypted vault rooms | ✅ |
 | Collaborative moodboard (tldraw + Yjs) | ✅ |
@@ -77,6 +77,8 @@ Run in Supabase SQL Editor (in order):
 2. `FIX_EVENT_ACCESS_AND_PROFILES.sql`
 3. `CANVAS_STATES_MIGRATION.sql`
 4. `FIX_CANVAS_RLS.sql` — **required** for canvas security
+5. `exif_migration.sql` — adds EXIF metadata columns
+6. `ADD_ROOM_PERMISSIONS.sql` — adds permissions to rooms
 
 ---
 
